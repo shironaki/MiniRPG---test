@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Mini RPG 7.0</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+</head>
+
+
+<body>
+
+<div id="game">
+
+    <header>
+
+        <h1>⚔️ MINI RPG 7.0</h1>
+
+        <p>The Lost Kingdom</p>
+
+    </header>
+
+
+    <!-- PLAYER -->
+
+    <section id="playerPanel">
+
+        <div id="playerName">
+            👤 Герой
+        </div>
+
+        <div class="bar">
+
+            <div
+                id="healthBar"
+                class="health"
+            ></div>
+
+        </div>
+
+        <div id="healthText">
+            ❤️ 100 / 100
+        </div>
+
+        <div id="quickStats">
+            ⭐ Lv.1 | 💰 100
+        </div>
+
+    </section>
+
+
+    <!-- CONTENT -->
+
+    <main id="gameContent">
+
+
+        <!-- MENU -->
+
+        <section
+            id="menuScreen"
+            class="screen"
+        >
+
+            <h2>🏰 THE LOST KINGDOM</h2>
+
+            <p>
+                Тебя ждёт опасное приключение.
+            </p>
+
+            <button id="newGameButton">
+                🎮 Новая игра
+            </button>
+
+            <button id="helpButton">
+                📖 Как играть
+            </button>
+
+        </section>
+
+
+        <!-- VILLAGE -->
+
+        <section
+            id="villageScreen"
+            class="screen hidden"
+        >
+
+            <h2>🏘️ ДЕРЕВНЯ</h2>
+
+            <p>
+                Здесь ты можешь подготовиться
+                к путешествию.
+            </p>
+
+            <div class="menuGrid">
+
+                <button id="npcButton">
+                    🧑 Староста
+                </button>
+
+                <button id="shopButton">
+                    🛒 Магазин
+                </button>
+
+                <button id="questButton">
+                    📜 Квесты
+                </button>
+
+                <button id="inventoryButton">
+                    🎒 Инвентарь
+                </button>
+
+                <button id="worldButton">
+                    🗺️ Выйти в мир
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- WORLD -->
+
+        <section
+            id="worldScreen"
+            class="screen hidden"
+        >
+
+            <h2>🗺️ МИР</h2>
+
+            <div id="worldDescription"></div>
+            <div id="miniMap">
+
+    <div class="mapRow">
+
+        <div class="mapRoom">
+            🏰
+            <small>Комната 2</small>
+        </div>
+
+    </div>
+
+
+    <div class="mapRow">
+
+        <div class="mapRoom">
+            🏚️
+            <small>Комната 1</small>
+        </div>
+
+
+        <div
+            id="mapStart"
+            class="mapRoom current"
+        >
+            🏕️
+            <small>Старт</small>
+        </div>
+
+
+        <div class="mapRoom">
+            🌲
+            <small>Лес</small>
+        </div>
+
+    </div>
+
+
+    <div class="mapRow">
+
+        <div></div>
+
+        <div></div>
+
+        <div class="mapRoom">
+            💎
+            <small>Сокровище</small>
+        </div>
+
+    </div>
+
+            </div>
+
+
+            <div class="movement">
+
+    <button
+        class="moveButton up"
+        data-direction="north"
+    >
+        ▲
+        <span>Север</span>
+    </button>
+
+
+    <div class="middleMoves">
+
+        <button
+            class="moveButton"
+            data-direction="west"
+        >
+            ◀
+            <span>Запад</span>
+        </button>
+
+
+        <button
+            class="moveButton"
+            data-direction="east"
+        >
+            ▶
+            <span>Восток</span>
+        </button>
+
+    </div>
+
+
+    <button
+        class="moveButton down"
+        data-direction="south"
+    >
+        ▼
+        <span>Юг</span>
+    </button>
+
+            </div>
+
+            <button id="returnVillageButton">
+                🏘️ Вернуться в деревню
+            </button>
+
+        </section>
+
+
+        <!-- LOCATION -->
+
+        <section
+            id="locationScreen"
+            class="screen hidden"
+        >
+
+            <h2 id="locationName">
+                🌲 Локация
+            </h2>
+
+            <p id="locationDescription"></p>
+
+            <div id="locationActions"></div>
+
+            <button id="locationBackButton">
+                🗺️ Назад к карте
+            </button>
+
+        </section>
+
+
+        <!-- BATTLE -->
+
+        <section
+            id="battleScreen"
+            class="screen hidden"
+        >
+
+            <h2>⚔️ БОЙ</h2>
+
+            <div id="enemyInfo"></div>
+
+            <div id="battleLog"></div>
+
+            <div class="menuGrid">
+
+                <button id="attackButton">
+                    ⚔️ Атаковать
+                </button>
+
+                <button id="healButton">
+                    🧪 Зелье
+                </button>
+
+                <button id="defendButton">
+                    🛡️ Защищаться
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- INVENTORY -->
+
+        <section
+            id="inventoryScreen"
+            class="screen hidden"
+        >
+
+            <h2>🎒 ИНВЕНТАРЬ</h2>
+
+            <div id="inventoryList"></div>
+
+            <button id="inventoryBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- SHOP -->
+
+        <section
+            id="shopScreen"
+            class="screen hidden"
+        >
+
+            <h2>🛒 МАГАЗИН</h2>
+
+            <div id="shopGold"></div>
+
+            <div id="shopItems"></div>
+
+            <button id="shopBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- NPC -->
+
+        <section
+            id="npcScreen"
+            class="screen hidden"
+        >
+
+            <h2>🧑 СТАРОСТА</h2>
+
+            <div id="npcDialogue"></div>
+
+            <button id="npcQuestButton">
+                📜 Получить квест
+            </button>
+
+            <button id="npcBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- QUESTS -->
+
+        <section
+            id="questScreen"
+            class="screen hidden"
+        >
+
+            <h2>📜 КВЕСТЫ</h2>
+
+            <div id="questList"></div>
+
+            <button id="questBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- END -->
+
+        <section
+            id="endScreen"
+            class="screen hidden"
+        >
+
+            <div id="endMessage"></div>
+
+            <button id="restartButton">
+                🆕 НАЧАТЬ ЗАНОВО
+            </button>
+
+        </section>
+
+    </main>
+
+
+    <!-- LOG -->
+
+    <section id="gameLog">
+
+        <h3>📜 Журнал</h3>
+
+        <div id="log"></div>
+
+    </section>
+
+</div>
+
+
+<script src="js/item.js"></script>
+<script src="js/player.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/enemy.js"></script>
+
+<script src="js/chest.js"></script>
+<script src="js/trap.js"></script>
+<script src="js/room.js"></script>
+
+<script src="js/shop.js"></script>
+<script src="js/npc.js"></script>
+<script src="js/quest.js"></script>
+<script src="js/world.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/save.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+
+
+</body>
+
+</html>
