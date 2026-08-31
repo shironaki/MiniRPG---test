@@ -504,6 +504,164 @@ function movePlayer(direction) {
     );
 }
 
+// =============================================
+// УНИВЕРСАЛЬНОЕ УПРАВЛЕНИЕ
+// PC / LAPTOP / ANDROID / iOS
+// =============================================
+
+const keyboardDirections = {
+    ArrowUp: "north",
+    ArrowDown: "south",
+    ArrowLeft: "west",
+    ArrowRight: "east",
+
+    w: "north",
+    W: "north",
+
+    s: "south",
+    S: "south",
+
+    a: "west",
+    A: "west",
+
+    d: "east",
+    D: "east"
+};
+
+
+// ---------------------------------------------
+// КЛАВИАТУРА
+// ---------------------------------------------
+
+document.addEventListener("keydown", event => {
+
+    // Не мешаем вводу текста
+    const tag = event.target.tagName;
+
+    if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT"
+    ) {
+        return;
+    }
+
+    const direction =
+        keyboardDirections[event.key];
+
+    if (!direction) {
+        return;
+    }
+
+    // Чтобы стрелки не прокручивали страницу
+    event.preventDefault();
+
+    // Не двигаем персонажа во время боя,
+    // в магазине, инвентаре и т.д.
+    const worldScreen =
+        document.getElementById("worldScreen");
+
+    if (
+        !worldScreen ||
+        worldScreen.classList.contains("hidden")
+    ) {
+        return;
+    }
+
+    movePlayer(direction);
+});
+
+
+// ---------------------------------------------
+// СВАЙПЫ НА ТЕЛЕФОНЕ / ПЛАНШЕТЕ
+// ---------------------------------------------
+
+let touchStartX = null;
+let touchStartY = null;
+
+const worldScreen =
+    document.getElementById("worldScreen");
+
+if (worldScreen) {
+
+    worldScreen.addEventListener(
+        "pointerdown",
+        event => {
+
+            if (
+                event.pointerType !== "touch"
+            ) {
+                return;
+            }
+
+            touchStartX =
+                event.clientX;
+
+            touchStartY =
+                event.clientY;
+        }
+    );
+
+
+    worldScreen.addEventListener(
+        "pointerup",
+        event => {
+
+            if (
+                event.pointerType !== "touch"
+            ) {
+                return;
+            }
+
+            if (
+                touchStartX === null ||
+                touchStartY === null
+            ) {
+                return;
+            }
+
+            const dx =
+                event.clientX -
+                touchStartX;
+
+            const dy =
+                event.clientY -
+                touchStartY;
+
+            touchStartX = null;
+            touchStartY = null;
+
+            const threshold = 35;
+
+            if (
+                Math.abs(dx) < threshold &&
+                Math.abs(dy) < threshold
+            ) {
+                return;
+            }
+
+            if (
+                Math.abs(dx) >
+                Math.abs(dy)
+            ) {
+
+                movePlayer(
+                    dx > 0
+                        ? "east"
+                        : "west"
+                );
+
+            } else {
+
+                movePlayer(
+                    dy > 0
+                        ? "south"
+                        : "north"
+                );
+            }
+        }
+    );
+}
 
 // =============================================
 // ЛОКАЦИЯ
