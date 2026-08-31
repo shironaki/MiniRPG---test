@@ -475,33 +475,22 @@ document
 
 function movePlayer(direction) {
 
-    const result =
-        game.world.move(
-            direction
-        );
-
+    const result = game.world.move(direction);
 
     if (!result.success) {
 
-        addLog(
-            result.message
-        );
+        addLog(result.message);
 
         return;
     }
 
-
     addLog(
-        `🗺️ Ты переместился: ${result.location.name}`
+        `🗺️ Ты переместился: ${result.room.name}`
     );
-
 
     renderLocation();
 
-
-    showScreen(
-        "locationScreen"
-    );
+    showScreen("locationScreen");
 }
 
 // =============================================
