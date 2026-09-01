@@ -90,6 +90,19 @@ class Battle {
         this.enemyTurn();
     }
 
+    playerFlee() {
+        if (this.finished) return;
+        const chance = Math.max(30, 65 - this.enemy.attack);
+        if (Math.random() * 100 < chance) {
+            this.finished = true;
+            this.log(`🏃 Ты скрылся от врага. Шанс был ${chance}%.`);
+            this.game.escapeBattle();
+            return;
+        }
+        this.log(`❌ Побег не удался (${chance}%). Враг перехватывает тебя!`);
+        this.enemyTurn();
+    }
+
 
     enemyTurn() {
 
@@ -104,9 +117,7 @@ class Battle {
             );
 
 
-        this.log(
-            `👹 ${this.enemy.name} нанёс ${damage} урона.`
-        );
+        this.log(`${this.enemy.emoji} ${this.enemy.name} нанёс ${damage} урона.`);
 
 
         this.game.updateUI();
@@ -147,6 +158,8 @@ class Battle {
         levelMessages.forEach(
             message => this.log(message)
         );
+
+        this.game.updateUI();
 
 
         this.game.enemyDefeated(

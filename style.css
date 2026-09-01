@@ -9,12 +9,7 @@ body {
 
     min-height: 100vh;
 
-    background:
-        linear-gradient(
-            135deg,
-            #080b12,
-            #151d2c
-        );
+    background: radial-gradient(circle at top, #253c61 0%, #111a2a 42%, #070a12 100%);
 
     color: #ffffff;
 
@@ -38,18 +33,15 @@ body {
 
     min-height: 95vh;
 
-    background: #111722;
+    background: rgba(17, 23, 34, 0.94);
 
-    border:
-        2px solid #303d55;
+    border: 1px solid #435675;
 
     border-radius: 20px;
 
     padding: 16px;
 
-    box-shadow:
-        0 20px 50px
-        rgba(0,0,0,0.6);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.58), inset 0 1px rgba(255,255,255,0.04);
 }
 
 
@@ -69,7 +61,8 @@ header h1 {
 
     color: #ffd166;
 
-    font-size: 28px;
+    font-size: clamp(25px, 6vw, 32px);
+    letter-spacing: 0.04em;
 }
 
 
@@ -85,7 +78,7 @@ header p {
 
 #playerPanel {
 
-    background: #1b2433;
+    background: linear-gradient(135deg, #1d2b41, #182131);
 
     border-radius: 14px;
 
@@ -207,7 +200,7 @@ button {
 
     border-radius: 12px;
 
-    background: #304565;
+    background: linear-gradient(145deg, #3d5d88, #29415f);
 
     color: white;
 
@@ -217,13 +210,14 @@ button {
 
     cursor: pointer;
 
-    transition: 0.15s;
+    box-shadow: 0 3px 0 #17263a;
+    transition: transform 0.15s, filter 0.15s, box-shadow 0.15s;
 }
 
 
 button:hover {
 
-    background: #405d88;
+    filter: brightness(1.15);
 
     transform:
         translateY(-1px);
@@ -233,7 +227,8 @@ button:hover {
 button:active {
 
     transform:
-        scale(0.98);
+        translateY(2px);
+    box-shadow: 0 1px 0 #17263a;
 }
 
 
@@ -371,6 +366,7 @@ h2 {
     margin-top: 8px;
 
     text-align: left;
+    border: 1px solid #31445f;
 }
 
 
@@ -385,6 +381,7 @@ h2 {
     padding: 12px;
 
     margin-top: 8px;
+    border: 1px solid #31445f;
 }
 
 
@@ -463,6 +460,10 @@ h2 {
         padding: 13px;
     }
 
+    #locationExits {
+        grid-template-columns: 1fr;
+    }
+
 }
 
 .locationEmpty {
@@ -478,6 +479,28 @@ h2 {
 
 #locationActions {
     margin-top: 15px;
+}
+
+#locationExits {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+}
+
+#locationExits::before {
+    content: "Доступные пути";
+    grid-column: 1 / -1;
+    color: #aebdd1;
+    font-size: 13px;
+}
+
+#locationExits .exitButton {
+    margin: 0;
+    padding: 10px 7px;
+    font-size: 12px;
+    background: linear-gradient(145deg, #365a62, #254148);
+    box-shadow: none;
 }
 
 
@@ -700,3 +723,36 @@ h2 {
         0 0 12px
         rgba(255, 209, 102, 0.4);
 }
+
+.worldMapGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+}
+
+.worldMapGrid .mapRoom {
+    width: auto;
+    height: 65px;
+    font-size: 18px;
+}
+
+.worldMapGrid .mapRoom span { display: block; font-size: 10px; line-height: 1.2; }
+
+.equipment { text-align: left; margin-bottom: 14px; }
+.equipment h3 { color: #c8d8ed; font-size: 15px; margin: 0 0 7px; }
+.equipmentGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.equipSlot { width: auto; min-height: 62px; margin: 0; padding: 8px; font-size: 12px; background: #334b68; box-shadow: none; }
+.equipSlot small { display: block; margin-top: 5px; color: #bdd2e9; font-weight: normal; }
+.equipSlot.empty { border: 1px dashed #42526a; border-radius: 10px; padding: 10px 6px; text-align: center; color: #8293a9; font-size: 12px; }
+.equipSlot.empty small { display: block; margin-top: 5px; }
+
+.mapRoom.cleared:not(.current) {
+    background: linear-gradient(145deg, #254338, #1b3029);
+    border-color: #5fa77e;
+}
+
+#worldDescription h3 { margin-bottom: 5px; color: #e5eefc; }
+#worldDescription p { margin-top: 0; color: #aebdd1; }
+#quickStats { font-size: 13px; line-height: 1.55; }
+#continueGameButton { background: linear-gradient(145deg, #4c714c, #31563c); }
+#locationActions button { background: linear-gradient(145deg, #617b3b, #435d26); }

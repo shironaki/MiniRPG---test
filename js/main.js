@@ -64,6 +64,14 @@ document
     );
 
 
+document
+    .getElementById("continueGameButton")
+    .addEventListener("click", () => {
+        if (!game.resume()) {
+            alert("💾 Сохранение ещё не найдено.");
+        }
+    });
+
 // =============================================
 // КАК ИГРАТЬ
 // =============================================
@@ -76,7 +84,7 @@ document
 
             alert(`
 
-MINI RPG 7.0
+MINI RPG 9.0
 
 🎮 Создай героя.
 
@@ -89,15 +97,23 @@ MINI RPG 7.0
 🗺️ В мире:
 - перемещайся по направлениям
 - исследуй комнаты
-- встречай врагов
+- в каждой комнате есть одна ценная находка или опасность
+- используй новые выходы, чтобы исследовать другие ветки
+- собери 3 руны, чтобы открыть сокровищницу
 
 ⚔️ В бою:
 - атакуй
 - лечись
 - защищайся
+- пытайся сбежать: неудача даёт врагу удар
 
-💥 Критический удар:
-10%
+⚠️ Ловушки:
+- обезвреживай их на удачу
+- успешные попытки повышают навык механика
+
+💥 Критический удар: 15%
+
+💾 Прогресс автоматически сохраняется в браузере.
 
 💀 Если HP станет 0 —
 игра закончится.
@@ -430,6 +446,15 @@ function renderWorld() {
     const location =
         game.world.getCurrentLocation();
 
+    const map = document.getElementById("miniMap");
+    map.className = "worldMapGrid";
+    map.innerHTML = Object.values(game.world.rooms).map(room => `
+        <div class="mapRoom" data-room="${room.id}" title="${room.name}">
+            <span>${room.name}</span>
+            <small>${room.id === "treasury" ? `Руны ${game.world.relics.length}/3` : room.cleared ? "Исследовано" : room.explored ? "Открыто" : "Неизведано"}</small>
+        </div>
+    `).join("");
+
 
     document
         .getElementById(
@@ -445,7 +470,22 @@ function renderWorld() {
                 ${location.description}
             </p>
 
+            <p>✨ Руны для сокровищницы: ${game.world.relics.length}/3</p>
+
         `;
+
+    document.querySelectorAll("[data-room]").forEach(mapRoom => {
+        const room = game.world.rooms[mapRoom.dataset.room];
+        mapRoom.classList.toggle("current", mapRoom.dataset.room === game.world.currentLocation);
+        mapRoom.classList.toggle("cleared", Boolean(room.cleared));
+    });
+}
+
+function inventoryUnequip(slot) {
+    const result = game.player.unequip(slot);
+    addLog(result.message);
+    showInventory();
+    game.updateUI();
 }
 
 
@@ -683,6 +723,13 @@ function renderLocation() {
             "locationActions"
         );
 
+    const exits = document.getElementById("locationExits");
+    const directions = { north: "↑ Север", south: "↓ Юг", east: "→ Восток", west: "← Запад" };
+    exits.innerHTML = Object.entries(game.world.connections[room.id])
+        .filter(([, destination]) => destination)
+        .map(([direction, destination]) => `<button class="exitButton" onclick="movePlayer('${direction}')">${directions[direction]} · ${game.world.rooms[destination].name}</button>`)
+        .join("");
+
 
     actions.innerHTML = "";
 
@@ -762,8 +809,14 @@ function renderLocation() {
     if (
         room.event === "trap" &&
         room.trap &&
-        !room.trap.triggered
+        !room.trap.triggered &&
+        !room.trap.disarmed
     ) {
+
+        const disarmButton = document.createElement("button");
+        disarmButton.textContent = `🧰 Обезвредить (${room.trap.chance(game.player)}%)`;
+        disarmButton.onclick = disarmTrap;
+        actions.appendChild(disarmButton);
 
         const trapButton =
             document.createElement(
@@ -772,7 +825,7 @@ function renderLocation() {
 
 
         trapButton.textContent =
-            "⚠️ Осмотреть ловушку";
+            "⚠️ Рискнуть и пройти";
 
 
         trapButton.onclick =
@@ -817,6 +870,31 @@ function renderLocation() {
         );
 
 
+        return;
+    }
+
+    if (room.event === "bossLocked") {
+        actions.innerHTML = `<div class="locationEmpty">🔒 Руны: ${game.world.relics.length}/3</div>`;
+        const sealButton = document.createElement("button");
+        sealButton.textContent = "✨ Проверить печать снова";
+        sealButton.onclick = exploreRoom;
+        actions.appendChild(sealButton);
+        return;
+    }
+
+    if (room.event === "relic") {
+        const relicButton = document.createElement("button");
+        relicButton.textContent = "✨ Забрать руну";
+        relicButton.onclick = claimRelic;
+        actions.appendChild(relicButton);
+        return;
+    }
+
+    if (room.event === "rest") {
+        const restButton = document.createElement("button");
+        restButton.textContent = "🔥 Отдохнуть у огня";
+        restButton.onclick = restAtCamp;
+        actions.appendChild(restButton);
         return;
     }
 
@@ -876,15 +954,7 @@ function renderLocation() {
     ========================================
     */
 
-    actions.innerHTML = `
-
-        <div class="locationEmpty">
-
-            ✅ Комната исследована.
-
-        </div>
-
-    `;
+    actions.innerHTML = `<div class="locationEmpty">✅ Комната исследована. Все находки собраны — время выбрать новый путь.</div>`;
 }
 
 function exploreRoom() {
@@ -943,6 +1013,16 @@ function exploreRoom() {
             renderLocation();
 
             return;
+
+        case "locked":
+
+        case "relic":
+
+        case "rest":
+
+            renderLocation();
+
+            return;
     }
 
 
@@ -972,9 +1052,7 @@ function startRandomEnemy() {
 
 
     const enemy =
-        createEnemy(
-            enemyType
-        );
+        createEnemy(enemyType, game.player.level);
 
 
     addLog(
@@ -1050,12 +1128,41 @@ function activateTrap() {
     renderLocation();
 }
 
+function disarmTrap() {
+    const room = game.world.getCurrentRoom();
+    const result = room.trap.disarm(game.player);
+    addLog(result.message);
+    room.cleared = true;
+    game.updateUI();
+    if (game.player.isDead()) {
+        game.gameOver();
+        return;
+    }
+    renderLocation();
+}
+
+function claimRelic() {
+    const relic = game.world.collectRelic();
+    if (relic) addLog(`✨ Получена ${relic}. Печать Стража ослабла: ${game.world.relics.length}/3.`);
+    game.updateUI();
+    renderLocation();
+}
+
+function restAtCamp() {
+    const healed = Math.min(25, game.player.maxHealth - game.player.health);
+    game.player.health += healed;
+    const room = game.world.getCurrentRoom();
+    room.cleared = true;
+    room.event = "cleared";
+    addLog(`🔥 Привал восстановил ${healed} HP. Ты снова настороже.`);
+    game.updateUI();
+    renderLocation();
+}
+
 function startBossBattle() {
 
     const enemy =
-        createEnemy(
-            "boss"
-        );
+        createEnemy("boss", game.player.level);
 
 
     addLog(
@@ -1108,7 +1215,9 @@ document
 
             game.battle.playerAttack();
 
-            game.showEnemy();
+            if (game.battle) {
+                game.showEnemy();
+            }
 
             game.updateUI();
         }
@@ -1153,6 +1262,15 @@ document
             game.showEnemy();
         }
     );
+
+document
+    .getElementById("fleeButton")
+    .addEventListener("click", () => {
+        if (!game.battle) return;
+        game.battle.playerFlee();
+        if (game.battle) game.showEnemy();
+        game.updateUI();
+    });
 
 
 // =============================================

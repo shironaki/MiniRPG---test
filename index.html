@@ -10,7 +10,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Mini RPG 7.0</title>
+    <title>Mini RPG 9.0</title>
 
     <link
         rel="stylesheet"
@@ -26,7 +26,7 @@
 
     <header>
 
-        <h1>⚔️ MINI RPG 7.0</h1>
+        <h1>⚔️ MINI RPG 9.0</h1>
 
         <p>The Lost Kingdom</p>
 
@@ -81,6 +81,10 @@
 
             <button id="newGameButton">
                 🎮 Новая игра
+            </button>
+
+            <button id="continueGameButton">
+                💾 Продолжить приключение
             </button>
 
             <button id="helpButton">
@@ -145,7 +149,7 @@
 
     <div class="mapRow">
 
-        <div class="mapRoom">
+        <div class="mapRoom" data-room="room2">
             🏰
             <small>Комната 2</small>
         </div>
@@ -155,22 +159,22 @@
 
     <div class="mapRow">
 
-        <div class="mapRoom">
+        <div class="mapRoom" data-room="room1">
             🏚️
             <small>Комната 1</small>
         </div>
 
 
         <div
-            id="mapStart"
-            class="mapRoom current"
+            class="mapRoom"
+            data-room="start"
         >
             🏕️
             <small>Старт</small>
         </div>
 
 
-        <div class="mapRoom">
+        <div class="mapRoom" data-room="room3">
             🌲
             <small>Лес</small>
         </div>
@@ -184,7 +188,7 @@
 
         <div></div>
 
-        <div class="mapRoom">
+        <div class="mapRoom" data-room="room4">
             💎
             <small>Сокровище</small>
         </div>
@@ -259,6 +263,8 @@
 
             <div id="locationActions"></div>
 
+            <div id="locationExits"></div>
+
             <button id="locationBackButton">
                 🗺️ Назад к карте
             </button>
@@ -291,6 +297,10 @@
 
                 <button id="defendButton">
                     🛡️ Защищаться
+                </button>
+
+                <button id="fleeButton">
+                    🏃 Попытаться сбежать
                 </button>
 
             </div>

@@ -17,15 +17,15 @@ class Game {
         this.battle = null;
 
         this.gameEnded = false;
+
+        this.saveSystem = new SaveSystem();
     }
 
 
     start() {
 
         const name =
-            prompt(
-                "Введите имя героя:"
-            );
+            prompt("Введите имя героя:");
 
 
         if (!name) {
@@ -67,9 +67,7 @@ class Game {
         this.gameEnded = false;
 
 
-        addLog(
-            `🎮 Добро пожаловать, ${name}!`
-        );
+        addLog(`🎮 Добро пожаловать, ${this.player.name}! В рюкзаке уже есть два зелья.`);
 
 
         showScreen(
@@ -78,6 +76,31 @@ class Game {
 
 
         this.updateUI();
+    }
+
+    resume() {
+        const data = this.saveSystem.load();
+        if (!data?.player || !data?.world) return false;
+
+        this.player = Object.assign(Object.create(Player.prototype), data.player);
+        this.player.inventory.forEach(item => Object.setPrototypeOf(item, Item.prototype));
+        Object.values(this.player.equipment).filter(Boolean).forEach(item => Object.setPrototypeOf(item, Item.prototype));
+        this.world = Object.assign(Object.create(World.prototype), data.world);
+        Object.values(this.world.rooms).forEach(room => {
+            Object.setPrototypeOf(room, Room.prototype);
+            if (room.chest) Object.setPrototypeOf(room.chest, Chest.prototype);
+            if (room.trap) Object.setPrototypeOf(room.trap, Trap.prototype);
+        });
+        this.quest = Object.assign(Object.create(Quest.prototype), data.quest || new Quest());
+        this.inventory = new Inventory(this.player);
+        this.shop = new Shop(this.player);
+        this.npc = new NPC("Староста");
+        this.battle = null;
+        this.gameEnded = false;
+        addLog(`💾 Приключение ${this.player.name} продолжено.`);
+        showScreen("villageScreen");
+        this.updateUI();
+        return true;
     }
 
 
@@ -116,7 +139,9 @@ class Game {
         document
             .getElementById("quickStats")
             .textContent =
-                `⭐ Lv.${this.player.level} | ⚔️ ${this.player.attack} | 🛡️ ${this.player.defense} | 💰 ${this.player.gold}`;
+                `⭐ ${this.player.level} ур. · ✨ ${this.player.experience}/${this.player.experienceToNextLevel} · ⚔️ ${this.player.attack} · 🛡️ ${this.player.defense} · 🧰 ${this.player.trapSkill} · 💰 ${this.player.gold}`;
+
+        if (!this.gameEnded) this.saveSystem.save(this);
     }
 
 
@@ -166,7 +191,7 @@ class Game {
             .innerHTML = `
 
                 <div class="enemyName">
-                    👹 ${enemy.name}
+                    ${enemy.emoji} ${enemy.name}
                 </div>
 
                 <div class="bar">
@@ -282,9 +307,19 @@ class Game {
     }, 500);
 }
 
+    escapeBattle() {
+        this.battle = null;
+        this.updateUI();
+        setTimeout(() => {
+            showScreen("locationScreen");
+            renderLocation();
+        }, 450);
+    }
+
     gameOver() {
 
         this.gameEnded = true;
+        this.saveSystem.clear();
 
         showScreen(
             "endScreen"
@@ -313,6 +348,7 @@ class Game {
     victory() {
 
         this.gameEnded = true;
+        this.saveSystem.clear();
 
         showScreen(
             "endScreen"

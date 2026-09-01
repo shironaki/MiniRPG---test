@@ -14,7 +14,7 @@ class SaveSystem {
 
 
         localStorage.setItem(
-            "miniRPG7",
+            "miniRPG9",
             JSON.stringify(data)
         );
     }
@@ -23,7 +23,15 @@ class SaveSystem {
     clear() {
 
         localStorage.removeItem(
-            "miniRPG7"
+            "miniRPG9"
         );
+    }
+
+    load() {
+        try {
+            return JSON.parse(localStorage.getItem("miniRPG9"));
+        } catch {
+            return null;
+        }
     }
 }

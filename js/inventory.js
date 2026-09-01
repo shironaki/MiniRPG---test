@@ -60,17 +60,24 @@ class Inventory {
             this.player.inventory;
 
 
-        if (items.length === 0) {
+        const equipment = Object.entries(this.player.equipment)
+            .map(([slot, item]) => item
+                ? `<button class="equipSlot" onclick="inventoryUnequip('${slot}')">${item.emoji || "⚔️"} ${item.name}<small>Снять</small></button>`
+                : `<div class="equipSlot empty">${slot === "weapon" ? "⚔️ Оружие" : slot === "armor" ? "🧥 Броня" : "🛡️ Щит"}<small>пусто</small></div>`)
+            .join("");
 
-            return `
+        const equipmentBlock = `<div class="equipment"><h3>Экипировка</h3><div class="equipmentGrid">${equipment}</div></div>`;
+
+        if (items.length === 0) {
+            return equipmentBlock + `
                 <div class="inventoryItem">
-                    🎒 Инвентарь пуст.
+                    🎒 Рюкзак пуст.
                 </div>
             `;
         }
 
 
-        return items.map(
+        return equipmentBlock + items.map(
 
             (item, index) => {
 
@@ -103,7 +110,7 @@ class Inventory {
                     <div class="inventoryItem">
 
                         <strong>
-                            ${index + 1}. ${item.name}
+                            ${index + 1}. ${item.emoji || "📦"} ${item.name}
                         </strong>
 
                         <p>
