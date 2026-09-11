@@ -13,4 +13,9 @@ class Trap {
         const actualDamage = player.takeDamage(damage);
         return { success: false, message: `${failedDisarm ? "💥 Механизм сорвался" : "⚠️ ЛОВУШКА"}! Ты получил ${actualDamage} урона.` };
     }
+    toJSON() { return { triggered: this.triggered, disarmed: this.disarmed }; }
+    static fromJSON(data) {
+        const trap = Object.assign(Object.create(Trap.prototype), data);
+        return trap;
+    }
 }

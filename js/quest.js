@@ -23,6 +23,20 @@ class Quest {
         this.rewardXP = 50;
     }
 
+    toJSON() {
+        return {
+            title: this.title, description: this.description,
+            required: this.required, progress: this.progress,
+            active: this.active, completed: this.completed,
+            rewardClaimed: this.rewardClaimed,
+            rewardGold: this.rewardGold, rewardXP: this.rewardXP
+        };
+    }
+    static fromJSON(data) {
+        const quest = Object.assign(Object.create(Quest.prototype), data);
+        return quest;
+    }
+
 
     start() {
 

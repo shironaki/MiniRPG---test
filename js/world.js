@@ -41,4 +41,24 @@ class World {
         const [type, message] = results[room.event] || results.nothing; if (type === "chest") room.chest = new Chest(); if (type === "trap") room.trap = new Trap(); if (type === "nothing") room.cleared = true; return { type, message };
     }
     collectRelic() { const room = this.getCurrentRoom(); if (!this.relicRooms[room.id] || this.relics.includes(room.id)) return null; this.relics.push(room.id); room.cleared = true; room.event = "cleared"; return this.relicRooms[room.id]; }
+    toJSON() {
+        const roomsJSON = {};
+        for (const key of Object.keys(this.rooms)) {
+            roomsJSON[key] = this.rooms[key].toJSON();
+        }
+        return {
+            currentLocation: this.currentLocation, relics: this.relics,
+            rooms: roomsJSON, connections: this.connections,
+            relicRooms: this.relicRooms, treasureFound: this.treasureFound
+        };
+    }
+    static fromJSON(data) {
+        const world = Object.assign(Object.create(World.prototype), data);
+        const rooms = {};
+        for (const key of Object.keys(data.rooms)) {
+            rooms[key] = Room.fromJSON(data.rooms[key]);
+        }
+        world.rooms = rooms;
+        return world;
+    }
 }

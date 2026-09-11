@@ -5,6 +5,11 @@ class Chest {
         this.opened = false;
     }
 
+    toJSON() { return { opened: this.opened }; }
+    static fromJSON(data) {
+        const chest = Object.assign(Object.create(Chest.prototype), data);
+        return chest;
+    }
 
     open(player) {
 

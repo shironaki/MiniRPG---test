@@ -4,11 +4,11 @@ class SaveSystem {
 
         const data = {
 
-            player: game.player,
+            player: game.player.toJSON(),
 
-            world: game.world,
+            world: game.world.toJSON(),
 
-            quest: game.quest
+            quest: game.quest.toJSON()
 
         };
 
@@ -27,9 +27,12 @@ class SaveSystem {
         );
     }
 
+
     load() {
         try {
-            return JSON.parse(localStorage.getItem("miniRPG9"));
+            const raw = localStorage.getItem("miniRPG9");
+            if (!raw) return null;
+            return JSON.parse(raw);
         } catch {
             return null;
         }

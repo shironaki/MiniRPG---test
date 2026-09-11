@@ -82,16 +82,9 @@ class Game {
         const data = this.saveSystem.load();
         if (!data?.player || !data?.world) return false;
 
-        this.player = Object.assign(Object.create(Player.prototype), data.player);
-        this.player.inventory.forEach(item => Object.setPrototypeOf(item, Item.prototype));
-        Object.values(this.player.equipment).filter(Boolean).forEach(item => Object.setPrototypeOf(item, Item.prototype));
-        this.world = Object.assign(Object.create(World.prototype), data.world);
-        Object.values(this.world.rooms).forEach(room => {
-            Object.setPrototypeOf(room, Room.prototype);
-            if (room.chest) Object.setPrototypeOf(room.chest, Chest.prototype);
-            if (room.trap) Object.setPrototypeOf(room.trap, Trap.prototype);
-        });
-        this.quest = Object.assign(Object.create(Quest.prototype), data.quest || new Quest());
+        this.player = Player.fromJSON(data.player);
+        this.world = World.fromJSON(data.world);
+        this.quest = Quest.fromJSON(data.quest || {});
         this.inventory = new Inventory(this.player);
         this.shop = new Shop(this.player);
         this.npc = new NPC("Староста");
