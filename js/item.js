@@ -5,6 +5,19 @@ class Item {
     }
     isEquipment() { return ["weapon", "armor", "shield"].includes(this.type); }
     clone() { return new Item(this.name, this.type, this.price, this.description, this.attackBonus, this.defenseBonus, this.healAmount, this.emoji); }
+    toJSON() {
+        return {
+            name: this.name, type: this.type, price: this.price, description: this.description,
+            attackBonus: this.attackBonus, defenseBonus: this.defenseBonus,
+            healAmount: this.healAmount, emoji: this.emoji
+        };
+    }
+    static fromJSON(data) {
+        const item = new Item(data.name, data.type, data.price, data.description,
+            data.attackBonus, data.defenseBonus, data.healAmount, data.emoji);
+        Object.setPrototypeOf(item, Item.prototype);
+        return item;
+    }
 }
 
 const ITEMS = {
@@ -14,3 +27,8 @@ const ITEMS = {
     armor: new Item("Кожаная броня", "armor", 120, "Прочная и лёгкая защита.", 0, 10, 0, "🧥"),
     potion: new Item("Зелье здоровья", "potion", 20, "Восстанавливает 35 HP.", 0, 0, 35, "🧪")
 };
+
+const ITEM_KEY_BY_NAME = {};
+for (const key of Object.keys(ITEMS)) {
+    ITEM_KEY_BY_NAME[ITEMS[key].name] = key;
+}

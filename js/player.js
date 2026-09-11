@@ -15,4 +15,30 @@ class Player {
     unequip(slot) { const item = this.equipment[slot]; if (!item) return { success: false, message: "❌ Этот слот уже пуст." }; this.equipment[slot] = null; this.inventory.push(item); this.updateStats(); return { success: true, message: `📦 ${item.name} снят и возвращён в рюкзак.` }; }
     addExperience(amount) { this.experience += amount; const messages = []; while (this.experience >= this.experienceToNextLevel) { this.experience -= this.experienceToNextLevel; this.level++; this.maxHealth += 20; this.health = this.maxHealth; this.baseAttack += 4; this.baseDefense += 2; this.experienceToNextLevel = Math.floor(this.experienceToNextLevel * 1.3); this.updateStats(); messages.push(`🌟 Новый уровень: ${this.level}! Здоровье полностью восстановлено.`); } return messages; }
     isDead() { return this.health <= 0; }
+    toJSON() {
+        return {
+            name: this.name, level: this.level, experience: this.experience,
+            experienceToNextLevel: this.experienceToNextLevel,
+            maxHealth: this.maxHealth, health: this.health,
+            baseAttack: this.baseAttack, baseDefense: this.baseDefense,
+            attack: this.attack, defense: this.defense, gold: this.gold,
+            inventory: this.inventory.map(i => i.toJSON()),
+            equipment: {
+                weapon: this.equipment.weapon ? this.equipment.weapon.toJSON() : null,
+                armor: this.equipment.armor ? this.equipment.armor.toJSON() : null,
+                shield: this.equipment.shield ? this.equipment.shield.toJSON() : null
+            },
+            isDefending: this.isDefending, trapSkill: this.trapSkill
+        };
+    }
+    static fromJSON(data) {
+        const player = Object.assign(Object.create(Player.prototype), data);
+        player.inventory = data.inventory.map(d => Item.fromJSON(d));
+        player.equipment = {
+            weapon: data.equipment.weapon ? Item.fromJSON(data.equipment.weapon) : null,
+            armor: data.equipment.armor ? Item.fromJSON(data.equipment.armor) : null,
+            shield: data.equipment.shield ? Item.fromJSON(data.equipment.shield) : null
+        };
+        return player;
+    }
 }
