@@ -43,6 +43,15 @@ describe("Player", () => {
         expect(new g.Player("x".repeat(40)).name.length).toBe(18);
     });
 
+    it("strips HTML-injection characters from the name", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player('<img src=x onerror=alert(1)>');
+        expect(p.name.includes("<")).toBe(false);
+        expect(p.name.includes(">")).toBe(false);
+        expect(new g.Player("<>&\"").name).toBe("Герой");
+        expect(new g.Player(null).name).toBe("Герой");
+    });
+
     it("equip updates stats and swaps previous item back to inventory", () => {
         const { exports: g } = loadGame();
         const p = new g.Player("A");

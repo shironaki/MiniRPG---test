@@ -1,6 +1,6 @@
 class Player {
     constructor(name) {
-        this.name = name.trim().slice(0, 18) || "Герой"; this.level = 1; this.experience = 0; this.experienceToNextLevel = 100;
+        this.name = (typeof name === "string" ? name : "").replace(/[<>&"]/g, "").trim().slice(0, 18) || "Герой"; this.level = 1; this.experience = 0; this.experienceToNextLevel = 100;
         this.maxHealth = 100; this.health = 100; this.baseAttack = 15; this.baseDefense = 5; this.attack = 15; this.defense = 5; this.gold = 100;
         this.inventory = [ITEMS.potion.clone(), ITEMS.potion.clone()]; this.equipment = { weapon: null, armor: null, shield: null }; this.isDefending = false; this.trapSkill = 0;
     }

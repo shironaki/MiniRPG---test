@@ -64,13 +64,26 @@ document
     );
 
 
-document
-    .getElementById("continueGameButton")
-    .addEventListener("click", () => {
-        if (!game.resume()) {
-            alert("💾 Сохранение ещё не найдено.");
-        }
-    });
+const continueButton =
+    document.getElementById("continueGameButton");
+
+continueButton.addEventListener("click", () => {
+    if (!game.resume()) {
+        alert("💾 Сохранение ещё не найдено.");
+        refreshContinueButton();
+    }
+});
+
+// Reflect save availability so players aren't offered a dead "Continue".
+function refreshContinueButton() {
+    const hasSave = Boolean(game.saveSystem.load()?.player);
+    continueButton.disabled = !hasSave;
+    continueButton.title = hasSave
+        ? "Продолжить сохранённое приключение"
+        : "Сохранение ещё не найдено";
+}
+
+refreshContinueButton();
 
 // =============================================
 // КАК ИГРАТЬ
