@@ -7,6 +7,9 @@ class Battle {
         this.enemy = enemy;
 
         this.finished = false;
+
+        // A defensive stance must never carry over from a previous fight.
+        this.player.isDefending = false;
     }
 
 

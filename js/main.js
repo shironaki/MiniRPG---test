@@ -898,6 +898,15 @@ function renderLocation() {
         return;
     }
 
+    // Enemy still lurking here (e.g. after a successful flee): let the player re-engage.
+    if (room.event === "enemy" && !room.cleared) {
+        const fightButton = document.createElement("button");
+        fightButton.textContent = "⚔️ Враг всё ещё здесь — атаковать";
+        fightButton.onclick = startRandomEnemy;
+        actions.appendChild(fightButton);
+        return;
+    }
+
      /*
     ========================================
     СОКРОВИЩЕ

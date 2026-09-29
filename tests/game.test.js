@@ -353,4 +353,91 @@ describe("SaveSystem + Game.resume", () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Battle
+// ---------------------------------------------------------------------------
+function makeBattleGame(g, player) {
+    return {
+        player,
+        calls: { updateUI: 0, enemyDefeated: 0, gameOver: 0, escapeBattle: 0 },
+        updateUI() { this.calls.updateUI++; },
+        enemyDefeated() { this.calls.enemyDefeated++; },
+        gameOver() { this.calls.gameOver++; },
+        escapeBattle() { this.calls.escapeBattle++; }
+    };
+}
+
+describe("Battle", () => {
+    it("resets a stale defending stance on start", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        p.isDefending = true;
+        const game = makeBattleGame(g, p);
+        new g.Battle(game, g.createEnemy("goblin", 1));
+        expect(p.isDefending).toBe(false);
+    });
+
+    it("winning grants gold + xp and notifies the game", () => {
+        const { exports: g } = loadGame({ random: () => 0 }); // no crit, min rolls
+        const p = new g.Player("A");
+        p.baseAttack = 100000;
+        p.updateStats();
+        const game = makeBattleGame(g, p);
+        const enemy = g.createEnemy("goblin", 1);
+        const goldBefore = p.gold;
+        const battle = new g.Battle(game, enemy);
+        battle.playerAttack();
+        expect(battle.finished).toBe(true);
+        expect(p.gold).toBe(goldBefore + enemy.gold);
+        expect(game.calls.enemyDefeated).toBe(1);
+    });
+
+    it("losing triggers game over", () => {
+        const { exports: g } = loadGame({ random: () => 0 });
+        const p = new g.Player("A");
+        p.health = 1;
+        const game = makeBattleGame(g, p);
+        const enemy = g.createEnemy("boss", 5); // hits hard enough to kill
+        const battle = new g.Battle(game, enemy);
+        battle.enemyTurn();
+        expect(p.isDead()).toBe(true);
+        expect(game.calls.gameOver).toBe(1);
+    });
+
+    it("successful flee ends the fight and escapes", () => {
+        const { exports: g } = loadGame({ random: () => 0 }); // 0 < chance -> success
+        const p = new g.Player("A");
+        const game = makeBattleGame(g, p);
+        const battle = new g.Battle(game, g.createEnemy("goblin", 1));
+        battle.playerFlee();
+        expect(battle.finished).toBe(true);
+        expect(game.calls.escapeBattle).toBe(1);
+    });
+
+    it("failed flee keeps fighting and lets the enemy strike", () => {
+        const { exports: g } = loadGame({ random: () => 0.999 }); // never below chance
+        const p = new g.Player("A");
+        const hpBefore = p.health;
+        const game = makeBattleGame(g, p);
+        const battle = new g.Battle(game, g.createEnemy("goblin", 1));
+        battle.playerFlee();
+        expect(battle.finished).toBe(false);
+        expect(p.health).toBeLessThanOrEqual(hpBefore - 1);
+    });
+
+    it("no-ops once the battle is finished", () => {
+        const { exports: g } = loadGame({ random: () => 0.5 });
+        const p = new g.Player("A");
+        const game = makeBattleGame(g, p);
+        const battle = new g.Battle(game, g.createEnemy("goblin", 1));
+        battle.finished = true;
+        const hpBefore = p.health;
+        battle.playerAttack();
+        battle.playerDefend();
+        battle.playerFlee();
+        expect(p.health).toBe(hpBefore);
+        expect(game.calls.enemyDefeated).toBe(0);
+    });
+});
+
 run();
