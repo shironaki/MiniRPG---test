@@ -17,11 +17,11 @@ class World {
         };
         this.connections = {
             start: { north: "ancientHall", south: "camp", east: "darkForest", west: "abandonedWing" },
-            abandonedWing: { north: "catacomb", south: null, east: "start", west: "forge" }, forge: { north: null, south: "camp", east: "abandonedWing", west: null },
+            abandonedWing: { north: "catacomb", south: null, east: "start", west: "forge" }, forge: { north: null, south: null, east: "abandonedWing", west: null },
             catacomb: { north: null, south: "abandonedWing", east: "ancientHall", west: null }, ancientHall: { north: "archive", south: "start", east: "shrine", west: "catacomb" },
             archive: { north: null, south: "ancientHall", east: null, west: null }, shrine: { north: null, south: "darkForest", east: null, west: "ancientHall" },
             darkForest: { north: "shrine", south: "ruins", east: "marsh", west: "start" }, ruins: { north: "darkForest", south: null, east: "treasury", west: "camp" },
-            camp: { north: "start", south: null, east: "ruins", west: "forge" }, marsh: { north: null, south: "treasury", east: null, west: "darkForest" },
+            camp: { north: "start", south: null, east: "ruins", west: null }, marsh: { north: null, south: "treasury", east: null, west: "darkForest" },
             treasury: { north: "marsh", south: null, east: null, west: "ruins" }
         };
         this.relicRooms = { archive: "Руна прилива", shrine: "Руна пламени", catacomb: "Руна праха" }; this.treasureFound = false;
