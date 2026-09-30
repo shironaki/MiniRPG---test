@@ -53,11 +53,18 @@ const GAME_DATA = {
         hero: "assets/sprites/hero.png",
         battleBg: "assets/bg/battle.png",
         enemies: {
-            goblin: "assets/sprites/goblin.png"
+            goblin: "assets/sprites/goblin.png",
+            wolf: "assets/sprites/wolf.png",
+            skeleton: "assets/sprites/skeleton.png",
+            tideWraith: "assets/sprites/tideWraith.png",
+            flameWarden: "assets/sprites/flameWarden.png",
+            boneColossus: "assets/sprites/boneColossus.png",
+            boss: "assets/sprites/boss.png"
         },
         allies: {
             warrior: "assets/sprites/warrior.png",
-            healer: "assets/sprites/healer.png"
+            healer: "assets/sprites/healer.png",
+            scout: "assets/sprites/scout.png"
         }
     }
 };

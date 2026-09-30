@@ -37,8 +37,20 @@ describe("Battle rendering", () => {
         const game = new g.Game();
         expect(game.spriteFor("hero")).toBe(g.GAME_DATA.sprites.hero);
         expect(game.spriteFor("enemy", "goblin")).toBe(g.GAME_DATA.sprites.enemies.goblin);
-        expect(game.spriteFor("enemy", "skeleton")).toBe(null); // no sprite yet -> emoji
+        expect(game.spriteFor("enemy", "skeleton")).toBe(g.GAME_DATA.sprites.enemies.skeleton);
+        expect(game.spriteFor("enemy", "phantom")).toBe(null); // unmapped -> emoji fallback
         expect(game.spriteFor("ally", "warrior")).toBe(g.GAME_DATA.sprites.allies.warrior);
+    });
+
+    it("has a sprite mapped for every enemy type and ally role", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        Object.keys(g.GAME_DATA.enemies).forEach(key => {
+            expect(typeof game.spriteFor("enemy", key)).toBe("string");
+        });
+        Object.keys(g.ALLIES).forEach(role => {
+            expect(typeof game.spriteFor("ally", role)).toBe("string");
+        });
     });
 
     it("fighterHtml uses an <img> when a sprite exists, emoji otherwise", () => {
