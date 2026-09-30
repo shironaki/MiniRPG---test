@@ -36,6 +36,7 @@ class World {
             treasury: { north: "marsh", south: null, east: null, west: "ruins" }
         };
         this.relicRooms = { archive: "Руна прилива", shrine: "Руна пламени", catacomb: "Руна праха" }; this.treasureFound = false;
+        this.relicGuardians = { archive: "tideWraith", shrine: "flameWarden", catacomb: "boneColossus" };
         this.enemyPool = ["goblin", "wolf", "skeleton"];
         // Per-zone enemy pools. Goblins stay common near the entrance so the
         // "hunt 3 goblins" quest is always completable.
@@ -44,10 +45,19 @@ class World {
             catacomb: ["skeleton"], ancientHall: ["skeleton", "wolf"], archive: ["skeleton"], shrine: ["skeleton", "wolf"],
             darkForest: ["wolf", "goblin"], ruins: ["wolf", "skeleton"], marsh: ["wolf"], treasury: ["boss"]
         };
+        // Per-zone chest loot tables (item keys from ITEMS).
+        this.chestLoot = {
+            start: ["potion", "sword", "shield"], camp: ["potion", "bow", "shield"], abandonedWing: ["potion", "shield", "sword"], forge: ["sword", "shield", "armor"],
+            catacomb: ["potion", "armor", "shield"], ancientHall: ["armor", "shield", "bow"], archive: ["potion", "armor", "bow"], shrine: ["potion", "armor", "shield"],
+            darkForest: ["bow", "potion", "sword"], ruins: ["bow", "armor", "shield"], marsh: ["potion", "bow", "armor"], treasury: ["armor", "shield", "sword"]
+        };
         this.rooms.start.visited = true;
     }
     // Enemy pool for a room's zone, falling back to the global pool.
     enemyPoolFor(roomId) { const pool = this.zoneEnemies && this.zoneEnemies[roomId]; return pool && pool.length ? pool : this.enemyPool; }
+
+    // Chest loot pool for a room's zone, with a safe default.
+    chestLootFor(roomId) { const pool = this.chestLoot && this.chestLoot[roomId]; return pool && pool.length ? pool : ["potion", "shield"]; }
 
     getCurrentRoom() { return this.rooms[this.currentLocation]; }
     getCurrentLocation() { return this.getCurrentRoom(); }
@@ -79,12 +89,15 @@ class World {
         const room = this.getCurrentRoom();
         if (room.id === "treasury") { room.explored = true; if (this.relics.length < 3) { room.event = "bossLocked"; return { type: "locked", message: `🔒 Печать не поддаётся. Нужно рун: ${this.relics.length}/3.` }; } room.event = "boss"; return { type: "boss", message: "👑 Три руны вспыхнули. Страж сокровищницы пробуждается!" }; }
         if (room.explored) return { type: "already", message: "🔎 Здесь ты уже нашёл всё, что было доступно." };
-        if (this.relicRooms[room.id] && !this.relics.includes(room.id)) { room.explored = true; room.event = "relic"; return { type: "relic", message: `✨ Ты нашёл: ${this.relicRooms[room.id]}.` }; }
+        if (this.relicRooms[room.id] && !this.relics.includes(room.id)) {
+            if (!room.guardianDefeated) { room.explored = true; room.event = "miniboss"; room.guardianType = this.relicGuardians[room.id]; return { type: "miniboss", message: `⚔️ Руну «${this.relicRooms[room.id]}» охраняет страж!` }; }
+            room.explored = true; room.event = "relic"; return { type: "relic", message: `✨ Путь свободен. Ты нашёл: ${this.relicRooms[room.id]}.` };
+        }
         room.explored = true; room.generateEvent(); return this.eventResult(room);
     }
     eventResult(room) {
         const results = { enemy: ["enemy", "👹 Шорох становится всё ближе — тебя заметили!"], chest: ["chest", "📦 Среди обломков блеснул запертый сундук."], trap: ["trap", "⚠️ На пути виден подозрительный механизм."], rest: ["rest", "🔥 Ты нашёл безопасное место для короткого привала."], nothing: ["nothing", "🌙 Пока здесь тихо, но подземелье не спит."] };
         const [type, message] = results[room.event] || results.nothing; if (type === "chest") room.chest = new Chest(); if (type === "trap") room.trap = new Trap(); if (type === "enemy") { const pool = this.enemyPoolFor(room.id); room.enemyType = pool[Math.floor(Math.random() * pool.length)]; } if (type === "nothing") room.cleared = true; return { type, message };
     }
-    collectRelic() { const room = this.getCurrentRoom(); if (!this.relicRooms[room.id] || this.relics.includes(room.id)) return null; this.relics.push(room.id); room.cleared = true; room.event = "cleared"; return this.relicRooms[room.id]; }
+    collectRelic() { const room = this.getCurrentRoom(); if (!this.relicRooms[room.id] || this.relics.includes(room.id)) return null; if (this.relicGuardians[room.id] && !room.guardianDefeated) return null; this.relics.push(room.id); room.cleared = true; room.event = "cleared"; return this.relicRooms[room.id]; }
 }

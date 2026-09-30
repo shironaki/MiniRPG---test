@@ -233,6 +233,29 @@ class Game {
 
     this.bumpStat("kills");
 
+    /*
+    ========================================
+    СТРАЖ РУНЫ (МИНИ-БОСС) ПОБЕЖДЁН
+    ========================================
+    */
+    if (enemy.isGuardian && enemy.relicRoom && this.world.rooms[enemy.relicRoom]) {
+
+        const guardedRoom = this.world.rooms[enemy.relicRoom];
+        guardedRoom.guardianDefeated = true;
+        guardedRoom.event = "relic";
+        guardedRoom.cleared = false;
+
+        this.battle = null;
+        this.updateUI();
+
+        setTimeout(() => {
+            showScreen("locationScreen");
+            renderLocation();
+        }, 500);
+
+        return;
+    }
+
     if (this.quest) {
 
         this.quest.enemyDefeated(

@@ -6,7 +6,12 @@ const game =
 // ОБЩИЕ ФУНКЦИИ
 // =============================================
 
+let previousScreen = "menuScreen";
+
 function showScreen(id) {
+
+    // Remember the last "real" screen so Settings can return to it.
+    if (id !== "settingsScreen") previousScreen = id;
 
     document
         .querySelectorAll(".screen")
@@ -18,11 +23,13 @@ function showScreen(id) {
         });
 
 
-    document
-        .getElementById(id)
-        .classList.remove(
-            "hidden"
-        );
+    const target = document.getElementById(id);
+    target.classList.remove("hidden");
+
+    // Retrigger the entrance animation on each switch.
+    target.classList.remove("screenEnter");
+    void target.offsetWidth; // reflow so the animation can replay
+    target.classList.add("screenEnter");
 }
 
 
@@ -113,6 +120,7 @@ MINI RPG 9.0
 - в каждой комнате есть одна ценная находка или опасность
 - используй новые выходы, чтобы исследовать другие ветки
 - собери 3 руны, чтобы открыть сокровищницу
+- каждую руну стережёт мини-босс — победи его, чтобы забрать руну
 
 ⚔️ В бою:
 - атакуй
@@ -542,6 +550,7 @@ function roomBadge(room, world) {
         case "trap": return room.trap && !room.trap.triggered && !room.trap.disarmed ? "⚠️" : "✅";
         case "relic": return "✨";
         case "rest": return "🔥";
+        case "miniboss": return "🗿";
         case "enemy": return "👹";
         case "boss": return "👑";
         default: return "";
@@ -1033,6 +1042,15 @@ function renderLocation() {
         return;
     }
 
+    // Relic guardian still blocking (first visit or after a flee).
+    if (room.event === "miniboss" && !room.guardianDefeated) {
+        const guardianButton = document.createElement("button");
+        guardianButton.textContent = "⚔️ Сразиться со стражем руны";
+        guardianButton.onclick = startMiniboss;
+        actions.appendChild(guardianButton);
+        return;
+    }
+
      /*
     ========================================
     СОКРОВИЩЕ
@@ -1113,6 +1131,13 @@ function exploreRoom() {
         case "enemy":
 
             startRandomEnemy();
+
+            return;
+
+
+        case "miniboss":
+
+            startMiniboss();
 
             return;
 
@@ -1201,7 +1226,8 @@ function openChest() {
 
     const result =
         room.chest.open(
-            game.player
+            game.player,
+            game.world.chestLootFor(room.id)
         );
 
     if (result.success) { game.bumpStat("chests"); sfx.play("chest"); }
@@ -1309,6 +1335,21 @@ function startBossBattle() {
     game.startBattle(
         enemy
     );
+}
+
+
+function startMiniboss() {
+
+    const room = game.world.getCurrentRoom();
+    const type = room.guardianType || game.world.relicGuardians[room.id] || "skeleton";
+
+    const enemy = createEnemy(type, game.player.level);
+    enemy.isGuardian = true;
+    enemy.relicRoom = room.id;
+
+    addLog(`⚔️ ${enemy.emoji} ${enemy.name} преграждает путь к руне!`);
+
+    game.startBattle(enemy);
 }
 
 
@@ -1539,4 +1580,57 @@ document
     });
 
     refresh();
+})();
+
+
+// =============================================
+// НАСТРОЙКИ
+// =============================================
+
+function renderSettings() {
+    const soundButton = document.getElementById("settingsSoundButton");
+    if (soundButton) soundButton.textContent = sfx.muted ? "Выкл" : "Вкл";
+
+    const statsBox = document.getElementById("settingsStats");
+    if (statsBox) {
+        statsBox.innerHTML = game.player
+            ? game.renderStats()
+            : `<p class="settingsHint">Начни игру, чтобы увидеть статистику забега.</p>`;
+    }
+}
+
+function openSettings() {
+    showScreen("settingsScreen");
+    renderSettings();
+}
+
+(function setupSettings() {
+    const openButton = document.getElementById("settingsButton");
+    if (openButton) openButton.addEventListener("click", openSettings);
+
+    const soundButton = document.getElementById("settingsSoundButton");
+    if (soundButton) {
+        soundButton.addEventListener("click", () => {
+            const nowMuted = sfx.toggleMute();
+            if (!nowMuted) sfx.play("heal");
+            renderSettings();
+            const headerMute = document.getElementById("muteButton");
+            if (headerMute) headerMute.textContent = nowMuted ? "🔇" : "🔊";
+        });
+    }
+
+    const resetButton = document.getElementById("settingsResetButton");
+    if (resetButton) {
+        resetButton.addEventListener("click", () => {
+            const ok = confirm("Удалить сохранение и начать заново? Это действие необратимо.");
+            if (!ok) return;
+            game.saveSystem.clear();
+            location.reload();
+        });
+    }
+
+    const backButton = document.getElementById("settingsBackButton");
+    if (backButton) {
+        backButton.addEventListener("click", () => showScreen(previousScreen));
+    }
 })();

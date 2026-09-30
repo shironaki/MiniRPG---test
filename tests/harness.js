@@ -169,6 +169,7 @@ function loadFullGame(opts = {}) {
         location: { reload() {} },
         prompt: () => opts.promptValue ?? "Игрок",
         alert: () => {},
+        confirm: () => true,
         setTimeout: (fn) => { if (typeof fn === "function") fn(); return 0; },
         clearTimeout: () => {}
     };
@@ -185,7 +186,7 @@ function loadFullGame(opts = {}) {
         .map((file) => fs.readFileSync(path.join(JS_DIR, file), "utf8"))
         .join("\n;\n");
 
-    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest };";
+    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings };";
 
     vm.createContext(sandbox);
     vm.runInContext(source + uiExports, sandbox, { filename: "minirpg.full.js" });

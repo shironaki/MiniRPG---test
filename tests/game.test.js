@@ -165,11 +165,20 @@ describe("Chest", () => {
         expect(chest.open(p).success).toBe(false);
     });
 
-    it("high roll grants a shield item", () => {
+    it("high roll grants an item from the default pool", () => {
         const { exports: g } = loadGame({ random: () => 0.95 });
         const p = new g.Player("A");
         new g.Chest().open(p);
         expect(p.inventory.some((i) => i.type === "shield")).toBe(true);
+    });
+
+    it("draws items from a supplied zone loot pool", () => {
+        const { exports: g } = loadGame({ random: () => 0.6 }); // >0.45 -> item branch
+        const p = new g.Player("A");
+        // random()=0.6 -> gold check fails; item index floor(0.6*len)
+        const res = new g.Chest().open(p, ["sword"]);
+        expect(res.success).toBe(true);
+        expect(p.inventory.some((i) => i.name === "Железный меч")).toBe(true);
     });
 });
 
@@ -232,15 +241,31 @@ describe("World", () => {
         expect(w.explore().type).toBe("boss");
     });
 
-    it("relic rooms yield a relic exactly once", () => {
+    it("relic rooms require defeating the guardian before the relic", () => {
         const { exports: g } = loadGame();
         const w = new g.World();
         w.currentLocation = "archive";
-        expect(w.explore().type).toBe("relic");
+        // First exploration spawns the relic guardian (mini-boss).
+        expect(w.explore().type).toBe("miniboss");
+        expect(w.rooms.archive.guardianType).toBe("tideWraith");
+        // Relic is locked until the guardian is beaten.
+        expect(w.collectRelic()).toBe(null);
+        w.rooms.archive.guardianDefeated = true;
         const relic = w.collectRelic();
         expect(relic).toBe("Руна прилива");
         expect(w.relics.length).toBe(1);
-        expect(w.collectRelic()).toBe(null);
+        expect(w.collectRelic()).toBe(null); // once only
+    });
+
+    it("defines a valid, well-formed guardian for every relic room", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        for (const roomId of Object.keys(w.relicRooms)) {
+            const type = w.relicGuardians[roomId];
+            expect(Boolean(type)).toBe(true);
+            const guardian = g.createEnemy(type, 1);
+            expect(guardian.maxHealth).toBeGreaterThan(100); // tougher than a mob
+        }
     });
 
     it("coordinates match the connection graph exactly", () => {
@@ -341,6 +366,18 @@ describe("World", () => {
         for (const pool of Object.values(w.zoneEnemies)) {
             for (const t of pool) expect(valid.has(t)).toBe(true);
         }
+    });
+
+    it("provides valid, zone-specific chest loot with a fallback", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        const validKeys = new Set(Object.keys(g.ITEMS));
+        for (const pool of Object.values(w.chestLoot)) {
+            expect(pool.length).toBeGreaterThan(0);
+            for (const key of pool) expect(validKeys.has(key)).toBe(true);
+        }
+        expect(w.chestLootFor("unknownRoom")).toEqual(["potion", "shield"]);
+        expect(w.chestLootFor("forge").length).toBeGreaterThan(0);
     });
 
     it("keeps goblins reachable near the entrance for the quest", () => {

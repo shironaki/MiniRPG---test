@@ -63,6 +63,25 @@ describe("Integration: end screen", () => {
     });
 });
 
+describe("Integration: settings", () => {
+    it("shows a hint before a game starts and stats afterwards", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.openSettings();
+        expect(/Начни игру/.test(sandbox.document.getElementById("settingsStats").innerHTML)).toBe(true);
+        ui.game.start();
+        ui.game.stats = { steps: 3, kills: 1, chests: 0, traps: 0 };
+        ui.renderSettings();
+        expect(/Итоги забега/.test(sandbox.document.getElementById("settingsStats").innerHTML)).toBe(true);
+    });
+
+    it("reflects the mute state on the sound button", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.renderSettings();
+        const label = sandbox.document.getElementById("settingsSoundButton").textContent;
+        expect(label === "Вкл" || label === "Выкл").toBe(true);
+    });
+});
+
 describe("Integration: audio safety", () => {
     it("all SFX calls are no-ops without a real AudioContext", () => {
         const { exports: ui } = loadFullGame();

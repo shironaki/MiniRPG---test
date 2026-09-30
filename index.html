@@ -31,7 +31,8 @@
 
     <header>
 
-        <button id="muteButton" class="muteButton" title="Звук вкл/выкл">🔊</button>
+        <button id="settingsButton" class="iconButton settingsButton" title="Настройки">⚙️</button>
+        <button id="muteButton" class="iconButton muteButton" title="Звук вкл/выкл">🔊</button>
 
         <h1>⚔️ MINI RPG 9.0</h1>
 
@@ -337,6 +338,33 @@
             <div id="questList"></div>
 
             <button id="questBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- SETTINGS -->
+
+        <section
+            id="settingsScreen"
+            class="screen hidden"
+        >
+
+            <h2>⚙️ НАСТРОЙКИ</h2>
+
+            <div class="settingsRow">
+                <span>🔊 Звук</span>
+                <button id="settingsSoundButton">Вкл</button>
+            </div>
+
+            <div id="settingsStats"></div>
+
+            <button id="settingsResetButton" class="dangerButton">
+                🗑️ Сбросить сохранение
+            </button>
+
+            <button id="settingsBackButton">
                 🔙 Назад
             </button>
 
