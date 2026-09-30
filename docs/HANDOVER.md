@@ -6,6 +6,7 @@
 * [`../AGENTS.md`](../AGENTS.md) — жёсткие правила и запреты (лицензия, `main`, ветки).
 * [`ARCHITECTURE.md`](ARCHITECTURE.md) — карта кода: что где лежит и почему.
 * [`CHANGELOG.md`](CHANGELOG.md) — полная история работ, 38 коммитов.
+* [`OWNER-SETUP.md`](OWNER-SETUP.md) — для владельца: настройки защиты на GitHub.
 
 Дата составления: **2026-09-30**.
 Владелец и правообладатель: **shironaki**. Лицензия: **MIT** (`LICENSE`).
