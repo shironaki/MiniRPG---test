@@ -80,14 +80,20 @@ class Game {
 
     start() {
 
-        const name =
+        const rawName =
             prompt("Введите имя героя:");
 
 
-        if (!name) {
+        if (!rawName) {
 
             return;
         }
+
+
+        // Names are sanitised at the source so the value is safe everywhere it
+        // is later rendered (logs, panels, battle screen, game-over).
+        const name =
+            (typeof sanitizeName === "function") ? sanitizeName(rawName) : rawName;
 
 
         this.player =
@@ -141,39 +147,65 @@ class Game {
     }
 
     resume() {
-        const data = this.saveSystem.load();
+        let data = null;
+        try {
+            data = this.saveSystem.load();
+        } catch {
+            data = null;
+        }
         if (!data?.player || !data?.world) return false;
 
-        this.player = Object.assign(Object.create(Player.prototype), data.player);
-        if (this.player.karma === undefined) this.player.karma = 0;
-        if (this.player.maxEnergy == null) this.player.maxEnergy = 30;
-        if (this.player.energy == null) this.player.energy = this.player.maxEnergy;
-        if (this.player.perkPoints == null) this.player.perkPoints = 0;
-        if (!this.player.perks) this.player.perks = {};
-        this.player.statuses = []; // effects never persist outside a battle
-        this.player.inventory.forEach(item => Object.setPrototypeOf(item, Item.prototype));
-        Object.values(this.player.equipment).filter(Boolean).forEach(item => Object.setPrototypeOf(item, Item.prototype));
-        if (this.player.ally) Object.setPrototypeOf(this.player.ally, Ally.prototype);
-        this.world = Object.assign(Object.create(World.prototype), data.world);
-        Object.values(this.world.rooms).forEach(room => {
-            Object.setPrototypeOf(room, Room.prototype);
-            if (room.chest) Object.setPrototypeOf(room.chest, Chest.prototype);
-            if (room.trap) Object.setPrototypeOf(room.trap, Trap.prototype);
-        });
-        this.world.getCurrentRoom().visited = true;
-        this.quest = Object.assign(Object.create(Quest.prototype), data.quest || new Quest());
-        this.journal = Object.assign(Object.create(QuestJournal.prototype), data.journal || new QuestJournal());
-        if (!this.journal.accepted) this.journal.accepted = {};
-        this.inventory = new Inventory(this.player);
-        this.shop = new Shop(this.player);
-        this.npc = new NPC("Староста");
-        this.battle = null;
-        this.gameEnded = false;
-        this.stats = Object.assign(this.emptyStats(), data.stats || {});
-        addLog(`💾 Приключение ${this.player.name} продолжено.`);
-        showScreen("villageScreen");
-        this.updateUI();
-        return true;
+        // Reconstruction is wrapped so a corrupt or tampered save fails safely
+        // to the menu instead of throwing and leaving the game unusable.
+        try {
+            this.player = Object.assign(Object.create(Player.prototype), data.player);
+            this.player.name = (typeof sanitizeName === "function") ? sanitizeName(this.player.name) : this.player.name;
+            if (this.player.karma === undefined) this.player.karma = 0;
+            if (this.player.maxEnergy == null) this.player.maxEnergy = 30;
+            if (this.player.energy == null) this.player.energy = this.player.maxEnergy;
+            if (this.player.perkPoints == null) this.player.perkPoints = 0;
+            if (!this.player.perks || typeof this.player.perks !== "object") this.player.perks = {};
+            this.player.statuses = []; // effects never persist outside a battle
+
+            // Defensive shape checks: never trust the loaded structure.
+            if (!Array.isArray(this.player.inventory)) this.player.inventory = [];
+            if (!this.player.equipment || typeof this.player.equipment !== "object") {
+                this.player.equipment = { weapon: null, armor: null, shield: null };
+            }
+            this.player.inventory.forEach(item => item && Object.setPrototypeOf(item, Item.prototype));
+            Object.values(this.player.equipment).filter(Boolean).forEach(item => Object.setPrototypeOf(item, Item.prototype));
+            if (this.player.ally) Object.setPrototypeOf(this.player.ally, Ally.prototype);
+
+            this.world = Object.assign(Object.create(World.prototype), data.world);
+            if (!this.world.rooms || typeof this.world.rooms !== "object") return false;
+            Object.values(this.world.rooms).forEach(room => {
+                Object.setPrototypeOf(room, Room.prototype);
+                if (room.chest) Object.setPrototypeOf(room.chest, Chest.prototype);
+                if (room.trap) Object.setPrototypeOf(room.trap, Trap.prototype);
+            });
+            // A tampered currentLocation must not break navigation.
+            if (!this.world.rooms[this.world.currentLocation]) this.world.currentLocation = "start";
+            const current = this.world.getCurrentRoom();
+            if (current) current.visited = true;
+
+            this.quest = Object.assign(Object.create(Quest.prototype), data.quest || new Quest());
+            this.journal = Object.assign(Object.create(QuestJournal.prototype), data.journal || new QuestJournal());
+            if (!this.journal.accepted) this.journal.accepted = {};
+            this.inventory = new Inventory(this.player);
+            this.shop = new Shop(this.player);
+            this.npc = new NPC("Староста");
+            this.battle = null;
+            this.dungeon = null;
+            this.gameEnded = false;
+            this.stats = Object.assign(this.emptyStats(), data.stats || {});
+            addLog(`💾 Приключение ${this.player.name} продолжено.`);
+            showScreen("villageScreen");
+            this.updateUI();
+            return true;
+        } catch {
+            if (typeof addLog === "function") addLog("⚠️ Не удалось загрузить сохранение: данные повреждены.");
+            return false;
+        }
     }
 
 
@@ -236,7 +268,15 @@ class Game {
 
         if (typeof refreshMenus === "function") refreshMenus();
 
-        if (!this.gameEnded) this.saveSystem.save(this);
+        if (!this.gameEnded) {
+            const res = this.saveSystem.save(this);
+            // Warn once if the browser storage rejects the autosave, so the
+            // player knows progress isn't being persisted.
+            if (res && res.success === false && !this._saveWarned) {
+                this._saveWarned = true;
+                if (typeof addLog === "function") addLog("⚠️ Прогресс не сохраняется: хранилище браузера недоступно.");
+            }
+        }
     }
 
 
@@ -379,9 +419,10 @@ class Game {
                 : "";
             elementHtml = `<p class="fighterElement">${el.emoji || ""} ${el.name || ""}${weak}</p>`;
         }
+        const safeName = (typeof escapeHtml === "function") ? escapeHtml(opts.name) : opts.name;
         return `
             <div class="fighterArt ${opts.side}">${art}${allyBadge}</div>
-            <div class="fighterName">${opts.emoji} ${opts.name}</div>
+            <div class="fighterName">${opts.emoji} ${safeName}</div>
             <div class="bar"><div class="health" style="width:${pct}%"></div></div>
             <p class="fighterHp">❤️ ${opts.health} / ${opts.maxHealth}</p>
             ${energyHtml}
@@ -636,7 +677,7 @@ class Game {
 
                 <br><br>
 
-                ${this.player.name}
+                ${(typeof escapeHtml === "function") ? escapeHtml(this.player.name) : this.player.name}
                 погиб.
 
                 <br><br>

@@ -505,6 +505,79 @@ describe("Quest", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Security / robustness
+// ---------------------------------------------------------------------------
+describe("Security", () => {
+    it("escapeHtml neutralises markup", () => {
+        const { exports: g } = loadGame();
+        const out = g.escapeHtml('<img src=x onerror="alert(1)">');
+        expect(out.includes("<img")).toBe(false);
+        expect(out.includes("&lt;img")).toBe(true);
+        expect(out.includes('"')).toBe(false);
+    });
+
+    it("sanitizeName strips tags, trims, caps length, and defaults", () => {
+        const { exports: g } = loadGame();
+        expect(g.sanitizeName("<script>evil</script>Bob")).toBe("scriptevil/scriptBob".slice(0, 24));
+        expect(g.sanitizeName("   ")).toBe("Герой");
+        expect(g.sanitizeName(null)).toBe("Герой");
+        expect(g.sanitizeName("a".repeat(50)).length).toBe(24);
+        expect(g.sanitizeName("Sir Reginald").includes("<")).toBe(false);
+    });
+
+    it("SaveSystem.load returns null for corrupt JSON", () => {
+        const { exports: g, sandbox } = loadGame();
+        const s = new g.SaveSystem();
+        sandbox.localStorage.setItem("miniRPG9", "{not valid json");
+        expect(s.load() === null).toBe(true);
+    });
+
+    it("SaveSystem falls back to the backup when the primary is corrupt", () => {
+        const { exports: g, sandbox } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.journal = new g.QuestJournal();
+        // First save establishes a good primary; second save mirrors it to backup.
+        game.saveSystem.save(game);
+        game.player.gold = 777;
+        game.saveSystem.save(game);
+        // Corrupt only the primary — load must recover from the backup copy.
+        sandbox.localStorage.setItem("miniRPG9", "###corrupt###");
+        const loaded = game.saveSystem.load();
+        expect(loaded !== null).toBe(true);
+        expect(typeof loaded.player).toBe("object");
+    });
+
+    it("save never throws when localStorage is unavailable", () => {
+        const { exports: g, sandbox } = loadGame();
+        const original = sandbox.localStorage.setItem;
+        sandbox.localStorage.setItem = () => { throw new Error("quota"); };
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.world = new g.World();
+        const res = game.saveSystem.save(game);
+        expect(res.success).toBe(false);
+        sandbox.localStorage.setItem = original;
+    });
+
+    it("resume fails gracefully on a corrupt save instead of throwing", () => {
+        const { exports: g, sandbox } = loadGame();
+        // player present but inventory is not an array, world.rooms missing
+        sandbox.localStorage.setItem("miniRPG9", JSON.stringify({
+            player: { name: "X", inventory: "oops", equipment: null },
+            world: { currentLocation: "start" }
+        }));
+        const game = new g.Game();
+        let threw = false, result;
+        try { result = game.resume(); } catch { threw = true; }
+        expect(threw).toBe(false);
+        expect(result).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Dialogue (Stage C)
 // ---------------------------------------------------------------------------
 describe("Dialogue", () => {

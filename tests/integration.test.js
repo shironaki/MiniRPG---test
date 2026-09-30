@@ -209,6 +209,32 @@ describe("Integration: perks UI", () => {
     });
 });
 
+describe("Integration: security", () => {
+    it("renders a malicious hero name without injecting markup", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        // Force an unsafe name past the input sanitiser (as a tampered save could).
+        ui.game.player.name = '<img src=x onerror="window.__pwned=1">';
+        ui.game.gameOver();
+        const html = sandbox.document.getElementById("endMessage").innerHTML;
+        expect(html.includes("<img")).toBe(false);
+        expect(html.includes("&lt;img")).toBe(true);
+        expect(sandbox.__pwned === undefined).toBe(true);
+    });
+
+    it("autosaves silently and warns once when storage fails", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        const original = sandbox.localStorage.setItem;
+        sandbox.localStorage.setItem = () => { throw new Error("quota"); };
+        let threw = false;
+        try { ui.game.updateUI(); } catch { threw = true; }
+        expect(threw).toBe(false);
+        expect(ui.game._saveWarned).toBe(true);
+        sandbox.localStorage.setItem = original;
+    });
+});
+
 describe("Integration: dialogue UI", () => {
     it("opens a branching talk and applies a choice's consequence", () => {
         const { exports: ui, sandbox } = loadFullGame();

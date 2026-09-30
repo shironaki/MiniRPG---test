@@ -19,6 +19,7 @@ const JS_DIR = path.join(ROOT, "js");
 
 // Load order mirrors index.html (minus the DOM-wiring entry point main.js).
 const LOGIC_FILES = [
+    "util.js",
     "data.js",
     "item.js",
     "craft.js",
@@ -41,7 +42,7 @@ const LOGIC_FILES = [
 ];
 
 const EXPORTED = [
-    "GAME_DATA", "Item", "ITEMS", "RARITY", "Craft", "Ally", "ALLIES", "Player", "Inventory", "Enemy", "createEnemy",
+    "GAME_DATA", "escapeHtml", "sanitizeName", "Item", "ITEMS", "RARITY", "Craft", "Ally", "ALLIES", "Player", "Inventory", "Enemy", "createEnemy",
     "Chest", "Trap", "Room", "Shop", "NPC", "Quest", "QuestJournal", "World",
     "Battle", "Dungeon", "Dialogue", "SaveSystem", "Game"
 ];
@@ -182,7 +183,7 @@ function loadFullGame(opts = {}) {
     sandbox.globalThis = sandbox;
 
     const ordered = [
-        "data.js", "item.js", "craft.js", "dungeon.js", "dialogue.js", "ally.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
+        "util.js", "data.js", "item.js", "craft.js", "dungeon.js", "dialogue.js", "ally.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
         "room.js", "shop.js", "npc.js", "quest.js", "world.js", "battle.js",
         "save.js", "audio.js", "game.js", "main.js"
     ];
