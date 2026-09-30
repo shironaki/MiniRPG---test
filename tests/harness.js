@@ -19,6 +19,7 @@ const JS_DIR = path.join(ROOT, "js");
 
 // Load order mirrors index.html (minus the DOM-wiring entry point main.js).
 const LOGIC_FILES = [
+    "data.js",
     "item.js",
     "ally.js",
     "player.js",
@@ -37,7 +38,7 @@ const LOGIC_FILES = [
 ];
 
 const EXPORTED = [
-    "Item", "ITEMS", "Ally", "ALLIES", "Player", "Inventory", "Enemy", "createEnemy",
+    "GAME_DATA", "Item", "ITEMS", "Ally", "ALLIES", "Player", "Inventory", "Enemy", "createEnemy",
     "Chest", "Trap", "Room", "Shop", "NPC", "Quest", "World",
     "Battle", "SaveSystem", "Game"
 ];
@@ -49,7 +50,7 @@ function createElementStub() {
         innerHTML: "",
         textContent: "",
         value: "",
-        style: {},
+        style: { setProperty() {}, removeProperty() {}, getPropertyValue() { return ""; } },
         dataset: {},
         children: [],
         classList: {
@@ -178,7 +179,7 @@ function loadFullGame(opts = {}) {
     sandbox.globalThis = sandbox;
 
     const ordered = [
-        "item.js", "ally.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
+        "data.js", "item.js", "ally.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
         "room.js", "shop.js", "npc.js", "quest.js", "world.js", "battle.js",
         "save.js", "audio.js", "game.js", "main.js"
     ];

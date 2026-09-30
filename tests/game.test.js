@@ -6,6 +6,59 @@ const { describe, it, expect, run } = require("./tiny-test");
 // ---------------------------------------------------------------------------
 // Item
 // ---------------------------------------------------------------------------
+describe("Data-driven core", () => {
+    it("builds ITEMS from GAME_DATA definitions", () => {
+        const { exports: g } = loadGame();
+        expect(Object.keys(g.ITEMS).length).toBe(Object.keys(g.GAME_DATA.items).length);
+        expect(g.ITEMS.sword.price).toBe(g.GAME_DATA.items.sword.price);
+        expect(g.ITEMS.sword instanceof g.Item).toBe(true);
+    });
+
+    it("createEnemy reads stats from GAME_DATA with scaling", () => {
+        const { exports: g } = loadGame();
+        const base = g.createEnemy("skeleton", 1);
+        expect(base.maxHealth).toBe(g.GAME_DATA.enemies.skeleton.health);
+        const scaled = g.createEnemy("skeleton", 3); // +2 levels -> +28 hp
+        expect(scaled.maxHealth).toBe(g.GAME_DATA.enemies.skeleton.health + 28);
+    });
+
+    it("exposes an accent colour for every room's zone", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        Object.keys(w.rooms).forEach(id => {
+            expect(typeof g.GAME_DATA.zones[id].accent).toBe("string");
+        });
+    });
+});
+
+describe("Battle rendering", () => {
+    it("resolves sprite paths from the manifest, null when absent", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        expect(game.spriteFor("hero")).toBe(g.GAME_DATA.sprites.hero);
+        expect(game.spriteFor("enemy", "goblin")).toBe(g.GAME_DATA.sprites.enemies.goblin);
+        expect(game.spriteFor("enemy", "skeleton")).toBe(null); // no sprite yet -> emoji
+        expect(game.spriteFor("ally", "warrior")).toBe(g.GAME_DATA.sprites.allies.warrior);
+    });
+
+    it("fighterHtml uses an <img> when a sprite exists, emoji otherwise", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        const withSprite = game.fighterHtml({ side: "enemy", name: "Гоблин", emoji: "👹", sprite: "assets/sprites/goblin.png", health: 30, maxHealth: 52 });
+        expect(/<img/.test(withSprite)).toBe(true);
+        expect(/goblin\.png/.test(withSprite)).toBe(true);
+        const noSprite = game.fighterHtml({ side: "enemy", name: "Скелет", emoji: "💀", sprite: null, health: 40, maxHealth: 84 });
+        expect(/fighterEmoji/.test(noSprite)).toBe(true);
+        expect(/💀/.test(noSprite)).toBe(true);
+    });
+
+    it("createEnemy tags the type key for sprite lookup", () => {
+        const { exports: g } = loadGame();
+        expect(g.createEnemy("goblin", 1).key).toBe("goblin");
+        expect(g.createEnemy("nonsense", 1).key).toBe("goblin"); // fallback keeps a valid key
+    });
+});
+
 describe("Item", () => {
     it("clones independently", () => {
         const { exports: g } = loadGame();

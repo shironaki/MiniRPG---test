@@ -518,11 +518,13 @@ function renderWorld() {
         const clickable = reachable && !isCurrent;
         const onclick = clickable ? ` onclick="moveToRoom('${id}')"` : "";
 
+        const zoneAccent = ((typeof GAME_DATA !== "undefined" && GAME_DATA.zones && GAME_DATA.zones[id]) || {}).accent || "#3a4a63";
+
         const badge = roomBadge(room, world);
         const badgeHtml = badge ? `<em class="mapBadge">${badge}</em>` : "";
         const markerHtml = isCurrent ? `<em class="mapMarker">📍</em>` : "";
 
-        return `<div class="${classes}" data-room="${id}" style="${pos}" title="${room.name}"${onclick}>
+        return `<div class="${classes}" data-room="${id}" style="${pos};--cell-accent:${zoneAccent}" title="${room.name}"${onclick}>
             ${markerHtml}
             ${badgeHtml}
             <span>${room.name}</span>
@@ -837,10 +839,26 @@ if (worldScreen) {
 // ЛОКАЦИЯ
 // =============================================
 
+// Swap a broken/missing sprite <img> for its emoji fallback.
+function spriteFallback(img, emoji) {
+    const div = document.createElement("div");
+    div.className = "fighterEmoji";
+    div.textContent = emoji;
+    if (img && img.replaceWith) img.replaceWith(div);
+}
+
 function renderLocation() {
 
     const room =
         game.world.getCurrentRoom();
+
+
+    // Tint the location screen with the zone's accent colour.
+    const zone = (typeof GAME_DATA !== "undefined" && GAME_DATA.zones && GAME_DATA.zones[room.id]) || null;
+    const locScreen = document.getElementById("locationScreen");
+    if (locScreen && zone && locScreen.style && locScreen.style.setProperty) {
+        locScreen.style.setProperty("--zone-accent", zone.accent);
+    }
 
 
     document

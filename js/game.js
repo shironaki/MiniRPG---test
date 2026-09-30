@@ -222,44 +222,65 @@ class Game {
     }
 
 
+    // Resolve a sprite path from the manifest, or null to fall back to emoji.
+    spriteFor(kind, key) {
+        const s = (typeof GAME_DATA !== "undefined" && GAME_DATA.sprites) || {};
+        if (kind === "hero") return s.hero || null;
+        if (kind === "enemy") return (s.enemies || {})[key] || null;
+        if (kind === "ally") return (s.allies || {})[key] || null;
+        return null;
+    }
+
+    // Markup for one combatant: sprite (with emoji fallback), name and HP bar.
+    fighterHtml(opts) {
+        const pct = Math.max(0, Math.min(100, (opts.health / opts.maxHealth) * 100));
+        const art = opts.sprite
+            ? `<img class="fighterSprite" src="${opts.sprite}" alt="${opts.name}" onerror="spriteFallback(this,'${opts.emoji}')">`
+            : `<div class="fighterEmoji">${opts.emoji}</div>`;
+        const allyBadge = opts.allyBadge
+            ? `<div class="fighterAlly">${opts.allyBadge}</div>`
+            : "";
+        return `
+            <div class="fighterArt ${opts.side}">${art}${allyBadge}</div>
+            <div class="fighterName">${opts.emoji} ${opts.name}</div>
+            <div class="bar"><div class="health" style="width:${pct}%"></div></div>
+            <p class="fighterHp">❤️ ${opts.health} / ${opts.maxHealth}</p>`;
+    }
+
     showEnemy() {
 
-        const enemy =
-            this.battle.enemy;
+        const enemy = this.battle.enemy;
+        const p = this.player;
 
+        const heroEl = document.getElementById("heroFighter");
+        const enemyEl = document.getElementById("enemyFighter");
 
-        const percent =
-            (
-                enemy.health /
-                enemy.maxHealth
-            ) * 100;
+        if (heroEl) {
+            const ally = p.ally;
+            heroEl.innerHTML = this.fighterHtml({
+                side: "hero",
+                name: p.name,
+                emoji: "🧑",
+                sprite: this.spriteFor("hero"),
+                health: p.health,
+                maxHealth: p.maxHealth,
+                allyBadge: ally ? `${ally.emoji} ${ally.name}` : ""
+            });
+        }
 
-
-        document
-            .getElementById("enemyInfo")
-            .innerHTML = `
-
-                <div class="enemyName">
-                    ${enemy.emoji} ${enemy.name}
-                </div>
-
-                <div class="bar">
-
-                    <div
-                        class="health"
-                        style="width:${percent}%"
-                    ></div>
-
-                </div>
-
-                <p>
-                    ❤️
-                    ${enemy.health}
-                    /
-                    ${enemy.maxHealth}
-                </p>
-
-            `;
+        if (enemyEl) {
+            enemyEl.innerHTML = this.fighterHtml({
+                side: "enemy",
+                name: enemy.name,
+                emoji: enemy.emoji,
+                sprite: this.spriteFor("enemy", enemy.key),
+                health: enemy.health,
+                maxHealth: enemy.maxHealth
+            });
+            enemyEl.classList.remove("hitFlash");
+            void enemyEl.offsetWidth;
+            enemyEl.classList.add("hitFlash");
+        }
     }
 
 
