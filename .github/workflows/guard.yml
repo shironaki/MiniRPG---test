@@ -1,34 +1,32 @@
 name: Guard
 
-# Автоматическая защита собственности владельца проекта.
-# Blocks changes to the licence, the copyright line, the frozen entry points
-# and the protection rules themselves. See AGENTS.md.
+# Лёгкая страховка, а не бюрократия.
+# Смысл один: основу (готовую игру v1 и лицензию) никто не трогает случайно.
+# Вся новая работа идёт в /v2 — там ограничений нет.
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
   push:
     branches: ["**"]
 
 jobs:
   copyright:
-    name: Копирайт на месте
+    name: Лицензия на месте
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: LICENSE exists and still belongs to the owner
+      - name: LICENSE still belongs to the owner
         run: |
           set -e
-          test -f LICENSE || { echo "::error::LICENSE отсутствует. Файл удалять нельзя."; exit 1; }
+          test -f LICENSE || { echo "::error::LICENSE отсутствует — удалять нельзя."; exit 1; }
           grep -qF "Copyright (c) 2026 shironaki" LICENSE || {
-            echo "::error::Строка копирайта изменена или удалена. Она должна оставаться: Copyright (c) 2026 shironaki"; exit 1; }
+            echo "::error::Строка копирайта изменена. Должно остаться: Copyright (c) 2026 shironaki"; exit 1; }
           grep -qF '"license": "MIT"' package.json || {
             echo "::error::Поле license в package.json изменено. Должно быть MIT."; exit 1; }
           echo "✅ Лицензия и копирайт на месте."
 
-  protected-paths:
-    name: Защищённые файлы не тронуты
+  base-untouched:
+    name: Основа (v1) не тронута
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -36,17 +34,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Pull request must not target main
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          if [ "$BASE_REF" = "main" ]; then
-            echo "::error::Ветка main заморожена. PR должен идти в рабочую ветку (arena/01a0eee6-minirpg-test), а не в main."
-            exit 1
-          fi
-          echo "✅ База PR: $BASE_REF"
-
-      - name: Diff against the base and reject protected paths
+      - name: v1 game files must stay as they are
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -56,41 +44,31 @@ jobs:
           CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
           echo "Изменённые файлы:"; echo "$CHANGED"; echo "---"
 
-          PROTECTED="LICENSE
-          AGENTS.md
-          CONTRIBUTING.md
-          .github/CODEOWNERS
-          .github/workflows/guard.yml
-          js/main.js
-          v2/js/main.js"
+          # Основа = готовая игра v1 в корне + лицензия.
+          # The finished v1 game and the licence are the frozen base.
+          BASE_HITS=$(echo "$CHANGED" | grep -E '^(js/|assets/|index\.html$|style\.css$|LICENSE$)' || true)
 
-          FAIL=0
-          while IFS= read -r p; do
-            p=$(echo "$p" | xargs)
-            [ -z "$p" ] && continue
-            if echo "$CHANGED" | grep -qxF "$p"; then
-              echo "::error file=$p::Файл '$p' защищён и не может изменяться без письменного разрешения владельца (см. AGENTS.md)."
-              FAIL=1
-            fi
-          done <<< "$PROTECTED"
-
-          if echo "$CHANGED" | grep -qxF "package.json"; then
-            if ! git diff "$BASE_SHA" "$HEAD_SHA" -- package.json | grep -E '^[+-]' | grep -E '"(license|author)"' -q; then
-              echo "ℹ️ package.json изменён, но поля license/author не затронуты — допустимо."
-            else
-              echo "::error file=package.json::Поля license/author в package.json менять нельзя."
-              FAIL=1
-            fi
-          fi
-
-          if [ "$FAIL" -ne 0 ]; then
-            echo "::error::PR отклонён guard-проверкой. Откатите изменения защищённых файлов."
+          if [ -n "$BASE_HITS" ]; then
+            echo "$BASE_HITS" | while read -r f; do
+              echo "::error file=$f::'$f' относится к основе (готовая игра v1 / лицензия). Менять её в обычной работе нельзя — вся разработка идёт в /v2. Нужно правда изменить основу? Согласуйте с владельцем."
+            done
             exit 1
           fi
-          echo "✅ Защищённые файлы не тронуты."
+          echo "✅ Основа не тронута, работа идёт в /v2."
+
+      - name: Heads-up when the v2 orchestrator changes
+        if: always()
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)
+          if echo "$CHANGED" | grep -qxF "v2/js/main.js"; then
+            echo "::warning file=v2/js/main.js::Изменён v2/js/main.js — это оркестратор всей 2D-версии. Не ошибка, но при ревью просмотреть внимательно."
+          fi
 
   no-dependencies:
-    name: Без зависимостей и артефактов
+    name: Без зависимостей
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

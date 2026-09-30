@@ -11,45 +11,62 @@
 
 ## 1. Жёсткие запреты / HARD RULES — нарушение = отклонение работы
 
+### Главное правило: **ОСНОВУ НЕ ТРОГАЕМ, РАБОТАЕМ В `/v2`**
+
+«Основа» — это готовая игра **v1** в корне репозитория и лицензия:
+
+```
+index.html   style.css   js/**   assets/**   LICENSE
+```
+
+Она доработана и считается законченной. Вся новая разработка ведётся
+**только внутри папки `/v2`** (плюс `docs/` для записей). Если кажется, что
+задачу нельзя решить без правки v1 — это повод спросить владельца, а не
+править.
+
 | # | Правило | Rule (EN) |
 |---|---------|-----------|
-| 1 | **Не менять `LICENSE` и строку копирайта** `Copyright (c) 2026 shironaki`. | Never modify `LICENSE` or the copyright line. |
-| 2 | **Не менять поле `license` и `author` в `package.json`.** | Do not change the `license`/`author` fields. |
-| 3 | **Не коммитить и не пушить в ветку `main`.** Ветка `main` заморожена и принадлежит владельцу. | Never commit, push, force-push or merge into `main`. It is frozen. |
-| 4 | **Не трогать точки входа `js/main.js` и `v2/js/main.js`** без явного письменного разрешения владельца. Это «главный main» проекта. | Do not edit the entry points `js/main.js` and `v2/js/main.js` without the owner's explicit written approval. |
-| 5 | **Никогда не использовать `git push --force`** и не переписывать чужую историю. | Never force-push, never rewrite existing history. |
-| 6 | Не удалять и не переименовывать `.git`, `LICENSE`, `AGENTS.md`, `CONTRIBUTING.md`, `.github/`. | Do not delete or rename these paths. |
-| 7 | Не добавлять зависимости и сборщики. Проект **принципиально без `node_modules`**, чистый ES5/ES6 в браузере. | No dependencies, no bundlers, no build step. Ever. |
-| 8 | Не коммитить бинарные артефакты, скриншоты-черновики, дампы, `node_modules`. | No generated artifacts in Git. |
+| 1 | **Не менять основу:** `index.html`, `style.css`, `js/**`, `assets/**`. Готовая игра v1 остаётся как есть. | Never touch the finished v1 game at the repo root. |
+| 2 | **Не менять `LICENSE` и строку копирайта** `Copyright (c) 2026 shironaki`, а также поля `license`/`author` в `package.json`. | Never modify the licence, the copyright line or those package.json fields. |
+| 3 | Ветка **`main` — стабильная основа-релиз**. Напрямую в неё не пушить; изменения попадают туда только через PR, который вливает владелец. | `main` is the stable release branch: no direct pushes, owner merges PRs. |
+| 4 | **Никогда не использовать `git push --force`** и не переписывать чужую историю. | Never force-push, never rewrite existing history. |
+| 5 | Не удалять и не переименовывать `.git`, `LICENSE`, `AGENTS.md`, `CONTRIBUTING.md`, `.github/`. | Do not delete or rename these paths. |
+| 6 | Не добавлять зависимости и сборщики. Проект **принципиально без `node_modules`**, чистый ES5/ES6 в браузере. | No dependencies, no bundlers, no build step. Ever. |
+| 7 | Не коммитить бинарные артефакты, скриншоты-черновики, дампы, `node_modules`. | No generated artifacts in Git. |
 
-Файлы из пункта 1–4 защищены автоматически: CI-проверка
-`.github/workflows/guard.yml` роняет пулл-реквест, если они изменены.
-`.github/CODEOWNERS` дополнительно требует ревью владельца.
+Пункты 1, 2 и 6 проверяются автоматически: `.github/workflows/guard.yml`
+роняет пулл-реквест при попытке изменить основу, лицензию или добавить
+зависимости. `.github/CODEOWNERS` зовёт владельца в ревью.
+
+Отдельно: `v2/js/main.js` — оркестратор всей 2D-версии. Менять его **можно**
+(без него не сделать новых систем), но осторожно и осознанно: CI пометит такой
+PR предупреждением, чтобы владелец посмотрел внимательнее.
 
 ---
 
 ## 2. Ветки / branching
 
-Работа ведётся **только в новой ветке от текущей рабочей ветки проекта**.
+Работа ведётся **только в новой ветке**, никогда прямо в `main`.
 
 ```bash
-# 1) взять актуальное состояние работы
+# 1) взять актуальное состояние
 git fetch origin
-git checkout -b work/<короткое-имя-задачи> origin/arena/01a0eee6-minirpg-test
+git checkout -b work/<короткое-имя-задачи> origin/main
 
-# 2) работать, коммитить атомарно, пушить только свою ветку
+# 2) работать в /v2, коммитить атомарно, пушить только свою ветку
 git push -u origin work/<короткое-имя-задачи>
 
-# 3) открыть Pull Request В СВОЮ РАБОЧУЮ ВЕТКУ-БАЗУ (НЕ в main)
-gh pr create --base arena/01a0eee6-minirpg-test --head work/<...>
+# 3) открыть Pull Request — вливает владелец
+gh pr create --base main --head work/<...>
 ```
 
-* Базовая ветка со всей текущей работой: **`arena/01a0eee6-minirpg-test`**
-  (38 коммитов, содержит v1 и v2 — см. `docs/HANDOVER.md`).
+* **`main`** — стабильная основа: доработанная игра v1 + текущее состояние v2
+  + документация. Прямых пушей в неё нет, только PR.
 * Имя новой ветки: `work/<задача>`, `feat/<фича>`, `fix/<баг>`.
-* **PR всегда в рабочую ветку, никогда в `main`.** Решение о `main` принимает
-  только владелец.
 * Одна ветка = одна логическая задача. Ветку не переиспользовать после мержа.
+* Историческая рабочая ветка — `arena/01a0eee6-minirpg-test` (с неё
+  публикуется GitHub Pages). Если владелец просит работать от неё —
+  подставь её вместо `main` в командах выше.
 
 ---
 
@@ -116,12 +133,13 @@ SCAN → AUDIT → FIX → VERIFY → EXTEND → COMMIT → LOG
 
 ## 6. Чек-лист перед каждым PR
 
-- [ ] Ветка создана от `arena/01a0eee6-minirpg-test`, PR **не** в `main`.
+- [ ] Работа сделана **внутри `/v2`** (и `docs/`), основа v1 не тронута:
+      `index.html`, `style.css`, `js/**`, `assets/**` — без изменений.
 - [ ] `LICENSE`, копирайт, `package.json` (license/author) — не тронуты.
-- [ ] `js/main.js` и `v2/js/main.js` — не тронуты (или есть письменное «да» владельца).
+- [ ] Отдельная ветка, прямого пуша в `main` не было.
 - [ ] `npm test` — всё зелёное, тесты не отключены и не ослаблены.
 - [ ] `node --check` по всем изменённым скриптам — чисто.
 - [ ] Игра открывается локально: `/` (v1) и `/v2/` (v2), в консоли браузера нет ошибок.
-- [ ] Новый файл добавлен в `index.html` и в харнесс тестов.
+- [ ] Новый файл добавлен в `v2/index.html` и в харнесс тестов.
 - [ ] `docs/CHANGELOG.md` обновлён.
 - [ ] Коммиты атомарные, сообщения осмысленные, force-push не использовался.

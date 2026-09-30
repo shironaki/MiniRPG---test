@@ -21,9 +21,10 @@ to unlock the treasury, defeat the Guardian and claim the treasure.
 | [`docs/OWNER-SETUP.md`](docs/OWNER-SETUP.md) | Для владельца: защита ветки `main` и прав доступа на GitHub, как проверять чужую работу |
 | [`docs/WORKER-BRIEF.md`](docs/WORKER-BRIEF.md) | Готовые тексты: что передать новому разработчику и стартовый промпт для его ИИ-агента |
 
-Кратко о главном: ветка `main` **заморожена**, работа ведётся в новой ветке от
-`arena/01a0eee6-minirpg-test`, файлы `LICENSE`, `js/main.js` и `v2/js/main.js`
-изменять нельзя. Нарушения автоматически ловит
+Кратко о главном: **основа — готовая игра v1 в корне (`index.html`,
+`style.css`, `js/**`, `assets/**`) и `LICENSE` — не трогается**, вся новая
+разработка идёт внутри папки `/v2`. Ветка `main` — стабильный релиз: работаем
+в отдельных ветках и вливаем через PR. Нарушения ловит
 [`guard.yml`](.github/workflows/guard.yml).
 
 ## Play locally
