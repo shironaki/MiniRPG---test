@@ -52,10 +52,34 @@ function openBattle(hero, kind, level, callbacks = {}) {
         }).join("") + `</div>`;
     }
 
-    const enemyArt = SPRITE_KINDS.includes(kind)
-        ? `<img class="bImg" src="assets/sprites/${kind}.png" alt="" onerror="this.replaceWith(document.createTextNode('${bc.enemy.emoji || "👹"}'))">`
+    // Render a pixel rig (hero or mob) to a crisp data URL for the battle panel.
+    function rigDataURL(what) {
+        try {
+            let composed = null;
+            if (what === "hero" && typeof CharacterRig !== "undefined") {
+                composed = CharacterRig.compose("down", 0, null);
+            } else if (typeof MobRig !== "undefined") {
+                composed = MobRig.compose(what, 0);
+            }
+            if (!composed) return null;
+            const { w, h, grid } = composed;
+            const cv = document.createElement("canvas");
+            cv.width = w; cv.height = h;
+            const c = cv.getContext("2d");
+            for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+                if (grid[y][x]) { c.fillStyle = grid[y][x]; c.fillRect(x, y, 1, 1); }
+            return cv.toDataURL();
+        } catch (_) { return null; }
+    }
+
+    const enemyURL = SPRITE_KINDS.includes(kind) ? rigDataURL(kind) : null;
+    const enemyArt = enemyURL
+        ? `<img class="bImg" src="${enemyURL}" alt="">`
         : null;
-    const heroArt = `<img class="bImg heroImg" src="assets/sprites/hero.png" alt="" onerror="this.remove()">`;
+    const heroURL = rigDataURL("hero");
+    const heroArt = heroURL
+        ? `<img class="bImg heroImg" src="${heroURL}" alt="">`
+        : "";
 
     function render() {
         const e = bc.enemy;

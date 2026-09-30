@@ -147,9 +147,27 @@ class Renderer {
             ctx.ellipse(cx, bottom, e.w * 0.5, 4, 0, 0, Math.PI * 2);
             ctx.fill();
 
+            // Pixel mob rig (matches the hero's art) — animated, no sprite files.
+            if (typeof MobRig !== "undefined") {
+                const dir = e.dir || { x: 0, y: 0 };
+                const moving = Math.hypot(dir.x, dir.y) > 0.01;
+                const facing = dir.x < -0.01 ? "left" : "right";
+                const bob = Math.sin(Date.now() / 480 + (e.x + e.y) * 0.05) * 1.1;
+                MobRig.draw(ctx, {
+                    x: cx,
+                    y: bottom + 2 - bob,
+                    H: e.h * MobRig.heightScale(e.kind),
+                    kind: e.kind,
+                    facing,
+                    moving,
+                    phase: Date.now() / 130 + (e.x + e.y) * 0.05,
+                    now: Date.now(),
+                });
+                continue;
+            }
+
             const img = this._img(e.kind);
             if (img) {
-                // Gentle idle bob (phase offset per-enemy so they aren't in sync).
                 const bob = Math.sin(Date.now() / 480 + (e.x + e.y) * 0.05) * 1.2;
                 this._drawSprite(img, cx, bottom + 2, e.h * 2.2, false, bob);
             } else {
@@ -188,7 +206,7 @@ class Renderer {
             CharacterRig.draw(ctx, {
                 x: cx,
                 y: s.y + h + 2,
-                H: h * 2.5,
+                H: h * 2.1,
                 facing: player.facing,
                 phase: player.animTime * 8,
                 moving: player.moving,
