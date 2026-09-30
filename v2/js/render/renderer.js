@@ -69,35 +69,83 @@ class Renderer {
         }
     }
 
+    drawEnemies(enemies, camera) {
+        const ctx = this.ctx;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "20px serif";
+        for (const e of enemies) {
+            if (e.alive === false) continue;
+            const s = camera.worldToScreen(e.x, e.y);
+            const cx = s.x + e.w / 2;
+            // shadow
+            ctx.fillStyle = "rgba(0,0,0,0.28)";
+            ctx.beginPath();
+            ctx.ellipse(cx, s.y + e.h, e.w * 0.45, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillText(e.emoji || "👹", cx, s.y + e.h / 2);
+        }
+    }
+
+    // A small procedural character with a 4-frame walk cycle (swinging limbs).
     drawPlayer(player, camera) {
         const ctx = this.ctx;
         const s = camera.worldToScreen(player.x, player.y);
         const cx = s.x + player.w / 2;
-        const cy = s.y + player.h / 2;
+        const w = player.w, h = player.h;
+
+        // Walk swing: frames 0..3 -> phase for limbs; bob for the body.
+        const walking = player.moving;
+        const phase = walking ? [0, 1, 0, -1][player.frame % 4] : 0;
+        const bob = walking ? (Math.abs(phase) === 1 ? 1 : 0) : 0;
+        const swing = phase * 3;
 
         // shadow
         ctx.fillStyle = "rgba(0,0,0,0.30)";
         ctx.beginPath();
-        ctx.ellipse(cx, s.y + player.h, player.w * 0.5, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, s.y + h, w * 0.5, 4.5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // body — a subtle bob while walking
-        const bob = player.moving ? (player.frame % 2 === 0 ? 0 : 2) : 0;
-        ctx.fillStyle = "#e8d8b0";
-        ctx.fillRect(s.x, s.y - bob, player.w, player.h);
+        const topY = s.y - bob;
+        const legY = topY + h * 0.7;
+
+        // legs (swing opposite each other)
+        ctx.fillStyle = "#3a3350";
+        ctx.fillRect(cx - w * 0.28 - swing * 0.15, legY, w * 0.22, h * 0.32 + (walking ? swing : 0) * 0.2);
+        ctx.fillRect(cx + w * 0.06 + swing * 0.15, legY, w * 0.22, h * 0.32 - (walking ? swing : 0) * 0.2);
+
+        // torso (tunic)
         ctx.fillStyle = "#6a4bd8";
-        ctx.fillRect(s.x, s.y + player.h * 0.5 - bob, player.w, player.h * 0.5);
+        ctx.fillRect(cx - w * 0.32, topY + h * 0.38, w * 0.64, h * 0.36);
 
-        // facing indicator (eyes / direction dot)
-        ctx.fillStyle = "#1a1030";
-        let ex = cx, ey = cy - bob;
-        if (player.facing === "up") ey = s.y + 3 - bob;
-        else if (player.facing === "down") ey = s.y + player.h * 0.45 - bob;
-        else if (player.facing === "left") ex = s.x + 3;
-        else if (player.facing === "right") ex = s.x + player.w - 3;
+        // arms
+        ctx.fillStyle = "#e8d8b0";
+        ctx.fillRect(cx - w * 0.42, topY + h * 0.40 + swing * 0.4, w * 0.12, h * 0.28);
+        ctx.fillRect(cx + w * 0.30, topY + h * 0.40 - swing * 0.4, w * 0.12, h * 0.28);
+
+        // head
+        ctx.fillStyle = "#f0dcb8";
         ctx.beginPath();
-        ctx.arc(ex, ey, 2.4, 0, Math.PI * 2);
+        ctx.arc(cx, topY + h * 0.24, w * 0.28, 0, Math.PI * 2);
         ctx.fill();
+        // hair cap
+        ctx.fillStyle = "#5b3b22";
+        ctx.beginPath();
+        ctx.arc(cx, topY + h * 0.20, w * 0.28, Math.PI, 0);
+        ctx.fill();
+
+        // face direction (eyes)
+        ctx.fillStyle = "#1a1030";
+        const eyeY = topY + h * 0.26;
+        if (player.facing === "down") {
+            ctx.fillRect(cx - w * 0.14, eyeY, 2.2, 2.6);
+            ctx.fillRect(cx + w * 0.06, eyeY, 2.2, 2.6);
+        } else if (player.facing === "left") {
+            ctx.fillRect(cx - w * 0.16, eyeY, 2.2, 2.6);
+        } else if (player.facing === "right") {
+            ctx.fillRect(cx + w * 0.10, eyeY, 2.2, 2.6);
+        }
+        // facing "up" shows the back of the head — no eyes.
     }
 }
 

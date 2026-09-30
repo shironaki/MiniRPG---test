@@ -21,7 +21,8 @@ const FILES = [
     "js/world/tilemap.js",
     "js/world/maps.js",
     "js/entities/mover.js",
-    "js/entities/player.js"
+    "js/entities/player.js",
+    "js/entities/enemy.js"
 ];
 
 const EXPORTED = [
@@ -29,7 +30,7 @@ const EXPORTED = [
     "Input", "Camera",
     "TILES", "DEFAULT_TILE", "tileInfo",
     "TileMap", "MAPS", "getMap",
-    "moveAndCollide", "Player2D"
+    "moveAndCollide", "Player2D", "Enemy2D", "detectEncounter"
 ];
 
 function loadEngine() {

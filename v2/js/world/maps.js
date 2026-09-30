@@ -35,6 +35,12 @@ const MAPS = {
             { col: 4,  row: 12, action: "forge",   label: "Кузница",   emoji: "🔨" },
             { col: 19, row: 12, action: "dungeon", label: "Врата испытаний", emoji: "🚪" },
             { col: 11, row: 4,  action: "quests",  label: "Доска квестов", emoji: "📜" }
+        ],
+        // Roaming foes that wandered in from the wilds. { col,row, kind, emoji }
+        enemies: [
+            { col: 2,  row: 6,  kind: "goblin", emoji: "👹", wanderRadius: 80 },
+            { col: 21, row: 8,  kind: "wolf",   emoji: "🐺", wanderRadius: 90 },
+            { col: 6,  row: 13, kind: "goblin", emoji: "👹", wanderRadius: 70 }
         ]
     }
 };

@@ -28,6 +28,13 @@
         py: it.row * mapData.tileSize + mapData.tileSize / 2
     }));
 
+    // Spawn roaming enemies from the map data.
+    const enemies = (mapData.enemies || []).map(e => new Enemy2D(
+        e.col * mapData.tileSize + 6,
+        e.row * mapData.tileSize + 6,
+        { w: 20, h: 20, kind: e.kind, emoji: e.emoji, wanderRadius: e.wanderRadius }
+    ));
+
     const camera = new Camera(canvas.width, canvas.height);
     const input = new Input();
     input.attach(window);
@@ -68,6 +75,19 @@
             <p class="hint">Полноценные действия этой точки подключаются в следующих шагах 2.0.</p>`;
         overlay.classList.remove("hidden");
     }
+
+    function openEncounter(foe) {
+        paused = true;
+        const kindName = { goblin: "Гоблин", wolf: "Волк", skeleton: "Скелет" }[foe.kind] || "Враг";
+        overlayBody.innerHTML = `<h2>${foe.emoji} ${escapeText(kindName)}!</h2>
+            <p>Дикий противник преграждает путь. Бой начнётся здесь же в 2D.</p>
+            <p class="hint">Подключение боевой системы (стихии, скиллы, статусы) — следующий шаг 2.0.</p>`;
+        overlay.classList.remove("hidden");
+        // Nudge the hero back to its home-ish tile so the fight doesn't loop.
+        foe.x = foe.homeX; foe.y = foe.homeY;
+        player.x = mapData.spawn.col * mapData.tileSize + 6;
+        player.y = mapData.spawn.row * mapData.tileSize + 6;
+    }
     function closeInteraction() {
         paused = false;
         overlay.classList.add("hidden");
@@ -101,14 +121,20 @@
         input.consumePressed();
 
         player.update(dt, input.axis(), tilemap);
+        for (const e of enemies) e.update(dt, tilemap);
         camera.follow(player.centerX, player.centerY, tilemap.pixelWidth, tilemap.pixelHeight);
         nearest = findNearest();
+
+        // Bumping into a roaming foe triggers an encounter.
+        const foe = detectEncounter(player.box, enemies);
+        if (foe) openEncounter(foe);
     }
 
     function render() {
         renderer.clear(camera.viewW, camera.viewH);
         renderer.drawMap(tilemap, camera);
         renderer.drawInteractables(interactables, camera);
+        renderer.drawEnemies(enemies, camera);
         renderer.drawPlayer(player, camera);
 
         hud.textContent = nearest

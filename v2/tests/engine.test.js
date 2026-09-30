@@ -199,4 +199,41 @@ describe("Player2D", () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Enemy2D wander + encounters
+// ---------------------------------------------------------------------------
+describe("Enemy2D", () => {
+    // Deterministic rng so movement is reproducible.
+    function seq(vals) { let i = 0; return () => vals[(i++) % vals.length]; }
+
+    it("stays near home within its wander radius", () => {
+        const { Enemy2D, TileMap } = loadEngine().exports;
+        const m = new TileMap(["........", "........", "........", "........", "........", "........"], 32);
+        const e = new Enemy2D(100, 100, { wanderRadius: 40, speed: 60, rng: seq([0.2, 0.9, 0.5, 0.1, 0.7]) });
+        for (let i = 0; i < 200; i++) e.update(0.1, m);
+        expect(Math.hypot(e.x - e.homeX, e.y - e.homeY) <= 60).toBe(true); // radius + a step of slack
+    });
+
+    it("collides with walls instead of passing through", () => {
+        const { Enemy2D, TileMap } = loadEngine().exports;
+        const m = new TileMap(["###", "#.#", "###"], 32);
+        const e = new Enemy2D(40, 40, { w: 16, h: 16, speed: 500, rng: () => 0.15 /* always move right-ish */ });
+        for (let i = 0; i < 20; i++) e.update(0.1, m);
+        expect(e.x + e.w <= 64).toBe(true);
+        expect(e.y + e.h <= 64).toBe(true);
+        expect(e.x >= 32).toBe(true);
+        expect(e.y >= 32).toBe(true);
+    });
+
+    it("detectEncounter finds an overlapping foe and ignores the dead", () => {
+        const { Enemy2D, detectEncounter } = loadEngine().exports;
+        const near = new Enemy2D(100, 100, { w: 20, h: 20 });
+        const far = new Enemy2D(400, 400, { w: 20, h: 20 });
+        const hero = { x: 110, y: 110, w: 20, h: 20 };
+        expect(detectEncounter(hero, [far, near]) === near).toBe(true);
+        near.alive = false;
+        expect(detectEncounter(hero, [far, near]) === null).toBe(true);
+    });
+});
+
 run();
