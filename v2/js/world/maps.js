@@ -99,6 +99,7 @@ const MAPS = {
     cave: {
         name: "Пещера",
         tileSize: 32,
+        indoor: true,   // underground: no outdoor day/night lighting
         // 20 x 14. Open rocky chamber with scattered pillars; a trial lair deep in.
         rows: [
             "rrgrrrrrrrrrrrrrrrrr",

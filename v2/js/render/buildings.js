@@ -147,13 +147,28 @@
         return cv;
     }
 
-    function draw(ctx, type, sx, sy, wTiles, hTiles, ts, now) {
+    function draw(ctx, type, sx, sy, wTiles, hTiles, ts, now, night) {
         const W = wTiles * U, H = hTiles * U;
         const cv = offscreen(type, W, H);
         const dw = wTiles * ts, dh = hTiles * ts;
         if (cv) {
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(cv, sx, sy, dw, dh);
+        }
+        // ---- windows glow warm at night (house/shop) ----
+        night = night || 0;
+        if (night > 0.06 && (type === "house" || type === "shop")) {
+            const wallTop = dh * 0.44;
+            const winY = sy + wallTop + (dh - wallTop) * 0.16;
+            const ws = dw * 0.13;
+            const xs = [sx + dw * 0.16, sx + dw * 0.84 - ws];
+            const a = Math.min(1, night) * 0.85;
+            for (const x of xs) {
+                ctx.fillStyle = `rgba(255,214,120,${a})`;
+                ctx.fillRect(x, winY, ws, ws);
+                ctx.fillStyle = `rgba(255,224,150,${a * 0.28})`;
+                ctx.fillRect(x - ws * 0.4, winY - ws * 0.4, ws * 1.8, ws * 1.8); // soft halo
+            }
         }
         // ---- animated overlays (drawn live, not cached) ----
         now = now || 0;

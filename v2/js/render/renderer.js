@@ -109,7 +109,7 @@ class Renderer {
     }
 
     // Whole buildings drawn from footprint metadata (roofs never misalign).
-    drawBuildings(buildings, camera, ts) {
+    drawBuildings(buildings, camera, ts, night) {
         if (!buildings || typeof BuildingArt === "undefined") return;
         const ctx = this.ctx;
         const now = Date.now();
@@ -121,8 +121,16 @@ class Renderer {
             // soft ground shadow
             ctx.fillStyle = "rgba(0,0,0,0.16)";
             ctx.fillRect(sx + 2, sy + hpx - 2, wpx - 4, 3);
-            BuildingArt.draw(ctx, b.type, sx, sy, b.w, b.h, ts, now);
+            BuildingArt.draw(ctx, b.type, sx, sy, b.w, b.h, ts, now, night || 0);
         }
+    }
+
+    // Full-screen day/night tint drawn over the world (below the DOM HUD).
+    drawNightOverlay(light, camera) {
+        if (!light || light.a <= 0.002) return;
+        const ctx = this.ctx;
+        ctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
+        ctx.fillRect(0, 0, camera.viewW, camera.viewH);
     }
 
     drawPortals(list, camera) {

@@ -19,6 +19,11 @@
 
     const player = new Player2D(0, 0, { w: 20, h: 20, speed: 130 });
 
+    // In-game clock in minutes (0..1440). A full day passes in DAY_REAL_SEC.
+    let clockMin = 8 * 60;                 // start the day at 08:00
+    const DAY_REAL_SEC = 300;             // 5 real minutes = one full day
+    const MIN_PER_SEC = 1440 / DAY_REAL_SEC;
+
     // Build (or rebuild) the world for a zone and drop the hero at `spawn`.
     function loadZone(id, spawn) {
         mapData = getMap(id);
@@ -294,7 +299,38 @@
         return (typeof escapeHtml === "function") ? escapeHtml(s) : String(s);
     }
 
+    // ---- day/night lighting -------------------------------------------------
+    // Keyframes by hour: overlay tint {r,g,b} and alpha. Interpolated + wrapped.
+    const LIGHT_KEYS = [
+        { h: 0,  a: 0.60, r: 16, g: 20, b: 58 },   // deep night
+        { h: 5,  a: 0.52, r: 24, g: 26, b: 72 },
+        { h: 6.5, a: 0.30, r: 150, g: 90, b: 70 },  // dawn (warm)
+        { h: 8,  a: 0.0,  r: 0, g: 0, b: 0 },       // morning
+        { h: 17, a: 0.0,  r: 0, g: 0, b: 0 },       // day
+        { h: 18.5, a: 0.30, r: 180, g: 95, b: 40 }, // dusk (orange)
+        { h: 20, a: 0.44, r: 44, g: 36, b: 82 },
+        { h: 22, a: 0.60, r: 16, g: 20, b: 58 },
+        { h: 24, a: 0.60, r: 16, g: 20, b: 58 }
+    ];
+    function lightingFor(min) {
+        const h = min / 60;
+        let a = LIGHT_KEYS[0], b = LIGHT_KEYS[LIGHT_KEYS.length - 1];
+        for (let i = 0; i < LIGHT_KEYS.length - 1; i++) {
+            if (h >= LIGHT_KEYS[i].h && h <= LIGHT_KEYS[i + 1].h) { a = LIGHT_KEYS[i]; b = LIGHT_KEYS[i + 1]; break; }
+        }
+        const span = (b.h - a.h) || 1, t = Math.min(1, Math.max(0, (h - a.h) / span));
+        const lerp = (x, y) => Math.round(x + (y - x) * t);
+        const alpha = a.a + (b.a - a.a) * t;
+        return { r: lerp(a.r, b.r), g: lerp(a.g, b.g), b: lerp(a.b, b.b), a: alpha, night: Math.min(1, alpha / 0.6) };
+    }
+    function clockLabel(min) {
+        const h = Math.floor(min / 60), m = Math.floor(min % 60);
+        const icon = (h >= 6 && h < 8) ? "🌅" : (h >= 8 && h < 18) ? "☀️" : (h >= 18 && h < 20) ? "🌇" : "🌙";
+        return `${icon} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
     function update(dt) {
+        clockMin = (clockMin + dt * MIN_PER_SEC) % 1440;
         if (paused) return;
         // Open the backpack/equipment panel anywhere with I.
         if (input.wasPressed("KeyI")) {
@@ -329,17 +365,22 @@
     }
 
     function render() {
+        // Indoor zones (the cave) ignore the outdoor day/night lighting.
+        const indoor = !!mapData.indoor;
+        const light = indoor ? { a: 0, night: 0 } : lightingFor(clockMin);
+
         renderer.clear(camera.viewW, camera.viewH);
         renderer.drawMap(tilemap, camera);
-        renderer.drawBuildings(mapData.buildings, camera, mapData.tileSize);
+        renderer.drawBuildings(mapData.buildings, camera, mapData.tileSize, light.night);
         renderer.drawPortals(portals, camera);
         renderer.drawInteractables(interactables, camera);
         renderer.drawEnemies(enemies, camera);
         renderer.drawPlayer(player, camera);
+        renderer.drawNightOverlay(light, camera);
 
         hud.textContent = nearest
             ? `Нажми E — ${nearest.emoji} ${nearest.label}`
-            : `📍 ${zoneName} · движение · E — действие · I — рюкзак`;
+            : `📍 ${zoneName} · ${clockLabel(clockMin)} · E — действие · I — рюкзак`;
         hud.classList.toggle("active", !!nearest);
     }
 
