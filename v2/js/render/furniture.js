@@ -1,0 +1,281 @@
+/**
+ * v2 render — furniture pixel art for interiors.
+ *
+ * Same approach as tilesart.js / character.js: every object is composed as a
+ * small pixel grid in code, cached to an offscreen canvas and blitted. No image
+ * files. Objects may span several tiles (w/h in tiles) and are drawn on top of
+ * the floor, before entities, so the hero can stand in front of them.
+ *
+ * Each kind is authored on a 16*w x 16*h grid so the pixel density matches the
+ * tiles exactly.
+ */
+(function (global) {
+    const N = 16;
+
+    function grid(w, h, fillColor) {
+        const g = [];
+        for (let y = 0; y < h; y++) {
+            const row = new Array(w);
+            for (let x = 0; x < w; x++) row[x] = fillColor || null;
+            g.push(row);
+        }
+        return g;
+    }
+    function px(g, x, y, c) {
+        if (!c) return;
+        if (y < 0 || y >= g.length || x < 0 || x >= g[0].length) return;
+        g[y][x] = c;
+    }
+    function rect(g, x, y, w, h, c) {
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(g, x + i, y + j, c);
+    }
+
+    // ---- individual pieces --------------------------------------------------
+
+    // Bed, 1x2 tiles: headboard, pillow, quilt with a fold.
+    function bed() {
+        const g = grid(N, N * 2);
+        rect(g, 1, 1, 14, 3, "#6b4a2c");          // headboard
+        rect(g, 1, 1, 14, 1, "#8a6239");
+        rect(g, 1, 4, 14, 26, "#7a5433");         // frame
+        rect(g, 2, 5, 12, 24, "#e8ddc4");         // mattress
+        rect(g, 3, 5, 10, 5, "#fdf6e4");          // pillow
+        rect(g, 2, 11, 12, 18, "#b6455a");        // quilt
+        rect(g, 2, 11, 12, 1, "#d9647a");
+        rect(g, 2, 19, 12, 1, "#8e3446");         // fold
+        for (let x = 3; x < 13; x += 3) rect(g, x, 13, 1, 5, "#c85a70");
+        rect(g, 1, 29, 14, 2, "#5c3a20");         // foot
+        return g;
+    }
+
+    // Storage chest, 1x1: banded lid and a brass lock.
+    function chest() {
+        const g = grid(N, N);
+        rect(g, 2, 6, 12, 8, "#7a5433");
+        rect(g, 2, 4, 12, 3, "#8a6239");          // lid
+        rect(g, 2, 4, 12, 1, "#a37a4c");
+        rect(g, 2, 13, 12, 1, "#5c3a20");
+        rect(g, 4, 4, 1, 10, "#4a2d18");          // straps
+        rect(g, 11, 4, 1, 10, "#4a2d18");
+        rect(g, 7, 7, 2, 3, "#e8c84a");           // lock
+        px(g, 7, 8, "#8a6a10");
+        shadow(g, 2, 15, 12);
+        return g;
+    }
+
+    // Table, 2x1: a solid top on four legs, outlined so it reads on wood.
+    function table() {
+        const g = grid(N * 2, N);
+        rect(g, 1, 6, 30, 5, "#9c7145");        // top slab, lower on the tile
+        rect(g, 1, 6, 30, 1, "#c19a68");        // lit edge
+        rect(g, 1, 10, 30, 1, "#5c3a20");       // shadowed lip
+        rect(g, 0, 6, 1, 5, "#4a2d18");         // outline
+        rect(g, 31, 6, 1, 5, "#4a2d18");
+        rect(g, 3, 11, 3, 4, "#7a5433"); rect(g, 3, 11, 1, 4, "#8f6540");
+        rect(g, 26, 11, 3, 4, "#7a5433"); rect(g, 26, 11, 1, 4, "#8f6540");
+        rect(g, 3, 14, 3, 1, "#4a2d18"); rect(g, 26, 14, 3, 1, "#4a2d18");
+        shadow(g, 2, 15, 28);
+        return g;
+    }
+
+    // A single chair, 1x1: outlined so it does not vanish into the floor.
+    function chair() {
+        const g = grid(N, N);
+        rect(g, 3, 1, 10, 9, "#4a2d18");          // back outline
+        rect(g, 4, 2, 8, 7, "#8a6239");
+        rect(g, 5, 3, 6, 5, "#6d4b29");           // inset panel
+        rect(g, 4, 2, 8, 1, "#a87b4a");
+        rect(g, 2, 9, 12, 4, "#4a2d18");          // seat outline
+        rect(g, 3, 10, 10, 2, "#9c7145");
+        rect(g, 3, 10, 10, 1, "#b88a58");
+        rect(g, 3, 13, 2, 3, "#6d4b29");          // legs
+        rect(g, 11, 13, 2, 3, "#6d4b29");
+        shadow(g, 2, 15, 12);
+        return g;
+    }
+
+    // Fireplace, 2x1: stone surround, logs and live flames.
+    function fireplace(phase) {
+        const g = grid(N * 2, N);
+        rect(g, 0, 0, 32, 16, "#6d6a63");
+        rect(g, 0, 0, 32, 2, "#807c73");
+        rect(g, 4, 4, 24, 12, "#241f1c");         // hearth opening
+        rect(g, 7, 12, 18, 2, "#5c3a20");         // logs
+        rect(g, 9, 11, 14, 1, "#7a5433");
+        const f = phase % 2 === 0;
+        rect(g, 12, 8, 8, 4, f ? "#e8622a" : "#d8541f");
+        rect(g, 14, 6, 4, 4, f ? "#f6a02a" : "#efb03a");
+        rect(g, 15, 5, 2, 2, "#ffe07a");
+        px(g, f ? 11 : 20, 7, "#f6a02a");
+        return g;
+    }
+
+    // Shop counter, 2x1: worktop with goods on display.
+    function counter() {
+        const g = grid(N * 2, N);
+        rect(g, 0, 4, 32, 10, "#7a5433");
+        rect(g, 0, 3, 32, 2, "#a37a4c");          // worktop
+        rect(g, 0, 13, 32, 1, "#4a2d18");
+        for (let x = 2; x < 31; x += 6) rect(g, x, 6, 1, 7, "#6d4b29");
+        rect(g, 4, 0, 3, 3, "#c0472b");           // apples in a crate
+        rect(g, 8, 1, 3, 2, "#4b9e57");
+        rect(g, 22, 0, 4, 3, "#c9a227");          // a wheel of cheese
+        return g;
+    }
+
+    // Shelf of wares, 1x1: a real cabinet with two loaded shelves.
+    function shelf() {
+        const g = grid(N, N);
+        rect(g, 0, 0, 16, 16, "#4a2d18");         // carcass
+        rect(g, 1, 1, 14, 14, "#6d4b29");
+        rect(g, 2, 2, 12, 5, "#3a2413");          // upper bay (in shadow)
+        rect(g, 2, 9, 12, 5, "#3a2413");          // lower bay
+        rect(g, 1, 7, 14, 2, "#8a6239");          // middle plank
+        rect(g, 1, 7, 14, 1, "#a87b4a");
+        rect(g, 1, 14, 14, 1, "#8a6239");         // bottom plank
+        rect(g, 3, 3, 2, 4, "#5d7fb8"); px(g, 3, 3, "#8fb3e0");   // bottles
+        rect(g, 6, 4, 2, 3, "#b6455a"); px(g, 6, 4, "#d9748c");
+        rect(g, 10, 3, 3, 4, "#4b9e57"); px(g, 10, 3, "#79c98a");
+        rect(g, 3, 10, 4, 4, "#c9a227");          // sacks & crate
+        rect(g, 3, 10, 4, 1, "#e0bd4c");
+        rect(g, 9, 11, 4, 3, "#9c7145");
+        rect(g, 9, 11, 4, 1, "#b88a58");
+        return g;
+    }
+
+    // Anvil on a stump, 1x1: bright steel so it stands out on dark flagstones.
+    function anvil() {
+        const g = grid(N, N);
+        rect(g, 2, 10, 12, 5, "#5c3a20");         // oak stump
+        rect(g, 2, 10, 12, 1, "#7a5433");
+        rect(g, 3, 12, 2, 3, "#4a2d18");          // stump grain
+        rect(g, 9, 12, 2, 3, "#4a2d18");
+        rect(g, 1, 4, 14, 4, "#2d2b28");          // body outline
+        rect(g, 2, 5, 12, 2, "#8a8781");          // steel face
+        rect(g, 2, 5, 12, 1, "#c3bfb6");          // polished highlight
+        rect(g, 0, 5, 3, 2, "#8a8781");           // horn
+        px(g, 0, 6, "#6e6a62");
+        rect(g, 13, 5, 2, 2, "#6e6a62");          // heel
+        rect(g, 5, 8, 6, 2, "#4a4740");           // waist
+        rect(g, 5, 8, 6, 1, "#6e6a62");
+        shadow(g, 2, 15, 12);
+        return g;
+    }
+
+    // Forge hearth, 1x1: coals glowing under a hood.
+    function forgeFire(phase) {
+        const g = grid(N, N);
+        rect(g, 0, 8, 16, 8, "#4c4944");
+        rect(g, 0, 8, 16, 1, "#6d6a63");
+        rect(g, 2, 10, 12, 5, "#241f1c");
+        const f = phase % 2 === 0;
+        rect(g, 3, 12, 10, 3, f ? "#e8622a" : "#f07a2a");
+        rect(g, 5, 11, 6, 2, "#ffb43a");
+        px(g, f ? 6 : 9, 10, "#ffe07a");
+        rect(g, 0, 0, 16, 5, "#3a3833");          // hood
+        rect(g, 0, 4, 16, 1, "#2a2724");
+        return g;
+    }
+
+    // Barrel, 1x1: staved body, iron hoops, dark outline.
+    function barrel() {
+        const g = grid(N, N);
+        rect(g, 2, 2, 12, 13, "#3a2413");         // outline
+        rect(g, 3, 3, 10, 11, "#8a6239");         // body
+        rect(g, 4, 3, 2, 11, "#a87b4a");          // lit stave
+        rect(g, 10, 3, 2, 11, "#6d4b29");         // shaded stave
+        rect(g, 3, 5, 10, 2, "#4c4944");          // hoops
+        rect(g, 3, 10, 10, 2, "#4c4944");
+        rect(g, 3, 5, 10, 1, "#6e6a62");
+        rect(g, 4, 3, 8, 1, "#c19a68");           // lid rim
+        shadow(g, 2, 15, 12);
+        return g;
+    }
+
+    // Rug, 2x2: soft colour to break up the floor.
+    function rug() {
+        const g = grid(N * 2, N * 2);
+        rect(g, 1, 1, 30, 30, "#7a4258");
+        rect(g, 3, 3, 26, 26, "#98536e");
+        rect(g, 6, 6, 20, 20, "#7a4258");
+        rect(g, 9, 9, 14, 14, "#c9a227");
+        rect(g, 12, 12, 8, 8, "#98536e");
+        return g;
+    }
+
+    // Potted plant, 1x1.
+    function plant() {
+        const g = grid(N, N);
+        rect(g, 5, 11, 6, 4, "#a4562f");
+        rect(g, 5, 11, 6, 1, "#c06a3c");
+        rect(g, 7, 6, 2, 5, "#3f7a35");
+        rect(g, 4, 5, 4, 3, "#4b9e57");
+        rect(g, 8, 3, 4, 3, "#57b364");
+        rect(g, 6, 2, 3, 2, "#67c473");
+        shadow(g, 4, 15, 8);
+        return g;
+    }
+
+    // A soft contact shadow so pieces sit ON the floor instead of floating.
+    function shadow(g, x, y, w) {
+        rect(g, x + 1, y, w - 2, 1, "#6b4a28");
+        rect(g, x, y - 1, w, 1, "#7a5630");
+    }
+
+    // ---- registry -----------------------------------------------------------
+    // size = footprint in tiles; animated pieces are rebuilt per phase.
+    const KINDS = {
+        bed:       { w: 1, h: 2, make: bed },
+        chest:     { w: 1, h: 1, make: chest },
+        table:     { w: 2, h: 1, make: table },
+        chair:     { w: 1, h: 1, make: chair },
+        fireplace: { w: 2, h: 1, make: fireplace, animated: true },
+        counter:   { w: 2, h: 1, make: counter },
+        shelf:     { w: 1, h: 1, make: shelf },
+        anvil:     { w: 1, h: 1, make: anvil },
+        forgeFire: { w: 1, h: 1, make: forgeFire, animated: true },
+        barrel:    { w: 1, h: 1, make: barrel },
+        rug:       { w: 2, h: 2, make: rug, walkable: true },
+        plant:     { w: 1, h: 1, make: plant }
+    };
+
+    const _cache = new Map();
+    function offscreen(kind, phase) {
+        const def = KINDS[kind];
+        if (!def) return null;
+        const key = kind + "|" + (def.animated ? phase : 0);
+        const hit = _cache.get(key);
+        if (hit !== undefined) return hit;
+        const g = def.make(phase);
+        let cv = null;
+        if (typeof document !== "undefined") {
+            cv = document.createElement("canvas");
+            cv.width = N * def.w; cv.height = N * def.h;
+            const c = cv.getContext("2d");
+            for (let y = 0; y < g.length; y++) for (let x = 0; x < g[y].length; x++)
+                if (g[y][x]) { c.fillStyle = g[y][x]; c.fillRect(x, y, 1, 1); }
+        }
+        _cache.set(key, cv);
+        return cv;
+    }
+
+    function size(kind) {
+        const def = KINDS[kind];
+        return def ? { w: def.w, h: def.h } : { w: 1, h: 1 };
+    }
+
+    // Draw `kind` with its top-left at screen (sx, sy), scaled to tile size ts.
+    function draw(ctx, kind, sx, sy, ts, phase) {
+        const def = KINDS[kind];
+        if (!def) return false;
+        const cv = offscreen(kind, phase | 0);
+        if (!cv) return false;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(cv, sx, sy, ts * def.w, ts * def.h);
+        return true;
+    }
+
+    const Furniture = { draw, size, KINDS, N };
+    global.Furniture = Furniture;
+    if (typeof module !== "undefined" && module.exports) module.exports = { Furniture };
+})(typeof window !== "undefined" ? window : globalThis);

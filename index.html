@@ -13,6 +13,11 @@
     <title>Mini RPG 9.0</title>
 
     <link
+        rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>"
+    >
+
+    <link
         rel="stylesheet"
         href="style.css"
     >
@@ -25,6 +30,9 @@
 <div id="game">
 
     <header>
+
+        <button id="settingsButton" class="iconButton settingsButton" title="Настройки">⚙️</button>
+        <button id="muteButton" class="iconButton muteButton" title="Звук вкл/выкл">🔊</button>
 
         <h1>⚔️ MINI RPG 9.0</h1>
 
@@ -57,6 +65,8 @@
         <div id="quickStats">
             ⭐ Lv.1 | 💰 100
         </div>
+
+        <div id="allyInfo"></div>
 
     </section>
 
@@ -122,6 +132,18 @@
                     📜 Квесты
                 </button>
 
+                <button id="perkButton">
+                    🧠 Навыки
+                </button>
+
+                <button id="forgeButton">
+                    🔨 Кузница
+                </button>
+
+                <button id="dungeonButton">
+                    🚪 Врата испытаний
+                </button>
+
                 <button id="inventoryButton">
                     🎒 Инвентарь
                 </button>
@@ -145,57 +167,7 @@
             <h2>🗺️ МИР</h2>
 
             <div id="worldDescription"></div>
-            <div id="miniMap">
-
-    <div class="mapRow">
-
-        <div class="mapRoom" data-room="room2">
-            🏰
-            <small>Комната 2</small>
-        </div>
-
-    </div>
-
-
-    <div class="mapRow">
-
-        <div class="mapRoom" data-room="room1">
-            🏚️
-            <small>Комната 1</small>
-        </div>
-
-
-        <div
-            class="mapRoom"
-            data-room="start"
-        >
-            🏕️
-            <small>Старт</small>
-        </div>
-
-
-        <div class="mapRoom" data-room="room3">
-            🌲
-            <small>Лес</small>
-        </div>
-
-    </div>
-
-
-    <div class="mapRow">
-
-        <div></div>
-
-        <div></div>
-
-        <div class="mapRoom" data-room="room4">
-            💎
-            <small>Сокровище</small>
-        </div>
-
-    </div>
-
-            </div>
+            <div id="miniMap"></div>
 
 
             <div class="movement">
@@ -261,6 +233,8 @@
 
             <p id="locationDescription"></p>
 
+            <div id="locationArt"></div>
+
             <div id="locationActions"></div>
 
             <div id="locationExits"></div>
@@ -281,9 +255,15 @@
 
             <h2>⚔️ БОЙ</h2>
 
-            <div id="enemyInfo"></div>
+            <div id="battleArena">
+                <div id="heroFighter" class="fighter"></div>
+                <div id="vsMark">⚔️</div>
+                <div id="enemyFighter" class="fighter"></div>
+            </div>
 
             <div id="battleLog"></div>
+
+            <div id="battleSkills"></div>
 
             <div class="menuGrid">
 
@@ -357,6 +337,13 @@
 
             <div id="npcDialogue"></div>
 
+            <div id="npcChat"></div>
+            <div id="npcChoices"></div>
+
+            <button id="npcTalkButton">
+                💬 Побеседовать
+            </button>
+
             <button id="npcQuestButton">
                 📜 Получить квест
             </button>
@@ -380,6 +367,95 @@
             <div id="questList"></div>
 
             <button id="questBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- PERKS -->
+
+        <section
+            id="perkScreen"
+            class="screen hidden"
+        >
+
+            <h2>🧠 НАВЫКИ</h2>
+
+            <div id="perkPoints"></div>
+
+            <div id="perkList"></div>
+
+            <button id="perkBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- DUNGEON -->
+
+        <section
+            id="dungeonScreen"
+            class="screen hidden"
+        >
+
+            <h2>🚪 ВРАТА ИСПЫТАНИЙ</h2>
+
+            <div id="dungeonTrack"></div>
+
+            <div id="dungeonBody"></div>
+
+            <button id="dungeonActionButton"></button>
+
+            <button id="dungeonLeaveButton">
+                🏃 Покинуть подземелье
+            </button>
+
+        </section>
+
+
+        <!-- FORGE -->
+
+        <section
+            id="forgeScreen"
+            class="screen hidden"
+        >
+
+            <h2>🔨 КУЗНИЦА</h2>
+
+            <div id="forgeResources"></div>
+
+            <div id="forgeList"></div>
+
+            <button id="forgeBackButton">
+                🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- SETTINGS -->
+
+        <section
+            id="settingsScreen"
+            class="screen hidden"
+        >
+
+            <h2>⚙️ НАСТРОЙКИ</h2>
+
+            <div class="settingsRow">
+                <span>🔊 Звук</span>
+                <button id="settingsSoundButton">Вкл</button>
+            </div>
+
+            <div id="settingsStats"></div>
+
+            <button id="settingsResetButton" class="dangerButton">
+                🗑️ Сбросить сохранение
+            </button>
+
+            <button id="settingsBackButton">
                 🔙 Назад
             </button>
 
@@ -417,7 +493,13 @@
 </div>
 
 
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
 <script src="js/item.js"></script>
+<script src="js/craft.js"></script>
+<script src="js/dungeon.js"></script>
+<script src="js/dialogue.js"></script>
+<script src="js/ally.js"></script>
 <script src="js/player.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/enemy.js"></script>
@@ -432,6 +514,7 @@
 <script src="js/world.js"></script>
 <script src="js/battle.js"></script>
 <script src="js/save.js"></script>
+<script src="js/audio.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 

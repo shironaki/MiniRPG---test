@@ -6,7 +6,20 @@ const game =
 // ОБЩИЕ ФУНКЦИИ
 // =============================================
 
+let previousScreen = "menuScreen";
+
 function showScreen(id) {
+
+    // Remember the last "real" screen so Settings can return to it.
+    if (id !== "settingsScreen") previousScreen = id;
+
+    // Progressive UI: the player panel and journal only exist once you're
+    // actually in a run. The menu and end screens stay clean and minimal.
+    const gameRoot = document.getElementById("game");
+    if (gameRoot) {
+        if (id === "menuScreen" || id === "endScreen") gameRoot.classList.remove("playing");
+        else if (id !== "settingsScreen") gameRoot.classList.add("playing");
+    }
 
     document
         .querySelectorAll(".screen")
@@ -18,11 +31,13 @@ function showScreen(id) {
         });
 
 
-    document
-        .getElementById(id)
-        .classList.remove(
-            "hidden"
-        );
+    const target = document.getElementById(id);
+    target.classList.remove("hidden");
+
+    // Retrigger the entrance animation on each switch.
+    target.classList.remove("screenEnter");
+    void target.offsetWidth; // reflow so the animation can replay
+    target.classList.add("screenEnter");
 }
 
 
@@ -64,13 +79,26 @@ document
     );
 
 
-document
-    .getElementById("continueGameButton")
-    .addEventListener("click", () => {
-        if (!game.resume()) {
-            alert("💾 Сохранение ещё не найдено.");
-        }
-    });
+const continueButton =
+    document.getElementById("continueGameButton");
+
+continueButton.addEventListener("click", () => {
+    if (!game.resume()) {
+        alert("💾 Сохранение ещё не найдено.");
+        refreshContinueButton();
+    }
+});
+
+// Reflect save availability so players aren't offered a dead "Continue".
+function refreshContinueButton() {
+    const hasSave = Boolean(game.saveSystem.load()?.player);
+    continueButton.disabled = !hasSave;
+    continueButton.title = hasSave
+        ? "Продолжить сохранённое приключение"
+        : "Сохранение ещё не найдено";
+}
+
+refreshContinueButton();
 
 // =============================================
 // КАК ИГРАТЬ
@@ -100,6 +128,7 @@ MINI RPG 9.0
 - в каждой комнате есть одна ценная находка или опасность
 - используй новые выходы, чтобы исследовать другие ветки
 - собери 3 руны, чтобы открыть сокровищницу
+- каждую руну стережёт мини-босс — победи его, чтобы забрать руну
 
 ⚔️ В бою:
 - атакуй
@@ -151,8 +180,65 @@ document
                         game.player,
                         game.quest
                     );
+
+            // Reset any prior branching conversation.
+            game.dialogue = null;
+            const chat = document.getElementById("npcChat");
+            const choicesEl = document.getElementById("npcChoices");
+            if (chat) chat.innerHTML = "";
+            if (choicesEl) choicesEl.innerHTML = "";
         }
     );
+
+
+// =============================================
+// ДИАЛОГ СО СТАРОСТОЙ (ВЕТВЯЩАЯСЯ БЕСЕДА)
+// =============================================
+
+document
+    .getElementById("npcTalkButton")
+    .addEventListener("click", () => {
+        const trees = (typeof GAME_DATA !== "undefined" && GAME_DATA.dialogues) || {};
+        if (!trees.elder) return;
+        game.dialogue = new Dialogue(trees.elder);
+        renderDialogue();
+    });
+
+function renderDialogue() {
+    const d = game.dialogue;
+    const chat = document.getElementById("npcChat");
+    const choicesEl = document.getElementById("npcChoices");
+    if (!chat || !choicesEl) return;
+
+    if (!d || d.isEnded()) {
+        chat.innerHTML = d ? `<p class="dialogueEnd">🧑 Староста кивает и возвращается к делам.</p>` : "";
+        choicesEl.innerHTML = "";
+        game.dialogue = null;
+        return;
+    }
+
+    const node = d.current();
+    chat.innerHTML = `<div class="dialogueNode"><strong>${node.speaker || ""}</strong><p>${node.text || ""}</p></div>`;
+    choicesEl.innerHTML = "";
+    d.choices().forEach((choice) => {
+        // Map the visible choice back to its real index in the node.
+        const realIndex = node.choices.indexOf(choice);
+        const btn = document.createElement("button");
+        btn.className = "dialogueChoice";
+        btn.textContent = choice.label;
+        btn.onclick = () => chooseDialogue(realIndex);
+        choicesEl.appendChild(btn);
+    });
+}
+
+function chooseDialogue(index) {
+    const d = game.dialogue;
+    if (!d) return;
+    const result = d.choose(index, game);
+    (result.messages || []).forEach(m => addLog(m));
+    game.updateUI();
+    renderDialogue();
+}
 
 
 // =============================================
@@ -187,6 +273,7 @@ document
 
 
             renderQuest();
+            refreshMenus();
         }
     );
 
@@ -210,14 +297,283 @@ document
     );
 
 
+// =============================================
+// НАВЫКИ (ПЕРКИ)
+// =============================================
+
+document
+    .getElementById("perkButton")
+    .addEventListener("click", openPerks);
+
+document
+    .getElementById("perkBackButton")
+    .addEventListener("click", () => showScreen("villageScreen"));
+
+
+// =============================================
+// ВРАТА ИСПЫТАНИЙ (ПРОЦЕДУРНОЕ ПОДЗЕМЕЛЬЕ)
+// =============================================
+
+document
+    .getElementById("dungeonButton")
+    .addEventListener("click", () => game.enterDungeon());
+
+document
+    .getElementById("dungeonActionButton")
+    .addEventListener("click", dungeonAction);
+
+document
+    .getElementById("dungeonLeaveButton")
+    .addEventListener("click", () => {
+        if (game.dungeon) game.dungeon.active = false;
+        game.dungeon = null;
+        addLog("🏃 Ты покинул Врата испытаний.");
+        showScreen("villageScreen");
+        refreshMenus();
+    });
+
+const DUNGEON_ICONS = { enemy: "⚔️", elite: "👑", chest: "📦", trap: "⚠️", rest: "🔥" };
+
+function renderDungeon() {
+    const d = game.dungeon;
+    if (!d) return;
+    const track = document.getElementById("dungeonTrack");
+    if (track) {
+        track.innerHTML = d.floors.map((f, i) => {
+            const state = i < d.index ? "done" : i === d.index ? "current" : "upcoming";
+            const icon = i < d.index ? "✅" : (DUNGEON_ICONS[f.type] || "❔");
+            return `<span class="floorPip ${state}">${icon}</span>`;
+        }).join("");
+    }
+
+    const body = document.getElementById("dungeonBody");
+    const action = document.getElementById("dungeonActionButton");
+    const f = d.current();
+    if (!f) { if (body) body.innerHTML = ""; return; }
+
+    const els = { enemy: "Впереди притаился враг.", elite: "Путь стережёт элитный противник!", chest: "Ты видишь запертый сундук.", trap: "Пол усеян ловушками.", rest: "Тихий уголок для передышки." };
+    if (body) {
+        body.innerHTML = `
+            <div class="dungeonFloor">
+                <p class="dungeonDepth">Этаж ${f.n} из ${d.depth}</p>
+                <p class="dungeonEvent">${DUNGEON_ICONS[f.type] || "❔"} ${els[f.type] || ""}</p>
+            </div>`;
+    }
+    if (action) {
+        action.textContent = (f.type === "enemy" || f.type === "elite") ? "⚔️ Сразиться" : "➡️ Продолжить";
+    }
+}
+
+function dungeonAction() {
+    const d = game.dungeon;
+    if (!d || !d.active) return;
+    const f = d.current();
+    if (!f) return;
+    if (f.type === "enemy" || f.type === "elite") {
+        game.startDungeonBattle(f);
+        return;
+    }
+    addLog(game.resolveDungeonFloor(f));
+    if (game.player.isDead()) return; // gameOver already handled
+    d.advance();
+    game.updateUI();
+    if (d.cleared) game.finishDungeon();
+    else renderDungeon();
+}
+
+
+// =============================================
+// КУЗНИЦА
+// =============================================
+
+document
+    .getElementById("forgeButton")
+    .addEventListener("click", openForge);
+
+document
+    .getElementById("forgeBackButton")
+    .addEventListener("click", () => showScreen("villageScreen"));
+
+
+// Progressive disclosure of village options: the quest board appears after the
+// Elder's call; the perks screen appears once you have a point (or a perk).
+function refreshMenus() {
+    const questBtn = document.getElementById("questButton");
+    if (questBtn) {
+        const unlocked = Boolean(game && game.quest && game.quest.active);
+        questBtn.style.display = unlocked ? "" : "none";
+    }
+    const perkBtn = document.getElementById("perkButton");
+    if (perkBtn) {
+        const p = game && game.player;
+        const unlocked = p && (((p.perkPoints || 0) > 0) || (p.perks && Object.keys(p.perks).length > 0));
+        perkBtn.style.display = unlocked ? "" : "none";
+    }
+    const forgeBtn = document.getElementById("forgeButton");
+    if (forgeBtn) {
+        const p = game && game.player;
+        const unlocked = p && typeof Craft !== "undefined" && Craft.essenceCount(p) > 0;
+        forgeBtn.style.display = unlocked ? "" : "none";
+    }
+    const dungeonBtn = document.getElementById("dungeonButton");
+    if (dungeonBtn) {
+        const p = game && game.player;
+        // The trial gate opens once the hero is seasoned enough (level 3).
+        const unlocked = p && (p.level || 1) >= 3;
+        dungeonBtn.style.display = unlocked ? "" : "none";
+    }
+}
+
+
+function openPerks() {
+    showScreen("perkScreen");
+    renderPerks();
+}
+
+function renderPerks() {
+    const pointsEl = document.getElementById("perkPoints");
+    if (pointsEl) pointsEl.innerHTML = `🧠 Очки навыков: <strong>${(game.player && game.player.perkPoints) || 0}</strong>`;
+    const list = document.getElementById("perkList");
+    if (!list) return;
+    const defs = (typeof GAME_DATA !== "undefined" && GAME_DATA.perks) || [];
+    list.innerHTML = defs.map(def => {
+        const rank = (game.player.perks && game.player.perks[def.id]) || 0;
+        const maxed = rank >= def.maxRank;
+        const afford = (game.player.perkPoints || 0) >= (def.cost || 1);
+        const pips = "●".repeat(rank) + "○".repeat(def.maxRank - rank);
+        const action = maxed
+            ? `<span class="perkMax">МАКС</span>`
+            : `<button class="perkBuy" onclick="buyPerk('${def.id}')"${afford ? "" : " disabled"}>Улучшить</button>`;
+        return `<div class="perkCard ${maxed ? "maxed" : ""}">
+            <strong>${def.emoji} ${def.name}</strong>
+            <span class="perkPips">${pips}</span>
+            <p>${def.desc}</p>
+            ${action}
+        </div>`;
+    }).join("");
+}
+
+function buyPerk(id) {
+    const res = game.buyPerk(id);
+    if (res.success) {
+        addLog(`🧠 Навык улучшен: ${res.def.emoji} ${res.def.name} (ранг ${res.rank}).`);
+        if (typeof sfx !== "undefined") sfx.play("relic");
+    } else if (res.message) {
+        addLog(`⚠️ ${res.message}`);
+    }
+    game.updateUI();
+    renderPerks();
+}
+
+
+// =============================================
+// КУЗНИЦА (КРАФТ / РЕДКОСТЬ)
+// =============================================
+
+function forgeItems() {
+    // Every upgradeable piece the player owns: equipped slots + inventory gear.
+    const p = game.player;
+    const equipped = Object.values(p.equipment || {}).filter(Boolean);
+    const bag = (p.inventory || []).filter(i => i.isEquipment && i.isEquipment());
+    return equipped.concat(bag);
+}
+
+function openForge() {
+    showScreen("forgeScreen");
+    renderForge();
+}
+
+function renderForge() {
+    const p = game.player;
+    const resEl = document.getElementById("forgeResources");
+    if (resEl) resEl.innerHTML = `🔩 Эссенции: <strong>${Craft.essenceCount(p)}</strong> &nbsp;·&nbsp; 💰 Золото: <strong>${p.gold}</strong>`;
+    const list = document.getElementById("forgeList");
+    if (!list) return;
+
+    const items = forgeItems();
+    game._forgeItems = items;
+    if (!items.length) {
+        list.innerHTML = `<p class="muted">Нет снаряжения для улучшения. Найдите или купите оружие и броню.</p>`;
+        return;
+    }
+
+    list.innerHTML = items.map((item, idx) => {
+        const info = Craft.rarityInfo(item.rarity || "common");
+        const next = Craft.nextRarity(item.rarity || "common");
+        const bonus = item.attackBonus ? `⚔️ +${item.attackBonus}` : (item.defenseBonus ? `🛡️ +${item.defenseBonus}` : "");
+        let action;
+        if (!next) {
+            action = `<span class="perkMax">МАКС</span>`;
+        } else {
+            const cost = Craft.upgradeCost(item);
+            const afford = p.gold >= cost.gold && Craft.essenceCount(p) >= cost.essence;
+            action = `<button class="perkBuy" onclick="upgradeItem(${idx})"${afford ? "" : " disabled"}>💰${cost.gold} · 🔩${cost.essence}</button>`;
+        }
+        return `<div class="forgeCard" style="border-left-color:${info.color}">
+            <strong>${item.emoji} ${item.name}</strong>
+            <span class="rarityTag" style="color:${info.color}">${info.emoji} ${info.label}</span>
+            <span class="forgeBonus">${bonus}</span>
+            ${action}
+        </div>`;
+    }).join("");
+}
+
+function upgradeItem(idx) {
+    const item = (game._forgeItems || [])[idx];
+    if (!item) return;
+    const res = Craft.upgrade(game.player, item);
+    if (res.success) {
+        addLog(`🔨 Улучшено: ${item.emoji} ${item.name}!`);
+        if (typeof sfx !== "undefined") sfx.play("relic");
+    } else if (res.message) {
+        addLog(`⚠️ ${res.message}`);
+    }
+    game.updateUI();
+    renderForge();
+}
+
+
 function renderQuest() {
+
+    const journalHtml = game.journal ? game.journal.render(game.player) : "";
 
     document
         .getElementById(
             "questList"
         )
         .innerHTML =
-            game.quest.render();
+            game.quest.render() + journalHtml;
+}
+
+
+function acceptQuest(id) {
+    if (!game.journal) return;
+    const def = game.journal.accept(id, game.player);
+    if (def) {
+        addLog(`📜 Взято задание: ${def.title}`);
+        if (typeof sfx !== "undefined") sfx.play("relic");
+    }
+    game.updateUI();
+    renderQuest();
+}
+
+
+function claimQuest(id) {
+    if (!game.journal) return;
+    const res = game.journal.claim(id, game);
+    if (res) {
+        const r = res.reward;
+        const parts = [];
+        if (r.gold) parts.push(`💰 +${r.gold}`);
+        if (r.xp) parts.push(`✨ +${r.xp} XP`);
+        if (r.karma) parts.push(`☯️ ${r.karma > 0 ? "+" : ""}${r.karma}`);
+        if (r.affinity) parts.push(`❤ +${r.affinity}`);
+        addLog(`🏆 Награда за «${res.def.title}»: ${parts.join(", ")}`);
+        res.levelMsgs.forEach(m => addLog(m));
+        if (typeof sfx !== "undefined") sfx.play("win");
+    }
+    game.updateUI();
+    renderQuest();
 }
 
 
@@ -443,42 +799,175 @@ function showWorld() {
 
 function renderWorld() {
 
-    const location =
-        game.world.getCurrentLocation();
+    const world = game.world;
+    const location = world.getCurrentLocation();
+    const coords = world.coords;
+
+    // Bounding box of the spatial layout.
+    const cells = Object.values(coords);
+    const minX = Math.min(...cells.map(c => c.x));
+    const maxX = Math.max(...cells.map(c => c.x));
+    const minY = Math.min(...cells.map(c => c.y));
+    const maxY = Math.max(...cells.map(c => c.y));
 
     const map = document.getElementById("miniMap");
     map.className = "worldMapGrid";
-    map.innerHTML = Object.values(game.world.rooms).map(room => `
-        <div class="mapRoom" data-room="${room.id}" title="${room.name}">
-            <span>${room.name}</span>
-            <small>${room.id === "treasury" ? `Руны ${game.world.relics.length}/3` : room.cleared ? "Исследовано" : room.explored ? "Открыто" : "Неизведано"}</small>
-        </div>
-    `).join("");
+    map.style.gridTemplateColumns = `repeat(${maxX - minX + 1}, 1fr)`;
+    map.style.gridTemplateRows = `repeat(${maxY - minY + 1}, 1fr)`;
 
+    map.innerHTML = Object.keys(world.rooms).map(id => {
+        const c = coords[id];
+        if (!c) return "";
+
+        const col = c.x - minX + 1;      // x → column (west→east)
+        const row = maxY - c.y + 1;      // y → row (north on top)
+        const pos = `grid-column:${col};grid-row:${row}`;
+
+        // Fog of war: undiscovered rooms are hidden behind "?".
+        if (!world.isVisible(id)) {
+            return `<div class="mapCell fog" style="${pos}">❓</div>`;
+        }
+
+        const room = world.rooms[id];
+        const isCurrent = id === world.currentLocation;
+        const reachable = world.directionTo(id) !== null; // adjacent to current
+        const locked = id === "treasury" && world.relics.length < 3;
+
+        const status = id === "treasury"
+            ? `🔒 Руны ${world.relics.length}/3`
+            : room.cleared ? "Исследовано"
+            : room.visited ? "Открыто"
+            : "Неизведано";
+
+        const smallText = isCurrent ? "📍 ТЫ ЗДЕСЬ" : status;
+
+        const classes = [
+            "mapCell", "mapRoom",
+            isCurrent ? "current" : "",
+            room.cleared ? "cleared" : "",
+            !room.visited && !isCurrent ? "undiscovered" : "",
+            reachable && !isCurrent ? "reachable" : "",
+            locked ? "locked" : ""
+        ].filter(Boolean).join(" ");
+
+        const clickable = reachable && !isCurrent;
+        const onclick = clickable ? ` onclick="moveToRoom('${id}')"` : "";
+
+        const zoneAccent = ((typeof GAME_DATA !== "undefined" && GAME_DATA.zones && GAME_DATA.zones[id]) || {}).accent || "#3a4a63";
+
+        const badge = roomBadge(room, world);
+        const badgeHtml = badge ? `<em class="mapBadge">${badge}</em>` : "";
+        const markerHtml = isCurrent ? `<em class="mapMarker">📍</em>` : "";
+        const thumbHtml = mapCreatureThumb(room);
+
+        return `<div class="${classes}" data-room="${id}" style="${pos};--cell-accent:${zoneAccent}" title="${room.name}"${onclick}>
+            ${markerHtml}
+            ${thumbHtml || badgeHtml}
+            <span>${room.name}</span>
+            <small>${smallText}</small>
+        </div>`;
+    }).join("");
+
+    drawMapConnectors(map);
 
     document
-        .getElementById(
-            "worldDescription"
-        )
+        .getElementById("worldDescription")
         .innerHTML = `
-
-            <h3>
-                ${location.name}
-            </h3>
-
-            <p>
-                ${location.description}
-            </p>
-
-            <p>✨ Руны для сокровищницы: ${game.world.relics.length}/3</p>
-
+            <h3>${location.name}</h3>
+            <p>${location.description}</p>
+            <p>✨ Руны для сокровищницы: ${world.relics.length}/3</p>
+            <p class="mapHint">👆 Нажми на соседнюю комнату — или используй стрелки / WASD / свайпы.</p>
         `;
+}
 
-    document.querySelectorAll("[data-room]").forEach(mapRoom => {
-        const room = game.world.rooms[mapRoom.dataset.room];
-        mapRoom.classList.toggle("current", mapRoom.dataset.room === game.world.currentLocation);
-        mapRoom.classList.toggle("cleared", Boolean(room.cleared));
+// Small creature sprite for a map cell when a fightable foe is present.
+// Returns "" (falls back to the emoji badge) when there is nothing to show.
+function mapCreatureThumb(room) {
+    let key = null;
+    if (room.event === "enemy" && !room.cleared && room.enemyType) key = room.enemyType;
+    else if (room.event === "miniboss" && room.guardianType && !room.guardianDefeated) key = room.guardianType;
+    else if (room.event === "boss") key = "boss";
+    if (!key || typeof game === "undefined" || !game.spriteFor) return "";
+    const path = game.spriteFor("enemy", key);
+    return path ? `<img class="mapThumb" src="${path}" alt="" onerror="this.remove()">` : "";
+}
+
+// Status badge for a map cell: what a discovered room currently holds.
+function roomBadge(room, world) {
+    if (room.id === "treasury") {
+        return world.relics.length >= 3 ? "👑" : "🔒";
+    }
+    if (!room.explored) return "";              // discovered on the map but not entered/searched
+    if (room.cleared) return "✅";
+    switch (room.event) {
+        case "chest": return room.chest && !room.chest.opened ? "💰" : "✅";
+        case "trap": return room.trap && !room.trap.triggered && !room.trap.disarmed ? "⚠️" : "✅";
+        case "relic": return "✨";
+        case "rest": return "🔥";
+        case "recruit": return "🤝";
+        case "wanderer": return "🧍";
+        case "miniboss": return "🗿";
+        case "enemy": return "👹";
+        case "boss": return "👑";
+        default: return "";
+    }
+}
+
+// Draw connector lines between centres of connected, visible rooms.
+// Purely decorative; safely no-ops outside a real DOM (tests) or when hidden.
+function drawMapConnectors(map) {
+    if (!document.createElementNS || typeof map.querySelectorAll !== "function") return;
+
+    const world = game.world;
+    const width = map.clientWidth;
+    const height = map.clientHeight;
+    if (!width || !height) return;
+
+    const cells = {};
+    map.querySelectorAll("[data-room]").forEach(cell => { cells[cell.dataset.room] = cell; });
+
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "mapLines");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+
+    const drawn = new Set();
+    Object.keys(world.connections).forEach(id => {
+        const a = cells[id];
+        if (!a || !world.isVisible(id)) return;
+        Object.values(world.connections[id]).forEach(dest => {
+            if (!dest) return;
+            const key = [id, dest].sort().join("|");
+            if (drawn.has(key)) return;
+            const b = cells[dest];
+            if (!b || !world.isVisible(dest)) return;
+            drawn.add(key);
+
+            const line = document.createElementNS(NS, "line");
+            line.setAttribute("x1", a.offsetLeft + a.offsetWidth / 2);
+            line.setAttribute("y1", a.offsetTop + a.offsetHeight / 2);
+            line.setAttribute("x2", b.offsetLeft + b.offsetWidth / 2);
+            line.setAttribute("y2", b.offsetTop + b.offsetHeight / 2);
+            svg.appendChild(line);
+        });
     });
+
+    map.insertBefore(svg, map.firstChild);
+}
+
+// Click-to-move on the map: one step to an adjacent, connected room only.
+function moveToRoom(id) {
+    const result = game.world.moveTo(id);
+    if (!result.success) {
+        addLog(result.message);
+        return;
+    }
+    game.bumpStat("steps");
+    addLog(`🗺️ Ты переместился: ${result.room.name}`);
+    renderLocation();
+    showScreen("locationScreen");
 }
 
 function inventoryUnequip(slot) {
@@ -523,6 +1012,8 @@ function movePlayer(direction) {
 
         return;
     }
+
+    game.bumpStat("steps");
 
     addLog(
         `🗺️ Ты переместился: ${result.room.name}`
@@ -696,10 +1187,100 @@ if (worldScreen) {
 // ЛОКАЦИЯ
 // =============================================
 
+// Swap a broken/missing sprite <img> for its emoji fallback.
+function spriteFallback(img, emoji) {
+    const div = document.createElement("div");
+    div.className = "fighterEmoji";
+    div.textContent = emoji;
+    if (img && img.replaceWith) img.replaceWith(div);
+}
+
+// Render the unlocked skill buttons for the current battle, disabling any the
+// player can't currently afford.
+function renderBattleSkills() {
+    const box = document.getElementById("battleSkills");
+    if (!box) return;
+    const skills = (typeof GAME_DATA !== "undefined" && GAME_DATA.skills) || {};
+    const p = game.player;
+    if (!p || !game.battle) { box.innerHTML = ""; return; }
+    box.innerHTML = "";
+    Object.keys(skills).forEach(id => {
+        const s = skills[id];
+        if (p.level < s.level) return; // not yet unlocked
+        const btn = document.createElement("button");
+        btn.className = "skillButton";
+        const els = (typeof GAME_DATA !== "undefined" && GAME_DATA.elements) || {};
+        const elChip = s.element && els[s.element] ? `<em class="skillEl" title="${els[s.element].name}">${els[s.element].emoji}</em>` : "";
+        btn.innerHTML = `${s.emoji} ${s.name} ${elChip}<small>⚡${s.cost}</small>`;
+        btn.title = s.desc || "";
+        btn.disabled = (p.energy || 0) < s.cost;
+        btn.onclick = () => useSkill(id);
+        box.appendChild(btn);
+    });
+}
+
+function useSkill(id) {
+    if (!game.battle) return;
+    const skill = ((typeof GAME_DATA !== "undefined" && GAME_DATA.skills) || {})[id];
+    const res = game.battle.playerUseSkill(id);
+    if (res && res.success) {
+        sfx.play(skill && skill.type === "heal" ? "heal" : "attack");
+    }
+    if (game.gameEnded) sfx.play("lose");
+    else if (!game.battle) sfx.play("win"); // enemy defeated
+    if (game.battle) {
+        game.showEnemy();
+        renderBattleSkills();
+    }
+    game.updateUI();
+}
+
+// Pick the sprite that best represents what's happening in a room:
+// the lurking creature, a recruitable ally, or the hero exploring.
+function locationArtSubject(room) {
+    const enemies = (typeof GAME_DATA !== "undefined" && GAME_DATA.enemies) || {};
+    if (room.event === "enemy" && !room.cleared && room.enemyType) {
+        return { kind: "enemy", key: room.enemyType, emoji: (enemies[room.enemyType] || {}).emoji || "👹", frame: "danger" };
+    }
+    if (room.event === "miniboss" && room.guardianType && !room.guardianDefeated) {
+        return { kind: "enemy", key: room.guardianType, emoji: (enemies[room.guardianType] || {}).emoji || "🗿", frame: "danger" };
+    }
+    if (room.event === "boss") {
+        return { kind: "enemy", key: "boss", emoji: "👑", frame: "danger" };
+    }
+    if (room.event === "recruit" && !room.recruitResolved && room.recruitType) {
+        const a = (typeof ALLIES !== "undefined" && ALLIES[room.recruitType]) ? ALLIES[room.recruitType]() : null;
+        return { kind: "ally", key: room.recruitType, emoji: a ? a.emoji : "🤝", frame: "friendly" };
+    }
+    return { kind: "hero", key: "hero", emoji: "🧑", frame: "calm" };
+}
+
+function renderLocationArt(room) {
+    const box = document.getElementById("locationArt");
+    if (!box) return;
+    const subject = locationArtSubject(room);
+    const path = (typeof game !== "undefined" && game.spriteFor) ? game.spriteFor(subject.kind, subject.key) : null;
+    const art = path
+        ? `<img class="locationSprite" src="${path}" alt="" onerror="spriteFallback(this,'${subject.emoji}')">`
+        : `<div class="fighterEmoji">${subject.emoji}</div>`;
+    box.className = `locationArt ${subject.frame}`;
+    box.innerHTML = art;
+}
+
 function renderLocation() {
 
     const room =
         game.world.getCurrentRoom();
+
+
+    // Tint the location screen with the zone's accent colour.
+    const zone = (typeof GAME_DATA !== "undefined" && GAME_DATA.zones && GAME_DATA.zones[room.id]) || null;
+    const locScreen = document.getElementById("locationScreen");
+    if (locScreen && zone && locScreen.style && locScreen.style.setProperty) {
+        locScreen.style.setProperty("--zone-accent", zone.accent);
+    }
+
+    renderLocationArt(room);
 
 
     document
@@ -898,6 +1479,69 @@ function renderLocation() {
         return;
     }
 
+    // Recruit a companion.
+    if (room.event === "recruit" && !room.recruitResolved) {
+        const template = (typeof ALLIES !== "undefined" && ALLIES[room.recruitType]) ? ALLIES[room.recruitType]() : null;
+        const name = template ? `${template.emoji} ${template.name}` : "Союзник";
+        const note = document.createElement("div");
+        note.className = "locationChoice";
+        note.innerHTML = `<p>🤝 ${name} готов присоединиться к тебе.${game.player.ally ? "<br><small>Он заменит текущего спутника.</small>" : ""}</p>`;
+        actions.appendChild(note);
+
+        const joinButton = document.createElement("button");
+        joinButton.textContent = "🤝 Взять в отряд";
+        joinButton.onclick = recruitHere;
+        actions.appendChild(joinButton);
+
+        const declineButton = document.createElement("button");
+        declineButton.textContent = "🚶 Отказаться";
+        declineButton.onclick = declineRecruit;
+        actions.appendChild(declineButton);
+        return;
+    }
+
+    // Wandering traveller: a moral choice with consequences.
+    if (room.event === "wanderer" && !room.wandererResolved) {
+        const note = document.createElement("div");
+        note.className = "locationChoice";
+        note.innerHTML = `<p>🧍 Измождённый путник просит о помощи. Как поступишь?</p>`;
+        actions.appendChild(note);
+
+        const helpButton = document.createElement("button");
+        helpButton.textContent = "❤️ Помочь (−15 💰)";
+        helpButton.onclick = () => resolveWanderer("help");
+        actions.appendChild(helpButton);
+
+        const robButton = document.createElement("button");
+        robButton.textContent = "🗡️ Ограбить";
+        robButton.onclick = () => resolveWanderer("rob");
+        actions.appendChild(robButton);
+
+        const ignoreButton = document.createElement("button");
+        ignoreButton.textContent = "🚶 Пройти мимо";
+        ignoreButton.onclick = () => resolveWanderer("ignore");
+        actions.appendChild(ignoreButton);
+        return;
+    }
+
+    // Enemy still lurking here (e.g. after a successful flee): let the player re-engage.
+    if (room.event === "enemy" && !room.cleared) {
+        const fightButton = document.createElement("button");
+        fightButton.textContent = "⚔️ Враг всё ещё здесь — атаковать";
+        fightButton.onclick = startRandomEnemy;
+        actions.appendChild(fightButton);
+        return;
+    }
+
+    // Relic guardian still blocking (first visit or after a flee).
+    if (room.event === "miniboss" && !room.guardianDefeated) {
+        const guardianButton = document.createElement("button");
+        guardianButton.textContent = "⚔️ Сразиться со стражем руны";
+        guardianButton.onclick = startMiniboss;
+        actions.appendChild(guardianButton);
+        return;
+    }
+
      /*
     ========================================
     СОКРОВИЩЕ
@@ -933,6 +1577,8 @@ function renderLocation() {
                     "💎 Ты нашёл легендарное сокровище!"
                 );
 
+
+                sfx.play("win");
 
                 game.victory();
 
@@ -980,6 +1626,13 @@ function exploreRoom() {
             return;
 
 
+        case "miniboss":
+
+            startMiniboss();
+
+            return;
+
+
         case "chest":
 
             renderLocation();
@@ -1020,6 +1673,10 @@ function exploreRoom() {
 
         case "rest":
 
+        case "recruit":
+
+        case "wanderer":
+
             renderLocation();
 
             return;
@@ -1031,24 +1688,15 @@ function exploreRoom() {
 
 function startRandomEnemy() {
 
-    const enemies = [
+    const room = game.world.getCurrentRoom();
 
-        "goblin",
-        "wolf",
-        "skeleton"
-
-    ];
-
-
-    const randomIndex =
-        Math.floor(
-            Math.random() *
-            enemies.length
-        );
-
-
+    // Reuse the enemy type stored for this room so a foe the player fled from
+    // returns as the same kind. Fall back to a random pick for safety.
+    const pool = game.world.enemyPool || ["goblin", "wolf", "skeleton"];
     const enemyType =
-        enemies[randomIndex];
+        room.enemyType || pool[Math.floor(Math.random() * pool.length)];
+
+    if (!room.enemyType) room.enemyType = enemyType;
 
 
     const enemy =
@@ -1073,13 +1721,26 @@ function openChest() {
 
     const result =
         room.chest.open(
-            game.player
+            game.player,
+            game.world.chestLootFor(room.id)
         );
+
+    if (result.success) { game.bumpStat("chests"); sfx.play("chest"); }
 
 
     addLog(
         result.message
     );
+
+    if (result.success && game.journal) {
+        game.journal.onChestOpened().forEach(id => {
+            const e = game.journal.entry(id);
+            const d = game.journal.def(id);
+            if (!e || !d) return;
+            if (e.completed) addLog(`🏆 Задание «${d.title}» выполнено! Забери награду в журнале.`);
+            else addLog(`📜 «${d.title}»: ${e.progress}/${d.objective.count}`);
+        });
+    }
 
 
     room.cleared =
@@ -1102,6 +1763,8 @@ function activateTrap() {
             game.player
         );
 
+    sfx.play("hurt");
+
 
     addLog(
         result.message
@@ -1119,6 +1782,8 @@ function activateTrap() {
         game.player.isDead()
     ) {
 
+        sfx.play("lose");
+
         game.gameOver();
 
         return;
@@ -1131,10 +1796,12 @@ function activateTrap() {
 function disarmTrap() {
     const room = game.world.getCurrentRoom();
     const result = room.trap.disarm(game.player);
+    if (result.success) { game.bumpStat("traps"); sfx.play("relic"); } else { sfx.play("hurt"); }
     addLog(result.message);
     room.cleared = true;
     game.updateUI();
     if (game.player.isDead()) {
+        sfx.play("lose");
         game.gameOver();
         return;
     }
@@ -1143,7 +1810,78 @@ function disarmTrap() {
 
 function claimRelic() {
     const relic = game.world.collectRelic();
-    if (relic) addLog(`✨ Получена ${relic}. Печать Стража ослабла: ${game.world.relics.length}/3.`);
+    if (relic) { addLog(`✨ Получена ${relic}. Печать Стража ослабла: ${game.world.relics.length}/3.`); sfx.play("relic"); }
+    game.updateUI();
+    renderLocation();
+}
+
+function recruitHere() {
+    const room = game.world.getCurrentRoom();
+    const ally = game.recruitAlly(room.recruitType);
+    room.recruitResolved = true;
+    room.cleared = true;
+    room.event = "cleared";
+    if (ally) {
+        addLog(`🤝 ${ally.emoji} ${ally.name} присоединяется к отряду!`);
+        sfx.play("relic");
+    }
+    game.updateUI();
+    renderLocation();
+}
+
+function declineRecruit() {
+    const room = game.world.getCurrentRoom();
+    room.recruitResolved = true;
+    room.cleared = true;
+    room.event = "cleared";
+    addLog("🚶 Ты отказался от спутника.");
+    game.updateUI();
+    renderLocation();
+}
+
+function resolveWanderer(choice) {
+    const room = game.world.getCurrentRoom();
+    room.wandererResolved = true;
+    room.cleared = true;
+    room.event = "cleared";
+    const p = game.player;
+
+    if (choice === "help") {
+        let cost = "";
+        if (p.gold >= 15) { p.gold -= 15; cost = "Ты отдал 15 золота."; }
+        else {
+            const idx = p.inventory.findIndex(i => i.type === "potion");
+            if (idx >= 0) { p.inventory.splice(idx, 1); cost = "Ты отдал зелье."; }
+            else cost = "У тебя не было чем поделиться, но ты помог делом.";
+        }
+        game.adjustKarma(8);
+        addLog(`❤️ Ты помог путнику. ${cost} Карма выросла (☯️ ${game.karmaLabel()}).`);
+        if (p.ally) {
+            p.ally.changeAffinity(6);
+            addLog(`🙂 ${p.ally.name} одобряет поступок (привязанность ❤ ${p.ally.affinity}).`);
+        } else {
+            const ally = game.recruitAlly("healer");
+            if (ally) addLog(`🌿 Благодарный путник оказался травницей — ${ally.name} присоединяется к тебе!`);
+        }
+        sfx.play("relic");
+    } else if (choice === "rob") {
+        const gold = 25 + Math.floor(Math.random() * 36);
+        p.gold += gold;
+        game.adjustKarma(-10);
+        addLog(`🗡️ Ты ограбил путника (+${gold} 💰). Карма упала (☯️ ${game.karmaLabel()}).`);
+        if (p.ally) {
+            p.ally.changeAffinity(-12);
+            addLog(`😠 ${p.ally.name} осуждает тебя (привязанность ❤ ${p.ally.affinity}).`);
+            if (p.ally.hasLeft()) {
+                addLog(`💔 ${p.ally.name} покидает отряд, разочаровавшись в тебе.`);
+                p.ally = null;
+            }
+        }
+        sfx.play("hurt");
+    } else {
+        addLog("🚶 Ты прошёл мимо путника.");
+    }
+
     game.updateUI();
     renderLocation();
 }
@@ -1173,6 +1911,21 @@ function startBossBattle() {
     game.startBattle(
         enemy
     );
+}
+
+
+function startMiniboss() {
+
+    const room = game.world.getCurrentRoom();
+    const type = room.guardianType || game.world.relicGuardians[room.id] || "skeleton";
+
+    const enemy = createEnemy(type, game.player.level);
+    enemy.isGuardian = true;
+    enemy.relicRoom = room.id;
+
+    addLog(`⚔️ ${enemy.emoji} ${enemy.name} преграждает путь к руне!`);
+
+    game.startBattle(enemy);
 }
 
 
@@ -1214,6 +1967,13 @@ document
 
 
             game.battle.playerAttack();
+            sfx.play("attack");
+
+            if (game.gameEnded) {
+                sfx.play("lose");
+            } else if (!game.battle) {
+                sfx.play("win"); // enemy defeated
+            }
 
             if (game.battle) {
                 game.showEnemy();
@@ -1238,6 +1998,8 @@ document
 
 
             game.battle.playerHeal();
+            sfx.play("heal");
+            if (game.gameEnded) sfx.play("lose");
 
             game.showEnemy();
         }
@@ -1258,6 +2020,8 @@ document
 
 
             game.battle.playerDefend();
+            sfx.play("defend");
+            if (game.gameEnded) sfx.play("lose");
 
             game.showEnemy();
         }
@@ -1268,6 +2032,8 @@ document
     .addEventListener("click", () => {
         if (!game.battle) return;
         game.battle.playerFlee();
+        if (game.gameEnded) sfx.play("lose");
+        else if (!game.battle) sfx.play("flee"); // escaped
         if (game.battle) game.showEnemy();
         game.updateUI();
     });
@@ -1368,3 +2134,79 @@ document
 
         }
     );
+
+
+// =============================================
+// ЗВУК (mute)
+// =============================================
+
+(function setupMuteButton() {
+    const button = document.getElementById("muteButton");
+    if (!button) return;
+
+    function refresh() {
+        button.textContent = sfx.muted ? "🔇" : "🔊";
+        button.setAttribute("aria-pressed", String(sfx.muted));
+    }
+
+    button.addEventListener("click", () => {
+        const nowMuted = sfx.toggleMute();
+        if (!nowMuted) sfx.play("heal"); // brief confirmation blip when unmuting
+        refresh();
+    });
+
+    refresh();
+})();
+
+
+// =============================================
+// НАСТРОЙКИ
+// =============================================
+
+function renderSettings() {
+    const soundButton = document.getElementById("settingsSoundButton");
+    if (soundButton) soundButton.textContent = sfx.muted ? "Выкл" : "Вкл";
+
+    const statsBox = document.getElementById("settingsStats");
+    if (statsBox) {
+        statsBox.innerHTML = game.player
+            ? game.renderStats()
+            : `<p class="settingsHint">Начни игру, чтобы увидеть статистику забега.</p>`;
+    }
+}
+
+function openSettings() {
+    showScreen("settingsScreen");
+    renderSettings();
+}
+
+(function setupSettings() {
+    const openButton = document.getElementById("settingsButton");
+    if (openButton) openButton.addEventListener("click", openSettings);
+
+    const soundButton = document.getElementById("settingsSoundButton");
+    if (soundButton) {
+        soundButton.addEventListener("click", () => {
+            const nowMuted = sfx.toggleMute();
+            if (!nowMuted) sfx.play("heal");
+            renderSettings();
+            const headerMute = document.getElementById("muteButton");
+            if (headerMute) headerMute.textContent = nowMuted ? "🔇" : "🔊";
+        });
+    }
+
+    const resetButton = document.getElementById("settingsResetButton");
+    if (resetButton) {
+        resetButton.addEventListener("click", () => {
+            const ok = confirm("Удалить сохранение и начать заново? Это действие необратимо.");
+            if (!ok) return;
+            game.saveSystem.clear();
+            location.reload();
+        });
+    }
+
+    const backButton = document.getElementById("settingsBackButton");
+    if (backButton) {
+        backButton.addEventListener("click", () => showScreen(previousScreen));
+    }
+})();

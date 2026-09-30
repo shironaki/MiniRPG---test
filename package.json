@@ -1,0 +1,17 @@
+{
+  "name": "mini-rpg",
+  "version": "9.0.0",
+  "description": "Mini RPG 9.0 — The Lost Kingdom. A dependency-free browser RPG.",
+  "private": true,
+  "author": "shironaki",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shironaki/MiniRPG---test.git"
+  },
+  "scripts": {
+    "test": "node tests/game.test.js && node tests/integration.test.js && node v2/tests/engine.test.js && node v2/tests/battle.test.js && node v2/tests/menus.test.js && node v2/tests/smoke.test.js",
+    "serve": "node scripts/serve.js",
+    "check": "for f in js/*.js scripts/*.js tests/*.js v2/js/main.js v2/js/*/*.js v2/tests/*.js; do node --check \"$f\" || exit 1; done && echo 'syntax OK'"
+  }
+}

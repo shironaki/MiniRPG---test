@@ -21,9 +21,13 @@ class NPC {
             player.gold +=
                 quest.rewardGold;
 
-            player.addExperience(
+            const levelMessages = player.addExperience(
                 quest.rewardXP
             );
+
+            const levelBlock = levelMessages.length
+                ? "<br><br>" + levelMessages.join("<br>")
+                : "";
 
 
             return `
@@ -33,7 +37,7 @@ class NPC {
                 Ты выполнил задание.<br><br>
 
                 💰 +${quest.rewardGold} золота<br>
-                ✨ +${quest.rewardXP} XP
+                ✨ +${quest.rewardXP} XP${levelBlock}
             `;
         }
 

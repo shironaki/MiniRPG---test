@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini RPG 2.0 — 2D</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>⚔️ Mini RPG <span>2.0</span></h1>
+            <p class="tag">Свободное перемещение · прототип 2D-мира</p>
+        </header>
+
+        <div id="stage">
+            <canvas id="game" width="640" height="360"></canvas>
+            <div id="stats"></div>
+            <div id="hud">WASD / стрелки — движение · E — действие</div>
+        </div>
+
+        <div id="overlay" class="hidden">
+            <div id="overlayCard">
+                <div id="overlayBody"></div>
+                <button id="overlayClose">Закрыть</button>
+            </div>
+        </div>
+
+        <div id="battle" class="hidden">
+            <div id="battleCard">
+                <div id="bEnemy" class="fighter"></div>
+                <div id="bHero" class="fighter"></div>
+                <div id="bLog"></div>
+                <div id="bActions"></div>
+                <div id="bResult" class="hidden"></div>
+            </div>
+        </div>
+
+        <footer>
+            <span class="pill">🕹️ WASD / ⬆⬇⬅➡</span>
+            <span class="pill">🅴 действие</span>
+            <span class="pill">v2 · Canvas engine</span>
+        </footer>
+    </div>
+
+    <!-- On-screen controls for touch devices -->
+    <button id="fsBtn" aria-label="На весь экран">⛶</button>
+    <button id="ctrlToggle" aria-label="Сменить управление">🕹️</button>
+    <div id="touch">
+        <div class="tleft">
+            <div id="joystick"><div id="stick"></div></div>
+            <div id="dpad">
+                <button class="tbtn" data-key="ArrowUp" aria-label="Вверх">▲</button>
+                <div class="drow">
+                    <button class="tbtn" data-key="ArrowLeft" aria-label="Влево">◀</button>
+                    <button class="tbtn" data-key="ArrowDown" aria-label="Вниз">▼</button>
+                    <button class="tbtn" data-key="ArrowRight" aria-label="Вправо">▶</button>
+                </div>
+            </div>
+        </div>
+        <div id="tactions">
+            <button class="tbtn big" data-tap="KeyI" aria-label="Рюкзак">🎒</button>
+            <button class="tbtn big" data-tap="KeyE" aria-label="Действие">Е</button>
+        </div>
+    </div>
+
+    <!-- Shared helpers + reused v1 combat engine -->
+    <script src="../js/util.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/item.js"></script>
+    <script src="../js/craft.js"></script>
+    <script src="../js/ally.js"></script>
+    <script src="../js/player.js"></script>
+    <script src="../js/enemy.js"></script>
+    <script src="../js/battle.js"></script>
+    <script src="../js/shop.js"></script>
+    <script src="../js/quest.js"></script>
+    <script src="../js/dungeon.js"></script>
+    <script src="../js/dialogue.js"></script>
+
+    <!-- Engine -->
+    <script src="js/engine/vec.js"></script>
+    <script src="js/engine/input.js"></script>
+    <script src="js/engine/camera.js"></script>
+    <script src="js/engine/loop.js"></script>
+
+    <!-- World -->
+    <script src="js/world/tiles.js"></script>
+    <script src="js/world/tilemap.js"></script>
+    <script src="js/world/social.js"></script>
+    <script src="js/world/resources.js"></script>
+    <script src="js/world/farming.js"></script>
+    <script src="js/world/requests.js"></script>
+    <script src="js/world/maps.js"></script>
+
+    <!-- Entities -->
+    <script src="js/entities/mover.js"></script>
+    <script src="js/entities/player.js"></script>
+    <script src="js/entities/enemy.js"></script>
+    <script src="js/entities/npc.js"></script>
+
+    <!-- Battle bridge -->
+    <script src="js/battle/battle2d.js"></script>
+    <script src="js/battle/battleui.js"></script>
+
+    <!-- Village menus (shop / forge / quests / dialogue / dungeon / inventory) -->
+    <script src="js/ui/menus.js"></script>
+
+    <!-- Render + bootstrap -->
+    <script src="js/render/tilesart.js"></script>
+    <script src="js/render/buildings.js"></script>
+    <script src="js/render/furniture.js"></script>
+    <script src="js/render/character.js"></script>
+    <script src="js/render/mobs.js"></script>
+    <script src="js/render/renderer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
