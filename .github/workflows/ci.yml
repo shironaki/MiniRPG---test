@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Syntax check all game scripts
-        run: for f in js/*.js scripts/*.js tests/*.js; do node --check "$f"; done
+      - name: Syntax check all game scripts (v1 + v2)
+        run: for f in js/*.js scripts/*.js tests/*.js v2/js/main.js v2/js/*/*.js v2/tests/*.js; do node --check "$f"; done
       - name: Run unit tests
         run: npm test

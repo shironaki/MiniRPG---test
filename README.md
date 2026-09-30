@@ -4,6 +4,26 @@ A dependency-free, single-file-per-system browser RPG written in vanilla
 JavaScript. Explore a dungeon, fight enemies, disarm traps, collect three runes
 to unlock the treasury, defeat the Guardian and claim the treasure.
 
+> 🚧 **Две версии в одном репозитории:**
+> **v1** — кликовая игра в корне (`/`), стабильна.
+> **v2** — 2D-версия со свободным перемещением в `/v2/`, активная разработка
+> (живые NPC, дружба, день/ночь, сбор ресурсов, ферма).
+
+## 📌 Новому разработчику — читать в этом порядке
+
+| Документ | Зачем |
+|----------|-------|
+| **[`AGENTS.md`](AGENTS.md)** | **Обязательно.** Жёсткие правила: лицензия, замороженная ветка `main`, замороженные `main.js`, порядок веток. Читается людьми и ИИ-агентами перед любой работой |
+| [`docs/HANDOVER.md`](docs/HANDOVER.md) | Полная передача проекта: что сделано, как запустить, как проверять, дорожная карта, грабли |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Карта кода: что в каком файле и как связано |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | История всех работ по коммитам |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Процесс: ветки, коммиты, чек-лист перед PR |
+
+Кратко о главном: ветка `main` **заморожена**, работа ведётся в новой ветке от
+`arena/01a0eee6-minirpg-test`, файлы `LICENSE`, `js/main.js` и `v2/js/main.js`
+изменять нельзя. Нарушения автоматически ловит
+[`guard.yml`](.github/workflows/guard.yml).
+
 ## Play locally
 
 No build step required. Either open `index.html` directly, or run the bundled
@@ -62,6 +82,21 @@ every push and pull request.
 
 ## Controls
 
+### v1 (кликовая версия, `/`)
 - **World map:** arrow keys / WASD, on-screen buttons, or swipe (touch).
 - **Combat:** Attack, Potion, Defend, Flee.
 - Progress auto-saves to `localStorage`; use **Продолжить приключение** to resume.
+
+### v2 (2D-версия, `/v2/`)
+- **WASD / стрелки** — ходьба, **E** — контекстное действие (поговорить, войти,
+  рубить/собирать, работать на грядке), **I** — рюкзак, **Esc** — закрыть меню.
+- На телефоне — виртуальный джойстик, кнопки действий и фуллскрин.
+- Живут суточные часы: жители ходят по расписанию, ночью светятся окна,
+  политые с вечера грядки подрастают на рассвете.
+
+## Лицензия и права
+
+Проект распространяется по лицензии **MIT** — см. [`LICENSE`](LICENSE).
+Правообладатель: **shironaki**. Строка `Copyright (c) 2026 shironaki` изменению
+не подлежит; любые вклады (включая сделанные с помощью ИИ-агентов) вносятся на
+условиях этой лицензии.

@@ -1,0 +1,107 @@
+name: Guard
+
+# Автоматическая защита собственности владельца проекта.
+# Blocks changes to the licence, the copyright line, the frozen entry points
+# and the protection rules themselves. See AGENTS.md.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: ["**"]
+
+jobs:
+  copyright:
+    name: Копирайт на месте
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: LICENSE exists and still belongs to the owner
+        run: |
+          set -e
+          test -f LICENSE || { echo "::error::LICENSE отсутствует. Файл удалять нельзя."; exit 1; }
+          grep -qF "Copyright (c) 2026 shironaki" LICENSE || {
+            echo "::error::Строка копирайта изменена или удалена. Она должна оставаться: Copyright (c) 2026 shironaki"; exit 1; }
+          grep -qF '"license": "MIT"' package.json || {
+            echo "::error::Поле license в package.json изменено. Должно быть MIT."; exit 1; }
+          echo "✅ Лицензия и копирайт на месте."
+
+  protected-paths:
+    name: Защищённые файлы не тронуты
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pull request must not target main
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$BASE_REF" = "main" ]; then
+            echo "::error::Ветка main заморожена. PR должен идти в рабочую ветку (arena/01a0eee6-minirpg-test), а не в main."
+            exit 1
+          fi
+          echo "✅ База PR: $BASE_REF"
+
+      - name: Diff against the base and reject protected paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -e
+          git fetch --no-tags origin "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || true
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Изменённые файлы:"; echo "$CHANGED"; echo "---"
+
+          PROTECTED="LICENSE
+          AGENTS.md
+          CONTRIBUTING.md
+          .github/CODEOWNERS
+          .github/workflows/guard.yml
+          js/main.js
+          v2/js/main.js"
+
+          FAIL=0
+          while IFS= read -r p; do
+            p=$(echo "$p" | xargs)
+            [ -z "$p" ] && continue
+            if echo "$CHANGED" | grep -qxF "$p"; then
+              echo "::error file=$p::Файл '$p' защищён и не может изменяться без письменного разрешения владельца (см. AGENTS.md)."
+              FAIL=1
+            fi
+          done <<< "$PROTECTED"
+
+          if echo "$CHANGED" | grep -qxF "package.json"; then
+            if ! git diff "$BASE_SHA" "$HEAD_SHA" -- package.json | grep -E '^[+-]' | grep -E '"(license|author)"' -q; then
+              echo "ℹ️ package.json изменён, но поля license/author не затронуты — допустимо."
+            else
+              echo "::error file=package.json::Поля license/author в package.json менять нельзя."
+              FAIL=1
+            fi
+          fi
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "::error::PR отклонён guard-проверкой. Откатите изменения защищённых файлов."
+            exit 1
+          fi
+          echo "✅ Защищённые файлы не тронуты."
+
+  no-dependencies:
+    name: Без зависимостей и артефактов
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Project must stay dependency-free
+        run: |
+          set -e
+          if [ -d node_modules ]; then echo "::error::node_modules закоммичен."; exit 1; fi
+          if ls package-lock.json yarn.lock pnpm-lock.yaml 2>/dev/null | grep -q .; then
+            echo "::error::Lock-файл в репозитории — значит появились зависимости. Проект должен оставаться без зависимостей."; exit 1; fi
+          if node -e "const p=require('./package.json'); process.exit((p.dependencies&&Object.keys(p.dependencies).length)||(p.devDependencies&&Object.keys(p.devDependencies).length)?1:0)"; then
+            echo "✅ Зависимостей нет."
+          else
+            echo "::error::В package.json появились dependencies/devDependencies."; exit 1
+          fi
