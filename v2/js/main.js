@@ -7,6 +7,7 @@
 (function () {
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
+    const stage = document.getElementById("stage");
     const hud = document.getElementById("hud");
     const statsEl = document.getElementById("stats");
     const overlay = document.getElementById("overlay");
@@ -87,27 +88,94 @@
     const INTERACT_RADIUS = 44;
 
     function resize() {
-        const wrap = canvas.parentElement;
         const isMobile = window.matchMedia("(max-width: 768px)").matches;
-        const availW = wrap.clientWidth;
-        const w = isMobile ? availW : Math.min(availW, 720);
-        // Taller playfield on phones (portrait); 16:9 on wider screens.
-        const h = isMobile
-            ? Math.min(Math.round(w * 1.15), Math.round(window.innerHeight * 0.62))
-            : Math.round(w * 9 / 16);
         const dpr = window.devicePixelRatio || 1;
-        // Zoom so a tile is a comfortable on-screen size (bigger on touch).
-        const targetTilePx = isMobile ? 54 : 44;
-        const zoom = Math.max(1, targetTilePx / mapData.tileSize);
-        canvas.width = Math.round(w * dpr);
-        canvas.height = Math.round(h * dpr);
-        canvas.style.width = w + "px";
-        canvas.style.height = h + "px";
+        const ts = mapData.tileSize;
+        let cw, ch, zoom;
+        if (isMobile) {
+            // Canvas fills the stage exactly (CSS makes #game absolute:inset:0),
+            // so the whole playfield fits the screen with no page scrolling.
+            cw = stage.clientWidth || window.innerWidth;
+            ch = stage.clientHeight || Math.round(window.innerHeight * 0.7);
+            canvas.style.width = "";
+            canvas.style.height = "";
+            zoom = Math.max(1, 54 / ts);
+        } else {
+            const w = Math.min(stage.clientWidth, 720);
+            cw = w;
+            ch = Math.round(w * 9 / 16);
+            canvas.style.width = w + "px";
+            canvas.style.height = ch + "px";
+            zoom = Math.max(1, 44 / ts);
+        }
+        canvas.width = Math.max(1, Math.round(cw * dpr));
+        canvas.height = Math.max(1, Math.round(ch * dpr));
         ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
-        camera.resize(w / zoom, h / zoom);
+        camera.resize(cw / zoom, ch / zoom);
     }
     window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", () => setTimeout(resize, 100));
     resize();
+
+    // ---- Control scheme (virtual joystick <-> D-pad), remembered locally -----
+    (function wireControlScheme() {
+        const joystick = document.getElementById("joystick");
+        const stick = document.getElementById("stick");
+        const dpad = document.getElementById("dpad");
+        const toggle = document.getElementById("ctrlToggle");
+        if (!joystick || !dpad || !toggle) return;
+
+        let mode = "stick";
+        try { mode = localStorage.getItem("v2ctrl") || "stick"; } catch (e) { /* ignore */ }
+
+        function apply(m) {
+            mode = m;
+            joystick.style.display = m === "stick" ? "block" : "none";
+            dpad.style.display = m === "dpad" ? "flex" : "none";
+            toggle.textContent = m === "stick" ? "🕹️" : "✚";
+            input.clearAnalog();
+            try { localStorage.setItem("v2ctrl", m); } catch (e) { /* ignore */ }
+        }
+        toggle.addEventListener("click", () => apply(mode === "stick" ? "dpad" : "stick"));
+        apply(mode);
+
+        // Analog joystick → Input.setAnalog.
+        const R = 34, DEAD = 0.18;
+        let active = false, cx = 0, cy = 0;
+        function point(e) { return e.touches ? (e.touches[0] || e.changedTouches[0]) : e; }
+        function start(e) {
+            active = true;
+            const r = joystick.getBoundingClientRect();
+            cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+            move(e); if (e.cancelable) e.preventDefault();
+        }
+        function move(e) {
+            if (!active) return;
+            const p = point(e);
+            let dx = p.clientX - cx, dy = p.clientY - cy;
+            const d = Math.hypot(dx, dy) || 1;
+            const cl = Math.min(d, R);
+            dx = dx / d * cl; dy = dy / d * cl;
+            stick.style.transform = `translate(${dx}px, ${dy}px)`;
+            let nx = dx / R, ny = dy / R;
+            if (Math.abs(nx) < DEAD) nx = 0;
+            if (Math.abs(ny) < DEAD) ny = 0;
+            input.setAnalog(nx, ny);
+            if (e.cancelable) e.preventDefault();
+        }
+        function end() {
+            active = false;
+            stick.style.transform = "translate(0,0)";
+            input.clearAnalog();
+        }
+        joystick.addEventListener("touchstart", start, { passive: false });
+        joystick.addEventListener("touchmove", move, { passive: false });
+        joystick.addEventListener("touchend", end);
+        joystick.addEventListener("touchcancel", end);
+        joystick.addEventListener("mousedown", start);
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
+    })();
 
     function findNearest() {
         let best = null, bestD = INTERACT_RADIUS;

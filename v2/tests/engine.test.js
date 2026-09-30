@@ -65,6 +65,16 @@ describe("Input", () => {
         i.press("ArrowDown");
         expect(i.axis().y).toBe(1);
     });
+    it("analog override wins over keys until cleared", () => {
+        const { Input } = loadEngine().exports;
+        const i = new Input();
+        i.press("KeyD");                 // keyboard says x = +1
+        i.setAnalog(-0.5, 0.7);          // joystick overrides
+        expect(i.axis().x).toBe(-0.5);
+        expect(i.axis().y).toBe(0.7);
+        i.clearAnalog();
+        expect(i.axis().x).toBe(1);      // back to keyboard
+    });
 });
 
 // ---------------------------------------------------------------------------

@@ -222,9 +222,50 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
     pointer-events: none;
     z-index: 15;
 }
-#touch > * { pointer-events: auto; }
-#dpad { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#touch > *, #ctrlToggle { pointer-events: auto; }
+.tleft { display: flex; align-items: flex-end; }
+#dpad { display: none; flex-direction: column; align-items: center; gap: 6px; }
 .drow { display: flex; gap: 6px; }
+
+/* Virtual joystick */
+#joystick {
+    position: relative;
+    width: 116px;
+    height: 116px;
+    border-radius: 50%;
+    background: rgba(34,48,73,0.5);
+    border: 1px solid #4a6a9a;
+    touch-action: none;
+    backdrop-filter: blur(2px);
+}
+#stick {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 48px;
+    height: 48px;
+    margin: -24px 0 0 -24px;
+    border-radius: 50%;
+    background: rgba(120,150,200,0.92);
+    border: 1px solid #b9a6ff;
+    transition: transform 0.03s linear;
+}
+
+/* Control-scheme toggle */
+#ctrlToggle {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    display: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(34,48,73,0.82);
+    border: 1px solid #4a6a9a;
+    color: #eef2f8;
+    font-size: 18px;
+    z-index: 16;
+}
 .tbtn {
     width: 54px;
     height: 54px;
@@ -249,20 +290,39 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 /* Show touch controls on touch devices */
 @media (pointer: coarse) {
     #touch { display: flex; }
+    #ctrlToggle { display: block; }
 }
 
-/* Compact layout on phones so the game gets the space */
+/* Phones: fill the screen so nothing needs scrolling */
 @media (max-width: 768px) {
-    body { padding: 6px; }
-    #app { gap: 8px; max-width: 100%; }
-    header h1 { font-size: 22px; }
+    html, body { height: 100%; overflow: hidden; }
+    body { padding: 0; }
+    #app {
+        height: 100vh;
+        height: 100dvh;
+        gap: 0;
+        max-width: 100%;
+        justify-content: flex-start;
+    }
+    header { padding: 5px 0; }
+    header h1 { font-size: 17px; letter-spacing: 0; }
     header .tag { display: none; }
     footer { display: none; }
-    #game { border-radius: 10px; }
+    #stage { flex: 1 1 auto; width: 100%; min-height: 0; }
+    #game {
+        position: absolute;
+        inset: 0;
+        width: 100% !important;
+        height: 100% !important;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
     #stats { font-size: 11px; gap: 6px; padding: 4px 8px; top: 6px; left: 6px; }
-    #hud { font-size: 11px; bottom: 8px; padding: 5px 10px; }
+    #hud { font-size: 11px; bottom: 84px; padding: 5px 10px; white-space: normal; max-width: 60vw; text-align: center; }
+    #overlay, #battle { padding: 10px; }
     #overlayCard { max-width: 100%; padding: 16px; }
-    #overlayBody { max-height: 56vh; }
+    #overlayBody { max-height: 64vh; }
     #battleCard { max-width: 100%; }
 }
 .pill {

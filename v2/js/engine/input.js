@@ -7,9 +7,15 @@ class Input {
     constructor() {
         this.held = new Set();
         this.pressed = new Set();   // keys pressed since the last consume()
+        this._analog = null;        // optional {x,y} override from a virtual stick
         this._onDown = null;
         this._onUp = null;
     }
+
+    // Virtual-joystick override: while set, axis() returns this vector instead
+    // of the keyboard state. Components are analog (roughly -1..1).
+    setAnalog(x, y) { this._analog = { x, y }; }
+    clearAnalog() { this._analog = null; }
 
     press(code) {
         if (!this.held.has(code)) this.pressed.add(code);
@@ -22,8 +28,10 @@ class Input {
     wasPressed(code) { return this.pressed.has(code); }
     consumePressed() { this.pressed.clear(); }
 
-    // Movement axis from WASD or arrow keys, each component in {-1,0,1}.
+    // Movement axis. A virtual-joystick vector wins when active; otherwise it is
+    // derived from WASD / arrow keys, each component in {-1,0,1}.
     axis() {
+        if (this._analog) return { x: this._analog.x, y: this._analog.y };
         let x = 0, y = 0;
         if (this.isDown("ArrowLeft") || this.isDown("KeyA")) x -= 1;
         if (this.isDown("ArrowRight") || this.isDown("KeyD")) x += 1;

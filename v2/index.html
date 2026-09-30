@@ -44,13 +44,17 @@
     </div>
 
     <!-- On-screen controls for touch devices -->
+    <button id="ctrlToggle" aria-label="Сменить управление">🕹️</button>
     <div id="touch">
-        <div id="dpad">
-            <button class="tbtn" data-key="ArrowUp" aria-label="Вверх">▲</button>
-            <div class="drow">
-                <button class="tbtn" data-key="ArrowLeft" aria-label="Влево">◀</button>
-                <button class="tbtn" data-key="ArrowDown" aria-label="Вниз">▼</button>
-                <button class="tbtn" data-key="ArrowRight" aria-label="Вправо">▶</button>
+        <div class="tleft">
+            <div id="joystick"><div id="stick"></div></div>
+            <div id="dpad">
+                <button class="tbtn" data-key="ArrowUp" aria-label="Вверх">▲</button>
+                <div class="drow">
+                    <button class="tbtn" data-key="ArrowLeft" aria-label="Влево">◀</button>
+                    <button class="tbtn" data-key="ArrowDown" aria-label="Вниз">▼</button>
+                    <button class="tbtn" data-key="ArrowRight" aria-label="Вправо">▶</button>
+                </div>
             </div>
         </div>
         <div id="tactions">
