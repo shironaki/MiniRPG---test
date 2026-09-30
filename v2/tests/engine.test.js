@@ -318,6 +318,55 @@ describe("Zones & portals", () => {
         for (const r of (v.resources || [])) {
             expect(tileInfo(v.rows[r.row][r.col]).solid).toBe(false);
         }
+        for (const c of (v.farm || [])) {
+            expect(tileInfo(v.rows[c.row][c.col]).solid).toBe(false);
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Farming
+// ---------------------------------------------------------------------------
+describe("Farm plots", () => {
+    it("cycles empty→tilled→growing→ready→harvest and needs seeds", () => {
+        const { Farm } = loadEngine().exports;
+        const f = new Farm({ rng: () => 0.9 });   // deterministic: no bumper crop
+        expect(f.actionFor(1, 1)).toBe("till");
+        expect(f.till(1, 1).ok).toBe(true);
+        expect(f.actionFor(1, 1)).toBe("plant");
+        expect(f.plant(1, 1, 1, 0).ok).toBe(false);        // no seeds
+        const pl = f.plant(1, 1, 1, 3);
+        expect(pl.ok && pl.consumeSeed).toBe(true);
+        expect(f.actionFor(1, 1)).toBe("water");
+        expect(f.harvest(1, 1).ok).toBe(false);            // not ready yet
+    });
+
+    it("grows only when watered the previous day, then harvest yields the crop", () => {
+        const { Farm, CROP } = loadEngine().exports;
+        const f = new Farm({ rng: () => 0.9 });
+        f.till(2, 2); f.plant(2, 2, 1, 5);
+        // Not watered on day 1 → no growth at dawn of day 2.
+        f.onNewDay(2);
+        expect(f.plot(2, 2).progress).toBe(0);
+        // Water on day 2, grow at dawn of day 3, water again, grow at dawn of day 4.
+        f.water(2, 2, 2); f.onNewDay(3);
+        expect(f.plot(2, 2).progress).toBe(1);
+        f.water(2, 2, 3); f.onNewDay(4);
+        expect(f.plot(2, 2).state).toBe("ready");          // growDays = 2
+        const h = f.harvest(2, 2);
+        expect(h.ok).toBe(true);
+        expect(h.crop).toBe(CROP.res);
+        expect(h.amount >= 1).toBe(true);
+        expect(f.plot(2, 2).state).toBe("tilled");         // ready to replant
+    });
+
+    it("water/harvest are rejected in the wrong state; watering is once per day", () => {
+        const { Farm } = loadEngine().exports;
+        const f = new Farm();
+        expect(f.water(3, 3, 1).ok).toBe(false);           // nothing planted
+        f.till(3, 3); f.plant(3, 3, 1, 1);
+        expect(f.water(3, 3, 1).ok).toBe(true);
+        expect(f.water(3, 3, 1).already).toBe(true);       // same day again
     });
 });
 

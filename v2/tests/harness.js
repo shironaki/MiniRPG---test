@@ -21,6 +21,7 @@ const FILES = [
     "js/world/tilemap.js",
     "js/world/social.js",
     "js/world/resources.js",
+    "js/world/farming.js",
     "js/world/maps.js",
     "js/entities/mover.js",
     "js/entities/player.js",
@@ -34,7 +35,8 @@ const EXPORTED = [
     "TILES", "DEFAULT_TILE", "tileInfo",
     "TileMap", "MAPS", "getMap",
     "moveAndCollide", "Player2D", "Enemy2D", "detectEncounter",
-    "NPC2D", "Social", "ResourceNode", "ResourceBag", "RESOURCES", "NODE_TYPES"
+    "NPC2D", "Social", "ResourceNode", "ResourceBag", "RESOURCES", "NODE_TYPES",
+    "Farm", "FarmPlot", "CROP"
 ];
 
 function loadEngine() {

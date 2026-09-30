@@ -12,7 +12,9 @@ const RESOURCES = {
     wood:  { name: "Древесина", emoji: "🪵" },
     stone: { name: "Камень",    emoji: "🪨" },
     berry: { name: "Ягоды",     emoji: "🫐" },
-    herb:  { name: "Травы",     emoji: "🌿" }
+    herb:  { name: "Травы",     emoji: "🌿" },
+    seeds: { name: "Семена",    emoji: "🌰" },
+    veg:   { name: "Морковь",   emoji: "🥕" }
 };
 
 // Per node-type defaults: which resource, how many hits to fell, regrow seconds.

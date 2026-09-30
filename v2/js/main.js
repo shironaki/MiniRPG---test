@@ -15,7 +15,7 @@
     const overlayClose = document.getElementById("overlayClose");
 
     // The active zone's data is (re)built by loadZone() on every map change.
-    let mapData, tilemap, interactables, enemies, portals, zoneName, npcs, resourceNodes;
+    let mapData, tilemap, interactables, enemies, portals, zoneName, npcs, resourceNodes, farmPlots;
 
     const player = new Player2D(0, 0, { w: 20, h: 20, speed: 130 });
 
@@ -25,9 +25,11 @@
     const DAY_REAL_SEC = 300;             // 5 real minutes = one full day
     const MIN_PER_SEC = 1440 / DAY_REAL_SEC;
 
-    // Persistent social & gathering state (survive zone changes).
+    // Persistent social, gathering & farming state (survive zone changes).
     const social = new Social();
     const resources = new ResourceBag();
+    const farm = new Farm();
+    resources.add("seeds", 6);            // a starter pouch of seeds
 
     // Transient on-screen feedback (gathering, gifts) — fades on its own.
     let flash = "", flashT = 0;
@@ -54,6 +56,7 @@
             return n;
         });
         resourceNodes = (mapData.resources || []).map(r => new ResourceNode(r, ts));
+        farmPlots = (mapData.farm || []).map(c => ({ col: c.col, row: c.row, px: c.col * ts + ts / 2, py: c.row * ts + ts / 2 }));
         zoneName = mapData.name || id;
         const sp = spawn || mapData.spawn;
         player.x = sp.col * ts + 6;
@@ -263,6 +266,14 @@
                 best = { kind: "resource", target: r, emoji: (meta && meta.emoji) || "🌿", label: gatherVerb(r.type) };
             }
         }
+        for (const c of farmPlots) {
+            const d = Math.hypot(c.px - player.centerX, c.py - player.centerY);
+            if (d <= bestD) {
+                bestD = d;
+                const act = farm.actionFor(c.col, c.row);
+                best = { kind: "farm", target: c, emoji: farmEmoji(act), label: farmVerb(act) };
+            }
+        }
         return best;
     }
 
@@ -272,6 +283,32 @@
             : type === "herb" ? "Собрать травы" : "Собрать ягоды";
     }
 
+    function farmVerb(act) {
+        return act === "till" ? "Вспахать грядку"
+            : act === "plant" ? "Посадить семена"
+            : act === "water" ? "Полить" : "Собрать урожай";
+    }
+    function farmEmoji(act) {
+        return act === "till" ? "🪓" : act === "plant" ? "🌱" : act === "water" ? "💧" : "🥕";
+    }
+
+    // Quick, non-pausing farm work driven by the plot's current state.
+    function workPlot(cell) {
+        const act = farm.actionFor(cell.col, cell.row);
+        let r;
+        if (act === "till") r = farm.till(cell.col, cell.row);
+        else if (act === "plant") {
+            r = farm.plant(cell.col, cell.row, dayCount, resources.count("seeds"));
+            if (r.ok && r.consumeSeed) resources.remove("seeds", 1);
+        } else if (act === "water") r = farm.water(cell.col, cell.row, dayCount);
+        else {
+            r = farm.harvest(cell.col, cell.row);
+            if (r.ok) resources.add(r.crop, r.amount);
+        }
+        if (r && r.msg) showFlash(r.msg, 1.3);
+        refreshStats();
+    }
+
     // A quick, non-pausing gather. Adds to the bag and gives feedback.
     function gatherFrom(node) {
         const r = node.hit();
@@ -279,7 +316,10 @@
         resources.add(r.res, r.amount);
         const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[r.res] : null;
         const em = (meta && meta.emoji) || "📦";
-        showFlash(r.felled ? `${em} +${r.amount} — собрано!` : `${em} +${r.amount}`, 1.2);
+        let extra = "";
+        // Foraging bushes sometimes yields a seed for the farm.
+        if (node.type === "bush" && Math.random() < 0.5) { resources.add("seeds", 1); extra = " 🌰+1"; }
+        showFlash((r.felled ? `${em} +${r.amount} — собрано!` : `${em} +${r.amount}`) + extra, 1.2);
         journal.onResourceGathered && journal.onResourceGathered(r.res, r.amount);
         refreshStats();
     }
@@ -392,7 +432,7 @@
     function update(dt) {
         const prev = clockMin;
         clockMin = (clockMin + dt * MIN_PER_SEC) % 1440;
-        if (clockMin < prev) dayCount += 1;      // wrapped past midnight → new day
+        if (clockMin < prev) { dayCount += 1; farm.onNewDay(dayCount); }  // dawn → new day
         social.setDay(dayCount);
         if (flashT > 0) flashT = Math.max(0, flashT - dt);
         if (paused) return;
@@ -407,11 +447,13 @@
         if ((input.wasPressed("KeyE") || input.wasPressed("Enter") || input.wasPressed("Space")) && nearest) {
             if (nearest.kind === "resource") {
                 gatherFrom(nearest.target);      // quick action, keep playing
+            } else if (nearest.kind === "farm") {
+                workPlot(nearest.target);        // quick action, keep playing
             } else {
                 openInteraction(nearest);
             }
             input.consumePressed();
-            if (nearest.kind !== "resource") return;
+            if (nearest.kind !== "resource" && nearest.kind !== "farm") return;
         }
         input.consumePressed();
 
@@ -442,6 +484,7 @@
         renderer.clear(camera.viewW, camera.viewH);
         renderer.drawMap(tilemap, camera);
         renderer.drawBuildings(mapData.buildings, camera, mapData.tileSize, light.night);
+        renderer.drawFarm(farm, farmPlots, camera, mapData.tileSize);
         renderer.drawResourceNodes(resourceNodes, camera);
         renderer.drawPortals(portals, camera);
         renderer.drawInteractables(interactables, camera);
@@ -466,5 +509,13 @@
     loop.start();
 
     // Expose for debugging / future bridging.
-    window.__v2 = { player, tilemap, camera, input, loop };
+    window.__v2 = {
+        player, tilemap, camera, input, loop,
+        social, resources, farm,
+        get npcs() { return npcs; },
+        get nodes() { return resourceNodes; },
+        get farmPlots() { return farmPlots; },
+        get clock() { return clockMin; },
+        get day() { return dayCount; }
+    };
 })();

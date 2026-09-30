@@ -209,6 +209,65 @@ class Renderer {
         }
     }
 
+    // Farm plots — soil, sprouts and ripe crops drawn per tile state.
+    drawFarm(farm, plotList, camera, ts) {
+        if (!farm || !plotList) return;
+        const ctx = this.ctx;
+        for (const cell of plotList) {
+            const p = farm.plot(cell.col, cell.row);
+            const sx = Math.round(cell.col * ts - camera.x);
+            const sy = Math.round(cell.row * ts - camera.y);
+            if (sx + ts < 0 || sy + ts < 0 || sx > camera.viewW || sy > camera.viewH) continue;
+            const pad = 3, x = sx + pad, y = sy + pad, s = ts - pad * 2;
+
+            if (p.state === "empty") {
+                // faint outline so the field reads as farmland before tilling
+                ctx.strokeStyle = "rgba(90,60,35,0.5)";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 0.5, y + 0.5, s - 1, s - 1);
+                continue;
+            }
+
+            // tilled soil (darker when watered)
+            ctx.fillStyle = p.watered ? "#4a3320" : "#6b4a2c";
+            ctx.fillRect(x, y, s, s);
+            ctx.strokeStyle = "rgba(0,0,0,0.25)";
+            ctx.lineWidth = 1;
+            for (let i = 1; i < 3; i++) {
+                const fy = y + (s * i) / 3;
+                ctx.beginPath(); ctx.moveTo(x + 1, fy); ctx.lineTo(x + s - 1, fy); ctx.stroke();
+            }
+
+            const cx = sx + ts / 2, by = sy + ts - pad - 1;
+            if (p.state === "growing") {
+                const t = p.growDays ? Math.min(1, p.progress / p.growDays) : 0;
+                const hgt = 4 + t * (ts * 0.5);
+                ctx.strokeStyle = "#4fae53";
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(cx, by); ctx.lineTo(cx, by - hgt); ctx.stroke();
+                ctx.fillStyle = "#5cc267";
+                ctx.beginPath();
+                ctx.ellipse(cx - 3, by - hgt * 0.7, 3, 1.6, -0.6, 0, Math.PI * 2);
+                ctx.ellipse(cx + 3, by - hgt * 0.85, 3, 1.6, 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                if (p.watered) {
+                    ctx.fillStyle = "rgba(90,170,255,0.5)";
+                    ctx.beginPath(); ctx.arc(cx + 5, by - 2, 1.6, 0, Math.PI * 2); ctx.fill();
+                }
+            } else if (p.state === "ready") {
+                // leafy top + orange root (a little carrot)
+                ctx.fillStyle = "#4caf50";
+                ctx.beginPath();
+                ctx.moveTo(cx, by - 14); ctx.lineTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8);
+                ctx.closePath(); ctx.fill();
+                ctx.fillStyle = "#e8862b";
+                ctx.beginPath();
+                ctx.moveTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8); ctx.lineTo(cx, by);
+                ctx.closePath(); ctx.fill();
+            }
+        }
+    }
+
     // Living townsfolk — drawn with the hero rig using each NPC's palette.
     drawNPCs(npcs, camera) {
         if (!npcs) return;

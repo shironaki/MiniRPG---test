@@ -55,7 +55,7 @@ const MAPS = {
             {
                 id: "marta", name: "Марта", emoji: "👩‍🌾", role: "Фермерша",
                 look: { shirt: "#4b9e57", shirtSh: "#357a41", hair: "#8a5a2b", hairSh: "#5f3d1c", hat: null, pants: "#6b4a2e", pantsSh: "#4a331f" },
-                likes: ["berry", "herb", "Зелье"],
+                likes: ["berry", "herb", "veg", "Зелье"],
                 dialogue: [
                     "Урожай в этом году добрый, если дожди не подведут.",
                     "Свежие ягоды? Обожаю! Не поделишься находкой?",
@@ -89,7 +89,7 @@ const MAPS = {
             {
                 id: "lena", name: "Лена", emoji: "👧", role: "Цветочница",
                 look: { shirt: "#d46a9f", shirtSh: "#a84c7c", hair: "#e6c34d", hairSh: "#c49a2b", hat: null, pants: "#7a5a86", pantsSh: "#573f61" },
-                likes: ["berry", "herb", "цвет"],
+                likes: ["berry", "herb", "veg", "цвет"],
                 dialogue: [
                     "Смотри, какие цветы у пруда — прелесть!",
                     "Ты принёс мне травы? Ты самый добрый!",
@@ -116,6 +116,11 @@ const MAPS = {
             { type: "bush", col: 17, row: 8  },
             { type: "herb", col: 16, row: 10 },
             { type: "herb", col: 7,  row: 4  }
+        ],
+        // Farm plots (till → plant seed → water daily → harvest) near the forge.
+        farm: [
+            { col: 7, row: 13 }, { col: 8, row: 13 }, { col: 9, row: 13 },
+            { col: 7, row: 14 }, { col: 8, row: 14 }, { col: 9, row: 14 }
         ],
         // Walk onto a portal tile to travel. { col,row, to, spawn, label, emoji }
         portals: [
