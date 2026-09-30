@@ -27,9 +27,30 @@ class Renderer {
                 const info = tilemap.infoAt(col, row);
                 const sx = Math.round(col * ts - camera.x);
                 const sy = Math.round(row * ts - camera.y);
+
+                // Pixel tile art (matches the character style).
+                if (typeof TileArt !== "undefined") {
+                    // Houses are multi-tile buildings: pick the right piece from
+                    // the neighbours (roof on the top edge, wall/window/door below).
+                    if (info.name === "house") {
+                        const isH = (c, r) => tilemap.infoAt(c, r).name === "house";
+                        const above = isH(col, row - 1);
+                        const below = isH(col, row + 1);
+                        const left = isH(col - 1, row);
+                        const right = isH(col + 1, row);
+                        let part;
+                        if (!above) part = "houseRoof";
+                        else if (!below && left && right) part = "houseDoor";
+                        else part = ((col * 3 + row) % 2 === 0 && left && right) ? "houseWin" : "houseWall";
+                        TileArt.draw(ctx, part, sx, sy, ts, col, row);
+                        continue;
+                    }
+                    if (TileArt.draw(ctx, info.name, sx, sy, ts, col, row)) continue;
+                }
+
                 ctx.fillStyle = info.color || "#101319";
                 ctx.fillRect(sx, sy, ts, ts);
-                // Simple texture accents.
+                // Simple texture accents (fallback only).
                 if (info.name === "tree") {
                     ctx.fillStyle = "#2e6b39";
                     ctx.beginPath();
