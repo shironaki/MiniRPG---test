@@ -154,6 +154,59 @@ header .tag { color: #8996ac; font-size: 14px; margin-top: 4px; }
 #bResult.hidden { display: none; }
 #bResult h2 { font-size: 24px; margin-bottom: 10px; }
 
+/* Overworld stats bar */
+#stats {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: rgba(6,8,13,0.6);
+    border: 1px solid #35496a;
+    border-radius: 10px;
+    padding: 5px 10px;
+    font-size: 13px;
+    color: #eef2f8;
+    pointer-events: none;
+}
+
+/* Menu panels (shop / forge / quests / dialogue / dungeon / inventory) */
+#overlayBody { max-height: 62vh; overflow-y: auto; text-align: left; }
+#overlayBody h2 { text-align: center; }
+.mGroup { margin: 12px 0 6px; color: #b9a6ff; font-size: 14px; border-bottom: 1px solid #2a3a56; padding-bottom: 3px; }
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #1c2740;
+    font-size: 14px;
+}
+.row small { color: #8996ac; }
+.mBtn {
+    padding: 7px 12px;
+    border: 1px solid #35496a;
+    border-radius: 9px;
+    background: #223049;
+    color: #eef2f8;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mBtn:hover { border-color: #b9a6ff; background: #2a3a56; }
+.mBtn.ghost { background: #1a2233; }
+.mBtn.wide { display: block; width: 100%; margin: 6px 0; text-align: left; white-space: normal; }
+.gold { text-align: center; color: #ffd166; font-weight: 600; }
+.flash { text-align: center; color: #9bd0ff; background: #14213a; border-radius: 8px; padding: 6px; }
+.qcard { background: #10182a; border: 1px solid #2a3a56; border-radius: 10px; padding: 10px; margin: 8px 0; }
+.qcard.offer { border-color: #4a6a9a; }
+.qcard.done { border-color: #4aa06a; }
+.qcard strong { display: inline-block; margin-right: 6px; }
+.qtag { font-size: 11px; color: #8996ac; }
+.qr { color: #ffd166; font-size: 13px; }
+
 footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .pill {
     background: #141b2a;

@@ -8,6 +8,7 @@
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     const hud = document.getElementById("hud");
+    const statsEl = document.getElementById("stats");
     const overlay = document.getElementById("overlay");
     const overlayBody = document.getElementById("overlayBody");
     const overlayClose = document.getElementById("overlayClose");
@@ -37,6 +38,21 @@
 
     // Persistent v1 hero drives stats/progression; Player2D handles position.
     const hero = new Player("Герой");
+    const journal = new QuestJournal();
+    const host = {
+        player: hero,
+        adjustKarma(n) { hero.karma = (hero.karma || 0) + n; }
+    };
+    const menuCtx = { hero, journal, host, refresh: refreshStats };
+
+    function refreshStats() {
+        statsEl.innerHTML =
+            `<span>❤️ ${Math.max(0, hero.health)}/${hero.maxHealth}</span>` +
+            `<span>⚡ ${hero.energy}/${hero.maxEnergy}</span>` +
+            `<span>⭐ ур.${hero.level}</span>` +
+            `<span>💰 ${hero.gold}</span>` +
+            `<span>☯️ ${hero.karma || 0}</span>`;
+    }
 
     const camera = new Camera(canvas.width, canvas.height);
     const input = new Input();
@@ -73,9 +89,17 @@
 
     function openInteraction(it) {
         paused = true;
+        const dispatch = {
+            shop: V2Menus.shop,
+            forge: V2Menus.forge,
+            quests: V2Menus.quests,
+            npc: V2Menus.dialogue,
+            dungeon: V2Menus.dungeon
+        };
+        const open = dispatch[it.action];
+        if (open) { open(menuCtx); return; }
         overlayBody.innerHTML = `<h2>${it.emoji} ${escapeText(it.label)}</h2>
-            <p>${escapeText(describe(it.action))}</p>
-            <p class="hint">Полноценные действия этой точки подключаются в следующих шагах 2.0.</p>`;
+            <p>${escapeText(describe(it.action))}</p>`;
         overlay.classList.remove("hidden");
     }
 
@@ -88,9 +112,11 @@
     function openEncounter(foe) {
         paused = true;
         openBattle(hero, foe.kind, hero.level, {
-            onWin() {
+            onWin(bc) {
+                journal.onEnemyDefeated(bc.enemy);   // advance side quests
                 foe.alive = false;          // defeated foe leaves the map
                 respawnHero();
+                refreshStats();
                 paused = false;
             },
             onFlee() {
@@ -110,6 +136,7 @@
     function closeInteraction() {
         paused = false;
         overlay.classList.add("hidden");
+        refreshStats();
         input.consumePressed();
     }
     overlayClose.addEventListener("click", closeInteraction);
@@ -131,6 +158,13 @@
 
     function update(dt) {
         if (paused) return;
+        // Open the backpack/equipment panel anywhere with I.
+        if (input.wasPressed("KeyI")) {
+            paused = true;
+            V2Menus.inventory(menuCtx);
+            input.consumePressed();
+            return;
+        }
         // Edge-triggered interaction.
         if ((input.wasPressed("KeyE") || input.wasPressed("Enter") || input.wasPressed("Space")) && nearest) {
             openInteraction(nearest);
@@ -158,10 +192,11 @@
 
         hud.textContent = nearest
             ? `Нажми E — ${nearest.emoji} ${nearest.label}`
-            : "WASD / стрелки — движение · E — действие";
+            : "WASD / стрелки — движение · E — действие · I — рюкзак";
         hud.classList.toggle("active", !!nearest);
     }
 
+    refreshStats();
     const loop = new Loop(update, render);
     loop.start();
 
