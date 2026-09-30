@@ -168,96 +168,43 @@ class Renderer {
         const cx = s.x + player.w / 2;
         const w = player.w, h = player.h;
 
-        // Walk swing: frames 0..3 -> phase for limbs; bob for the body.
-        const walking = player.moving;
-        const phase = walking ? [0, 1, 0, -1][player.frame % 4] : 0;
-        const bob = walking ? (Math.abs(phase) === 1 ? 1 : 0) : 0;
-        const swing = phase * 3;
-
-        // shadow
-        ctx.fillStyle = "rgba(0,0,0,0.30)";
+        // ground shadow (shrinks a touch on the up-beat of a stride)
+        const stride = player.moving ? Math.abs(Math.sin(player.animTime * 8)) : 0;
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
         ctx.beginPath();
-        ctx.ellipse(cx, s.y + h, w * 0.5, 4.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx, s.y + h, w * (0.52 - stride * 0.06), 4.6, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Frame-based walk cycle (real leg movement) when the sheet is loaded.
-        const walk = this.sprites && this.sprites.heroWalk;
-        const framesReady = walk && walk.length === 4 &&
-            walk.every(im => im && im.complete && im.naturalWidth > 0);
-        if (framesReady) {
-            const idx = player.moving ? (player.frame % 4) : 1; // idle = passing pose
-            const img = walk[idx];
-            const ar = img.naturalWidth / img.naturalHeight;
-            const hh = h * 2.6;
-            const ww = hh * ar;
-            const flip = player.facing === "left" ? -1 : 1;
-            // subtle idle breathing (scale only — no hopping)
-            const breathe = player.moving ? 1 : 1 + Math.sin(Date.now() / 700) * 0.012;
+        // footstep dust while moving (on foot-contact beats)
+        if (player.moving && stride < 0.22) {
+            ctx.fillStyle = "rgba(210,198,175,0.22)";
+            ctx.beginPath();
+            ctx.ellipse(cx, s.y + h + 1, 5, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
-            // footstep dust on the contact frames
-            if (player.moving && (idx === 0 || idx === 2)) {
-                ctx.fillStyle = "rgba(210,198,175,0.22)";
-                ctx.beginPath();
-                ctx.ellipse(cx, s.y + h + 2, 5, 2, 0, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            ctx.save();
-            ctx.translate(cx, s.y + h + 2);
-            ctx.scale(flip, 1);
-            ctx.drawImage(img, -ww / 2, -hh * breathe, ww, hh * breathe);
-            ctx.restore();
+        // Procedural part-based hero: real limbs, every direction, gear as layers.
+        if (typeof CharacterRig !== "undefined") {
+            CharacterRig.draw(ctx, {
+                x: cx,
+                y: s.y + h + 2,
+                H: h * 2.5,
+                facing: player.facing,
+                phase: player.animTime * 8,
+                moving: player.moving,
+                now: Date.now(),
+                look: this.heroLook || null,
+            });
             return;
         }
 
-        // Fallback: single static sprite (bob only) if the walk sheet is missing.
-        const img = this._img("hero");
-        if (img) {
-            const lift = player.moving ? Math.abs(Math.sin(player.animTime * 9)) * 2.6 : 0;
-            this._drawSprite(img, cx, s.y + h + 2, h * 2.4, player.facing === "left", lift);
-            return;
-        }
-
-        const topY = s.y - bob;
-        const legY = topY + h * 0.7;
-
-        // legs (swing opposite each other)
-        ctx.fillStyle = "#3a3350";
-        ctx.fillRect(cx - w * 0.28 - swing * 0.15, legY, w * 0.22, h * 0.32 + (walking ? swing : 0) * 0.2);
-        ctx.fillRect(cx + w * 0.06 + swing * 0.15, legY, w * 0.22, h * 0.32 - (walking ? swing : 0) * 0.2);
-
-        // torso (tunic)
+        // Minimal fallback if the rig module failed to load.
         ctx.fillStyle = "#6a4bd8";
-        ctx.fillRect(cx - w * 0.32, topY + h * 0.38, w * 0.64, h * 0.36);
-
-        // arms
-        ctx.fillStyle = "#e8d8b0";
-        ctx.fillRect(cx - w * 0.42, topY + h * 0.40 + swing * 0.4, w * 0.12, h * 0.28);
-        ctx.fillRect(cx + w * 0.30, topY + h * 0.40 - swing * 0.4, w * 0.12, h * 0.28);
-
-        // head
+        ctx.fillRect(cx - w * 0.32, s.y + h * 0.38, w * 0.64, h * 0.36);
         ctx.fillStyle = "#f0dcb8";
         ctx.beginPath();
-        ctx.arc(cx, topY + h * 0.24, w * 0.28, 0, Math.PI * 2);
+        ctx.arc(cx, s.y + h * 0.24, w * 0.28, 0, Math.PI * 2);
         ctx.fill();
-        // hair cap
-        ctx.fillStyle = "#5b3b22";
-        ctx.beginPath();
-        ctx.arc(cx, topY + h * 0.20, w * 0.28, Math.PI, 0);
-        ctx.fill();
-
-        // face direction (eyes)
-        ctx.fillStyle = "#1a1030";
-        const eyeY = topY + h * 0.26;
-        if (player.facing === "down") {
-            ctx.fillRect(cx - w * 0.14, eyeY, 2.2, 2.6);
-            ctx.fillRect(cx + w * 0.06, eyeY, 2.2, 2.6);
-        } else if (player.facing === "left") {
-            ctx.fillRect(cx - w * 0.16, eyeY, 2.2, 2.6);
-        } else if (player.facing === "right") {
-            ctx.fillRect(cx + w * 0.10, eyeY, 2.2, 2.6);
-        }
-        // facing "up" shows the back of the head — no eyes.
     }
 }
 

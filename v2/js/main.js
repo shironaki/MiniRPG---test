@@ -70,17 +70,12 @@
     // for any that fail to load, so the game always draws something.
     (function loadSprites() {
         const sprites = {};
-        ["hero", "goblin", "wolf", "skeleton"].forEach(k => {
+        ["goblin", "wolf", "skeleton"].forEach(k => {
             const img = new Image();
             img.src = "assets/sprites/" + k + ".png";
             sprites[k] = img;
         });
-        // Hero walk-cycle frames for real limb animation while moving.
-        sprites.heroWalk = [0, 1, 2, 3].map(i => {
-            const img = new Image();
-            img.src = "assets/sprites/hero_walk_" + i + ".png";
-            return img;
-        });
+        // The hero is drawn procedurally (CharacterRig) — no sprite needed.
         renderer.sprites = sprites;
     })();
 
