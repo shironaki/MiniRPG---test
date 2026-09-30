@@ -61,7 +61,10 @@ function createElementStub() {
         scrollHeight: 0,
         appendChild(child) { this.children.push(child); return child; },
         prepend(child) { this.children.unshift(child); return child; },
+        insertBefore(child) { this.children.unshift(child); return child; },
         addEventListener() {},
+        setAttribute() {},
+        removeAttribute() {},
         querySelectorAll() { return []; },
         set onclick(_) {},
         get onclick() { return null; }
@@ -140,4 +143,54 @@ function loadGame(opts = {}) {
     return { exports: sandbox.__game_exports, sandbox };
 }
 
-module.exports = { loadGame };
+// UI-level files layered on top of the logic bundle (browser entry points).
+const UI_FILES = ["audio.js", "main.js"];
+
+/**
+ * Load the FULL game including the DOM-wiring entry point (audio.js + main.js)
+ * against the browser shims. Used for integration tests: it verifies the render
+ * functions and event wiring execute without throwing and produce the expected
+ * markup, without pulling in a heavyweight headless browser.
+ *
+ * Returns { exports, sandbox } where sandbox exposes the UI globals
+ * (game, renderWorld, moveToRoom, roomBadge, sfx, ...).
+ */
+function loadFullGame(opts = {}) {
+    const sandboxMath = Object.create(Math);
+    if (typeof opts.random === "function") sandboxMath.random = opts.random;
+
+    const sandbox = {
+        Math: sandboxMath,
+        Object, Array, JSON, String, Number, Boolean, Date, Error,
+        console,
+        document: createDocumentStub(),
+        localStorage: createLocalStorageStub(),
+        navigator: {},
+        location: { reload() {} },
+        prompt: () => opts.promptValue ?? "Игрок",
+        alert: () => {},
+        setTimeout: (fn) => { if (typeof fn === "function") fn(); return 0; },
+        clearTimeout: () => {}
+    };
+    sandbox.window = sandbox;
+    sandbox.globalThis = sandbox;
+
+    const ordered = [
+        "item.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
+        "room.js", "shop.js", "npc.js", "quest.js", "world.js", "battle.js",
+        "save.js", "audio.js", "game.js", "main.js"
+    ];
+
+    const source = ordered
+        .map((file) => fs.readFileSync(path.join(JS_DIR, file), "utf8"))
+        .join("\n;\n");
+
+    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest };";
+
+    vm.createContext(sandbox);
+    vm.runInContext(source + uiExports, sandbox, { filename: "minirpg.full.js" });
+
+    return { exports: sandbox.__ui_exports, sandbox };
+}
+
+module.exports = { loadGame, loadFullGame };

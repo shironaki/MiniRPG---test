@@ -508,7 +508,11 @@ function renderWorld() {
         const clickable = reachable && !isCurrent;
         const onclick = clickable ? ` onclick="moveToRoom('${id}')"` : "";
 
+        const badge = roomBadge(room, world);
+        const badgeHtml = badge ? `<em class="mapBadge">${badge}</em>` : "";
+
         return `<div class="${classes}" data-room="${id}" style="${pos}" title="${room.name}"${onclick}>
+            ${badgeHtml}
             <span>${room.name}</span>
             <small>${status}</small>
         </div>`;
@@ -524,6 +528,24 @@ function renderWorld() {
             <p>✨ Руны для сокровищницы: ${world.relics.length}/3</p>
             <p class="mapHint">👆 Нажми на соседнюю комнату — или используй стрелки / WASD / свайпы.</p>
         `;
+}
+
+// Status badge for a map cell: what a discovered room currently holds.
+function roomBadge(room, world) {
+    if (room.id === "treasury") {
+        return world.relics.length >= 3 ? "👑" : "🔒";
+    }
+    if (!room.explored) return "";              // discovered on the map but not entered/searched
+    if (room.cleared) return "✅";
+    switch (room.event) {
+        case "chest": return room.chest && !room.chest.opened ? "💰" : "✅";
+        case "trap": return room.trap && !room.trap.triggered && !room.trap.disarmed ? "⚠️" : "✅";
+        case "relic": return "✨";
+        case "rest": return "🔥";
+        case "enemy": return "👹";
+        case "boss": return "👑";
+        default: return "";
+    }
 }
 
 // Draw connector lines between centres of connected, visible rooms.
@@ -1047,6 +1069,8 @@ function renderLocation() {
                 );
 
 
+                sfx.play("win");
+
                 game.victory();
 
             };
@@ -1180,7 +1204,7 @@ function openChest() {
             game.player
         );
 
-    if (result.success) game.bumpStat("chests");
+    if (result.success) { game.bumpStat("chests"); sfx.play("chest"); }
 
 
     addLog(
@@ -1208,6 +1232,8 @@ function activateTrap() {
             game.player
         );
 
+    sfx.play("hurt");
+
 
     addLog(
         result.message
@@ -1225,6 +1251,8 @@ function activateTrap() {
         game.player.isDead()
     ) {
 
+        sfx.play("lose");
+
         game.gameOver();
 
         return;
@@ -1237,11 +1265,12 @@ function activateTrap() {
 function disarmTrap() {
     const room = game.world.getCurrentRoom();
     const result = room.trap.disarm(game.player);
-    if (result.success) game.bumpStat("traps");
+    if (result.success) { game.bumpStat("traps"); sfx.play("relic"); } else { sfx.play("hurt"); }
     addLog(result.message);
     room.cleared = true;
     game.updateUI();
     if (game.player.isDead()) {
+        sfx.play("lose");
         game.gameOver();
         return;
     }
@@ -1250,7 +1279,7 @@ function disarmTrap() {
 
 function claimRelic() {
     const relic = game.world.collectRelic();
-    if (relic) addLog(`✨ Получена ${relic}. Печать Стража ослабла: ${game.world.relics.length}/3.`);
+    if (relic) { addLog(`✨ Получена ${relic}. Печать Стража ослабла: ${game.world.relics.length}/3.`); sfx.play("relic"); }
     game.updateUI();
     renderLocation();
 }
@@ -1321,6 +1350,13 @@ document
 
 
             game.battle.playerAttack();
+            sfx.play("attack");
+
+            if (game.gameEnded) {
+                sfx.play("lose");
+            } else if (!game.battle) {
+                sfx.play("win"); // enemy defeated
+            }
 
             if (game.battle) {
                 game.showEnemy();
@@ -1345,6 +1381,8 @@ document
 
 
             game.battle.playerHeal();
+            sfx.play("heal");
+            if (game.gameEnded) sfx.play("lose");
 
             game.showEnemy();
         }
@@ -1365,6 +1403,8 @@ document
 
 
             game.battle.playerDefend();
+            sfx.play("defend");
+            if (game.gameEnded) sfx.play("lose");
 
             game.showEnemy();
         }
@@ -1375,6 +1415,8 @@ document
     .addEventListener("click", () => {
         if (!game.battle) return;
         game.battle.playerFlee();
+        if (game.gameEnded) sfx.play("lose");
+        else if (!game.battle) sfx.play("flee"); // escaped
         if (game.battle) game.showEnemy();
         game.updateUI();
     });
@@ -1475,3 +1517,26 @@ document
 
         }
     );
+
+
+// =============================================
+// ЗВУК (mute)
+// =============================================
+
+(function setupMuteButton() {
+    const button = document.getElementById("muteButton");
+    if (!button) return;
+
+    function refresh() {
+        button.textContent = sfx.muted ? "🔇" : "🔊";
+        button.setAttribute("aria-pressed", String(sfx.muted));
+    }
+
+    button.addEventListener("click", () => {
+        const nowMuted = sfx.toggleMute();
+        if (!nowMuted) sfx.play("heal"); // brief confirmation blip when unmuting
+        refresh();
+    });
+
+    refresh();
+})();

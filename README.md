@@ -31,7 +31,8 @@ js/
   shop.js           # buying / selling
   npc.js            # village elder dialogue + quest rewards
   quest.js          # goblin-hunt quest state machine
-  world.js          # rooms, connections graph, exploration & relics
+  world.js          # rooms, spatial coords, connections graph, zones, exploration & relics
+  audio.js          # synthesized SFX + haptics (mute toggle, fully guarded)
   battle.js         # turn-based battle loop
   save.js           # localStorage persistence
   game.js           # top-level game orchestration + UI sync
@@ -42,13 +43,19 @@ tests/              # zero-dependency unit tests (Node vm harness)
 
 ## Testing
 
-Pure gameplay logic is covered by unit tests that load the real `js/` sources in
-a Node `vm` sandbox with minimal browser shims — no build tooling, no
-node_modules.
+Gameplay logic is covered by **unit tests** and the UI wiring by **integration
+tests**, both loading the real `js/` sources in a Node `vm` sandbox with minimal
+browser shims — no build tooling, no node_modules, no headless browser.
 
 ```bash
-npm test
+npm test        # runs tests/game.test.js + tests/integration.test.js
 ```
+
+- `tests/game.test.js` — logic units + a deterministic Monte-Carlo **balance
+  suite** that runs the real `Battle` loop and asserts the intended difficulty
+  curve (early enemies winnable, boss a real gate, geared hero prevails).
+- `tests/integration.test.js` — boots the full game (`audio.js` + `main.js`) and
+  checks map rendering, click-to-move, room badges and the end-screen summary.
 
 CI (`.github/workflows/ci.yml`) syntax-checks every script and runs the suite on
 every push and pull request.

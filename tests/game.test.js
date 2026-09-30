@@ -324,10 +324,30 @@ describe("World", () => {
         const res = w.explore();
         expect(res.type).toBe("enemy");
         const type = w.rooms.darkForest.enemyType;
-        expect(w.enemyPool.includes(type)).toBe(true);
+        expect(w.enemyPoolFor("darkForest").includes(type)).toBe(true);
         // A created enemy of that type is well-formed.
         const enemy = g.createEnemy(type, 1);
         expect(enemy.maxHealth).toBeGreaterThan(0);
+    });
+
+    it("uses zone-specific enemy pools with a safe fallback", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        expect(w.enemyPoolFor("marsh")).toEqual(["wolf"]);
+        expect(w.enemyPoolFor("catacomb")).toEqual(["skeleton"]);
+        expect(w.enemyPoolFor("unknownRoom")).toEqual(w.enemyPool); // fallback
+        // Every zone pool references only known enemy types.
+        const valid = new Set(["goblin", "wolf", "skeleton", "boss"]);
+        for (const pool of Object.values(w.zoneEnemies)) {
+            for (const t of pool) expect(valid.has(t)).toBe(true);
+        }
+    });
+
+    it("keeps goblins reachable near the entrance for the quest", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        const goblinRooms = Object.keys(w.zoneEnemies).filter(id => w.zoneEnemies[id].includes("goblin"));
+        expect(goblinRooms.length).toBeGreaterThanOrEqual(3);
     });
 
     it("every room is reachable from start", () => {
@@ -594,6 +614,73 @@ describe("Battle", () => {
         battle.playerFlee();
         expect(p.health).toBe(hpBefore);
         expect(game.calls.enemyDefeated).toBe(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Balance — deterministic Monte-Carlo over the real Battle loop.
+// Encodes the intended difficulty curve so accidental number changes are caught.
+// ---------------------------------------------------------------------------
+function mulberry32(a) {
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+function simulateWinRate(seed, count, buildPlayer, buildEnemy) {
+    const { exports: g } = loadGame({ random: mulberry32(seed) });
+    let wins = 0;
+    for (let i = 0; i < count; i++) {
+        const p = buildPlayer(g);
+        const game = makeBattleGame(g, p);
+        const battle = new g.Battle(game, buildEnemy(g));
+        let guard = 0;
+        while (!battle.finished && guard++ < 1000) {
+            if (p.health < p.maxHealth * 0.35 && p.inventory.some(x => x.type === "potion")) {
+                battle.playerHeal();
+            } else {
+                battle.playerAttack();
+            }
+        }
+        if (game.calls.enemyDefeated > 0) wins++;
+    }
+    return wins / count;
+}
+
+function levelUpTo(g, p, level) {
+    while (p.level < level) p.addExperience(p.experienceToNextLevel);
+    return p;
+}
+
+function fullyGeared(g, level) {
+    return (gg) => {
+        const p = levelUpTo(gg, new gg.Player("A"), level);
+        ["sword", "armor", "shield"].forEach(key => {
+            p.addItem(gg.ITEMS[key].clone());
+            p.equip(p.inventory[p.inventory.length - 1]);
+        });
+        for (let i = 0; i < 5; i++) p.addItem(gg.ITEMS.potion.clone());
+        return p;
+    };
+}
+
+describe("Balance", () => {
+    it("a fresh hero reliably beats a starting goblin (winnable early game)", () => {
+        const rate = simulateWinRate(1, 200, g => new g.Player("A"), g => g.createEnemy("goblin", 1));
+        expect(rate).toBeGreaterThanOrEqual(0.9);
+    });
+
+    it("an unprepared hero almost never beats the boss (real gate)", () => {
+        const rate = simulateWinRate(5, 200, g => new g.Player("A"), g => g.createEnemy("boss", 1));
+        expect(rate).toBeLessThanOrEqual(0.1);
+    });
+
+    it("a geared, levelled hero reliably beats a level-scaled boss", () => {
+        const rate = simulateWinRate(4, 200, fullyGeared(null, 8), g => g.createEnemy("boss", 8));
+        expect(rate).toBeGreaterThanOrEqual(0.8);
     });
 });
 
