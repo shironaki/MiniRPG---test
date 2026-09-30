@@ -188,8 +188,20 @@ class Game {
 
         document
             .getElementById("quickStats")
-            .textContent =
-                `⭐ ${this.player.level} ур. · ✨ ${this.player.experience}/${this.player.experienceToNextLevel} · ⚔️ ${this.player.attack} · 🛡️ ${this.player.defense} · ⚡ ${this.player.energy}/${this.player.maxEnergy} · 🧰 ${this.player.trapSkill} · 💰 ${this.player.gold} · ☯️ ${this.karmaLabel()}`;
+            .textContent = (() => {
+                const p = this.player;
+                const parts = [
+                    `⭐ ${p.level} ур.`,
+                    `✨ ${p.experience}/${p.experienceToNextLevel}`,
+                    `⚔️ ${p.attack}`,
+                    `🛡️ ${p.defense}`,
+                    `⚡ ${p.energy}/${p.maxEnergy}`
+                ];
+                if (p.trapSkill > 0) parts.push(`🧰 ${p.trapSkill}`);       // shown once learned
+                parts.push(`💰 ${p.gold}`);
+                if ((p.karma || 0) !== 0) parts.push(`☯️ ${this.karmaLabel()}`); // shown once earned
+                return parts.join(" · ");
+            })();
 
         const allyBox = document.getElementById("allyInfo");
         if (allyBox) {
@@ -198,6 +210,8 @@ class Game {
                 ? `<span class="allyChip">${ally.emoji} ${ally.name} · ${ally.tierLabel()} <small>❤ ${ally.affinity}</small></span>`
                 : "";
         }
+
+        if (typeof refreshMenus === "function") refreshMenus();
 
         if (!this.gameEnded) this.saveSystem.save(this);
     }

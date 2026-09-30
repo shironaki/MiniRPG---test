@@ -168,6 +168,27 @@ describe("Integration: quest journal", () => {
     });
 });
 
+describe("Integration: progressive UI", () => {
+    it("hides the quest board until the first quest is accepted", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        ui.refreshMenus();
+        expect(sandbox.document.getElementById("questButton").style.display).toBe("none");
+        ui.game.quest.start(); // answer the Elder's call
+        ui.refreshMenus();
+        expect(sandbox.document.getElementById("questButton").style.display).toBe("");
+    });
+
+    it("omits karma from the HUD until the player has any", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        expect(/☯️/.test(sandbox.document.getElementById("quickStats").textContent)).toBe(false);
+        ui.game.adjustKarma(12);
+        ui.game.updateUI();
+        expect(/☯️/.test(sandbox.document.getElementById("quickStats").textContent)).toBe(true);
+    });
+});
+
 describe("Integration: audio safety", () => {
     it("all SFX calls are no-ops without a real AudioContext", () => {
         const { exports: ui } = loadFullGame();

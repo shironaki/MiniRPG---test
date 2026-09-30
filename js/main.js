@@ -13,6 +13,14 @@ function showScreen(id) {
     // Remember the last "real" screen so Settings can return to it.
     if (id !== "settingsScreen") previousScreen = id;
 
+    // Progressive UI: the player panel and journal only exist once you're
+    // actually in a run. The menu and end screens stay clean and minimal.
+    const gameRoot = document.getElementById("game");
+    if (gameRoot) {
+        if (id === "menuScreen" || id === "endScreen") gameRoot.classList.remove("playing");
+        else if (id !== "settingsScreen") gameRoot.classList.add("playing");
+    }
+
     document
         .querySelectorAll(".screen")
         .forEach(screen => {
@@ -208,6 +216,7 @@ document
 
 
             renderQuest();
+            refreshMenus();
         }
     );
 
@@ -229,6 +238,17 @@ document
             renderQuest();
         }
     );
+
+
+// Progressive disclosure of village options: the quest board only appears
+// once the player has answered the Elder's call (accepted the first quest).
+function refreshMenus() {
+    const questBtn = document.getElementById("questButton");
+    if (questBtn) {
+        const unlocked = Boolean(game && game.quest && game.quest.active);
+        questBtn.style.display = unlocked ? "" : "none";
+    }
+}
 
 
 function renderQuest() {

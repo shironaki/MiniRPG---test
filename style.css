@@ -76,6 +76,17 @@ header p {
 
 /* PLAYER */
 
+/* Progressive UI: HUD panels stay hidden until a run is actually in progress,
+   so the menu / end screens read as clean and minimal. */
+#playerPanel,
+#gameLog { display: none; }
+
+#game.playing #playerPanel { display: block; }
+#game.playing #gameLog { display: block; }
+
+/* On the (minimal) menu, drop the tagline to keep the first screen calm. */
+#game:not(.playing) header p { display: none; }
+
 #playerPanel {
 
     background: linear-gradient(135deg, #1d2b41, #182131);
