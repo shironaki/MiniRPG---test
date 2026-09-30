@@ -189,6 +189,49 @@
         return g;
     }
 
+    // ---- interiors ----------------------------------------------------------
+    // Wooden floorboards: long planks with seams and a little grain.
+    function floorBoards(plank, seam, grain, variant) {
+        const g = fill(plank);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++)
+            if ((x + y * 3) % 11 === 0) px(g, x, y, grain);
+        const off = (variant % 2) * 8;
+        rect(g, 0, (5 + off) % N, N, 1, seam);
+        rect(g, 0, (13 + off) % N, N, 1, seam);
+        rect(g, (variant % 2 ? 4 : 11), 0, 1, N, seam);   // staggered short seam
+        return g;
+    }
+    // Flagstones for the forge: big irregular blocks, soot-dark mortar.
+    function flagstones(stone, mortar, hi, variant) {
+        const g = fill(mortar);
+        const shift = (variant % 2) * 4;
+        rect(g, 1, 1, 6, 6, stone); rect(g, 1, 1, 6, 1, hi);
+        rect(g, 9 - shift, 1, 6, 6, stone); rect(g, 9 - shift, 1, 6, 1, hi);
+        rect(g, 1, 9, 6, 6, stone); rect(g, 1, 9, 6, 1, hi);
+        rect(g, 9 - shift, 9, 6, 6, stone); rect(g, 9 - shift, 9, 6, 1, hi);
+        return g;
+    }
+    // Interior wall: plaster over a timber frame, with a skirting board.
+    function wallInside(plaster, beam, beamSh, skirt) {
+        const g = fill(plaster);
+        rect(g, 0, 0, N, 2, beamSh);            // ceiling beam
+        rect(g, 0, 2, N, 1, beam);
+        rect(g, 3, 3, 2, 11, beam); px(g, 4, 3, beamSh);   // uprights
+        rect(g, 11, 3, 2, 11, beam); px(g, 12, 3, beamSh);
+        rect(g, 0, 14, N, 2, skirt);            // skirting
+        return g;
+    }
+    // The way back out: an open doorway with daylight spilling in.
+    function doorwayTile(frame, frameSh, light) {
+        const g = fill(frame);
+        rect(g, 3, 2, 10, 14, light);
+        rect(g, 4, 4, 8, 12, "#f3e3b6");
+        rect(g, 0, 0, N, 2, frameSh);
+        rect(g, 0, 2, 3, 14, frameSh);
+        rect(g, 13, 2, 3, 14, frameSh);
+        return g;
+    }
+
     // ---- registry -----------------------------------------------------------
     function compose(name, variant) {
         variant = variant | 0;
@@ -213,6 +256,10 @@
             case "fence": g = fenceTile("#3d7a3a", "#8a6a3f", "#5f4626"); break;
             case "bridge": g = bridgeTile("#8a6a42", "#6a4e2e", "#2f6d8f"); break;
             case "gate": g = gateTile("#c7ad78", "#e8c04a", "#f4d971"); break;
+            case "floor": g = floorBoards("#8a6239", "#6d4b29", "#9c7145", variant); break;
+            case "floorStone": g = flagstones("#6d6a63", "#4c4944", "#807c73", variant); break;
+            case "wallIn": g = wallInside("#c9b089", "#7a5433", "#5e3f26", "#6b4a2c"); break;
+            case "doorway": g = doorwayTile("#7d5a33", "#5c4123", "#ffe9a8"); break;
             default: g = fill("#101319");
         }
         return { w: N, h: N, grid: g };
@@ -240,7 +287,7 @@
     function variantFor(name, col, row) {
         if (name === "tree" || name === "tree2" || name === "rock" ||
             name === "house" || name === "gate" || name === "bridge" ||
-            name === "fence") return 0;
+            name === "fence" || name === "wallIn" || name === "doorway") return 0;
         // Deterministic 0..2 that varies per-tile; flowers (variant 2) ~20%.
         const h = (((col * 13 + row * 7) % 5) + 5) % 5;
         return h < 2 ? 0 : h < 4 ? 1 : 2;

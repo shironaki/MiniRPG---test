@@ -210,6 +210,19 @@ class Renderer {
     }
 
     // Farm plots — soil, sprouts and ripe crops drawn per tile state.
+    // Interior furniture. Drawn after the floor and before entities so the
+    // hero walks in front of the pieces. `phase` animates fire.
+    drawFurniture(list, camera, ts, phase) {
+        if (!list || !list.length || typeof Furniture === "undefined") return;
+        for (const f of list) {
+            const s = Furniture.size(f.kind);
+            const sx = Math.round(f.col * ts - camera.x);
+            const sy = Math.round(f.row * ts - camera.y);
+            if (sx + s.w * ts < 0 || sy + s.h * ts < 0 || sx > camera.viewW || sy > camera.viewH) continue;
+            Furniture.draw(this.ctx, f.kind, sx, sy, ts, phase | 0);
+        }
+    }
+
     drawFarm(farm, plotList, camera, ts) {
         if (!farm || !plotList) return;
         const ctx = this.ctx;

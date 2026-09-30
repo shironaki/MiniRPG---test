@@ -20,7 +20,12 @@ const TILES = {
     "d": { name: "dirt",   solid: false, color: "#5b4a34" },
     "r": { name: "rock",   solid: true,  color: "#453f38" },
     "b": { name: "bridge", solid: false, color: "#8a6a42" },
-    "g": { name: "gate",   solid: false, color: "#caa24b" }
+    "g": { name: "gate",   solid: false, color: "#caa24b" },
+    // Interior tiles (rooms you can walk into: home, shop, forge).
+    "o": { name: "floor",     solid: false, color: "#8a6239" },  // wooden boards
+    "O": { name: "floorStone", solid: false, color: "#6d6a63" }, // forge flagstones
+    "W": { name: "wallIn",    solid: true,  color: "#4a3a2c" },  // plastered wall
+    "D": { name: "doorway",   solid: false, color: "#7d5a33" }    // way back outside
 };
 
 const DEFAULT_TILE = { name: "void", solid: true, color: "#101319" };

@@ -33,6 +33,9 @@ class Social {
         return e.points;
     }
 
+    // Direct award (errands, story beats) — no once-a-day gate.
+    award(id, n) { return this._add(id, n); }
+
     canTalk(id) { return this._e(id).talkedDay !== this.day; }
     canGift(id) { return this._e(id).giftedDay !== this.day; }
 

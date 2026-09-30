@@ -474,3 +474,117 @@ describe("Resource nodes & bag", () => {
 });
 
 run();
+
+// ---------------------------------------------------------------------------
+// Villager requests
+// ---------------------------------------------------------------------------
+describe("Villager requests", () => {
+    it("stays silent with strangers and asks once you have chatted", () => {
+        const { Requests, REQUEST_MIN_POINTS } = loadEngine().exports;
+        const r = new Requests({ rng: () => 0 });
+        expect(r.ensure("marta", 0, 1)).toBe(null);          // never talked
+        const req = r.ensure("marta", REQUEST_MIN_POINTS, 1);
+        expect(!!req).toBe(true);
+        expect(typeof req.res).toBe("string");
+        expect(req.n > 0).toBe(true);
+    });
+
+    it("keeps one open request per villager", () => {
+        const { Requests } = loadEngine().exports;
+        const r = new Requests({ rng: () => 0.5 });
+        const a = r.ensure("boris", 50, 1);
+        const b = r.ensure("boris", 50, 2);
+        expect(a).toBe(b);                                    // same errand
+        expect(r.current("boris")).toBe(a);
+    });
+
+    it("refuses delivery without the goods and pays out with them", () => {
+        const { Requests, REQUEST_FRIENDSHIP } = loadEngine().exports;
+        const r = new Requests({ rng: () => 0 });
+        const req = r.ensure("lena", 50, 1);
+        const short = r.fulfil("lena", req.n - 1);
+        expect(short.ok).toBe(false);
+        expect(short.short).toBe(1);
+        expect(r.current("lena")).toBe(req);                  // still pending
+
+        const done = r.fulfil("lena", req.n);
+        expect(done.ok).toBe(true);
+        expect(done.take).toBe(req.n);
+        expect(done.gold > 0).toBe(true);
+        expect(done.friendship).toBe(REQUEST_FRIENDSHIP);
+        expect(r.current("lena")).toBe(null);                 // cleared
+        expect(r.completed("lena")).toBe(1);
+    });
+
+    it("pays better as the villager trusts you more", () => {
+        const { Requests } = loadEngine().exports;
+        const r = new Requests({ rng: () => 0 });
+        const first = r.ensure("marta", 50, 1).gold;
+        r.fulfil("marta", 99);
+        const second = r.ensure("marta", 50, 2).gold;
+        expect(second > first).toBe(true);
+    });
+
+    it("friendship can be awarded directly, outside the daily gates", () => {
+        const { Social } = loadEngine().exports;
+        const s = new Social();
+        s.setDay(1);
+        s.talk("marta");
+        const before = s.points("marta");
+        s.award("marta", 45);
+        expect(s.points("marta")).toBe(before + 45);
+        expect(s.canTalk("marta")).toBe(false);               // gate untouched
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Interiors
+// ---------------------------------------------------------------------------
+describe("Interiors", () => {
+    it("every interior is enclosed, indoor and has a way back out", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        for (const id of ["home", "shop_in", "forge_in"]) {
+            const m = MAPS[id];
+            expect(!!m).toBe(true);
+            expect(m.indoor).toBe(true);
+            expect(m.portals.length > 0).toBe(true);
+            // the room is walled in: every border tile is solid except doorways
+            const last = m.rows.length - 1;
+            for (let c = 0; c < m.rows[0].length; c++) {
+                const top = tileInfo(m.rows[0][c]).solid;
+                const bottomKey = m.rows[last][c];
+                const isDoor = m.portals.some(p => p.col === c && p.row === last);
+                expect(top).toBe(true);
+                if (!isDoor) expect(tileInfo(bottomKey).solid).toBe(true);
+            }
+            // spawn is inside and walkable
+            expect(tileInfo(m.rows[m.spawn.row][m.spawn.col]).solid).toBe(false);
+        }
+    });
+
+    it("village doors lead to interiors that lead back to the village", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        const doors = MAPS.village.interactables.filter(i => i.action === "enter");
+        expect(doors.length).toBe(3);
+        for (const d of doors) {
+            const room = MAPS[d.to];
+            expect(!!room).toBe(true);
+            // entering lands on a walkable tile inside
+            expect(tileInfo(room.rows[d.spawn.row][d.spawn.col]).solid).toBe(false);
+            // and the room sends you back to a walkable village tile
+            const back = room.portals.find(p => p.to === "village");
+            expect(!!back).toBe(true);
+            expect(tileInfo(MAPS.village.rows[back.spawn.row][back.spawn.col]).solid).toBe(false);
+        }
+    });
+
+    it("blocked cells make furniture solid without changing the tile", () => {
+        const { TileMap, MAPS } = loadEngine().exports;
+        const m = MAPS.home;
+        const tm = new TileMap(m.rows, m.tileSize);
+        expect(tm.isSolidTile(1, 1)).toBe(false);   // bare floor
+        tm.block(1, 1);                              // the bed stands here
+        expect(tm.isSolidTile(1, 1)).toBe(true);
+        expect(tm.tileAt(1, 1)).toBe("o");           // art unchanged
+    });
+});

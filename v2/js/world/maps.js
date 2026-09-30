@@ -40,12 +40,14 @@ const MAPS = {
             { col: 19, row: 11, w: 3, h: 4, type: "gate" }
         ],
         // Interactable points sit in front of each building's door.
+        // `enter` walks the hero into a real interior zone.
         interactables: [
-            { col: 5,  row: 5,  action: "npc",     label: "Староста",       emoji: "🧑" },
-            { col: 21, row: 5,  action: "shop",    label: "Лавка",          emoji: "🛒" },
-            { col: 5,  row: 15, action: "forge",   label: "Кузница",        emoji: "🔨" },
+            { col: 5,  row: 5,  action: "enter", to: "home",     spawn: { col: 5, row: 6 }, label: "Твой дом",  emoji: "🏠" },
+            { col: 21, row: 5,  action: "enter", to: "shop_in",  spawn: { col: 5, row: 7 }, label: "Лавка",     emoji: "🛒" },
+            { col: 5,  row: 15, action: "enter", to: "forge_in", spawn: { col: 5, row: 7 }, label: "Кузница",   emoji: "🔨" },
             { col: 20, row: 15, action: "dungeon", label: "Врата испытаний", emoji: "🚪" },
-            { col: 13, row: 6,  action: "quests",  label: "Доска квестов",   emoji: "📜" }
+            { col: 13, row: 6,  action: "quests",  label: "Доска квестов",   emoji: "📜" },
+            { col: 6,  row: 5,  action: "npc",     label: "Староста",        emoji: "🧑" }
         ],
         // The village is a peaceful zone — no enemies here (they roam the wilds).
         enemies: [],
@@ -210,6 +212,114 @@ const MAPS = {
         ],
         portals: [
             { col: 2, row: 0, to: "forest", spawn: { col: 11, row: 15 }, label: "Выход из пещеры", emoji: "🌲" }
+        ]
+    },
+
+    // ---- interiors ---------------------------------------------------------
+    // Small rooms you actually walk into. `furniture` items are drawn by
+    // render/furniture.js and (unless walkable) block movement.
+
+    home: {
+        name: "Твой дом",
+        tileSize: 32,
+        indoor: true,
+        rows: [
+            "WWWWWWWWWWW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WWWWWDWWWWW"
+        ],
+        spawn: { col: 5, row: 6 },
+        furniture: [
+            { kind: "bed",       col: 1, row: 1 },
+            { kind: "chest",     col: 3, row: 1 },
+            { kind: "fireplace", col: 7, row: 1 },
+            { kind: "table",     col: 6, row: 4 },
+            { kind: "chair",     col: 5, row: 4 },
+            { kind: "chair",     col: 8, row: 4 },
+            { kind: "rug",       col: 2, row: 4 },
+            { kind: "plant",     col: 9, row: 6 }
+        ],
+        interactables: [
+            { col: 1, row: 2, action: "sleep", label: "Лечь спать", emoji: "🛏️" },
+            { col: 3, row: 1, action: "storage", label: "Сундук", emoji: "🧰" }
+        ],
+        portals: [
+            { col: 5, row: 7, to: "village", spawn: { col: 5, row: 6 }, label: "На улицу", emoji: "🚪" }
+        ]
+    },
+
+    shop_in: {
+        name: "Лавка",
+        tileSize: 32,
+        indoor: true,
+        rows: [
+            "WWWWWWWWWWW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WoooooooooW",
+            "WWWWWDWWWWW"
+        ],
+        spawn: { col: 5, row: 7 },
+        furniture: [
+            { kind: "shelf",   col: 1, row: 1 },
+            { kind: "shelf",   col: 2, row: 1 },
+            { kind: "shelf",   col: 8, row: 1 },
+            { kind: "shelf",   col: 9, row: 1 },
+            { kind: "counter", col: 4, row: 2 },
+            { kind: "barrel",  col: 1, row: 5 },
+            { kind: "barrel",  col: 9, row: 5 },
+            { kind: "rug",     col: 4, row: 5 },
+            { kind: "plant",   col: 1, row: 3 }
+        ],
+        interactables: [
+            { col: 4, row: 3, action: "shop", label: "Прилавок", emoji: "🛒" },
+            { col: 5, row: 3, action: "shop", label: "Прилавок", emoji: "🛒" }
+        ],
+        portals: [
+            { col: 5, row: 8, to: "village", spawn: { col: 21, row: 6 }, label: "На улицу", emoji: "🚪" }
+        ]
+    },
+
+    forge_in: {
+        name: "Кузница",
+        tileSize: 32,
+        indoor: true,
+        rows: [
+            "WWWWWWWWWWW",
+            "WOOOOOOOOOW",
+            "WOOOOOOOOOW",
+            "WOOOOOOOOOW",
+            "WOOOOOOOOOW",
+            "WOOOOOOOOOW",
+            "WOOOOOOOOOW",
+            "WOOOOOOOOOW",
+            "WWWWWDWWWWW"
+        ],
+        spawn: { col: 5, row: 7 },
+        furniture: [
+            { kind: "forgeFire", col: 1, row: 1 },
+            { kind: "forgeFire", col: 2, row: 1 },
+            { kind: "anvil",     col: 5, row: 2 },
+            { kind: "barrel",    col: 8, row: 1 },
+            { kind: "barrel",    col: 9, row: 3 },
+            { kind: "table",     col: 7, row: 5 },
+            { kind: "chest",     col: 1, row: 5 }
+        ],
+        interactables: [
+            { col: 5, row: 3, action: "forge", label: "Наковальня", emoji: "🔨" },
+            { col: 4, row: 2, action: "forge", label: "Наковальня", emoji: "🔨" }
+        ],
+        portals: [
+            { col: 5, row: 8, to: "village", spawn: { col: 5, row: 16 }, label: "На улицу", emoji: "🚪" }
         ]
     }
 };

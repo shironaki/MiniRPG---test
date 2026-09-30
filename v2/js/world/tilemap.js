@@ -10,7 +10,13 @@ class TileMap {
         this.lookup = legendLookup;
         this.rowsCount = this.rows.length;
         this.colsCount = this.rows.reduce((m, r) => Math.max(m, r.length), 0);
+        // Cells blocked on top of the tile legend (furniture, props).
+        this.blocked = new Set();
     }
+
+    // Mark a cell impassable without changing the underlying tile art.
+    block(col, row) { this.blocked.add(col + "," + row); return this; }
+    isBlocked(col, row) { return this.blocked.has(col + "," + row); }
 
     get pixelWidth() { return this.colsCount * this.tileSize; }
     get pixelHeight() { return this.rowsCount * this.tileSize; }
@@ -35,6 +41,7 @@ class TileMap {
     isSolidTile(col, row) {
         const key = this.tileAt(col, row);
         if (key == null) return true;
+        if (this.isBlocked(col, row)) return true;
         return !!this.lookup(key).solid;
     }
 

@@ -174,7 +174,7 @@
 
     // ---- Townsfolk (living NPC social panel) ---------------------------------
     function townsfolk(ctx) {
-        const { npc, social, hero, resources, refresh } = ctx;
+        const { npc, social, hero, resources, refresh, requests } = ctx;
         let msg = "";
         // pick one greeting line for this visit
         const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
@@ -188,6 +188,20 @@
         function heartBar() {
             const h = social.hearts(npc.id);
             return "❤️".repeat(h) + "🤍".repeat(10 - h);
+        }
+        // The errand this villager currently wants done (if you know them).
+        function requestBlock() {
+            if (!requests) return "";
+            const req = requests.ensure(npc.id, social.points(npc.id), ctx.day || 0);
+            if (!req) return `<p class="hint">Поговорите почаще — и вас начнут просить о помощи.</p>`;
+            const m = RES[req.res] || {};
+            const have = resources ? resources.count(req.res) : 0;
+            const done = requests.completed(npc.id);
+            const btn = have >= req.n
+                ? `<button class="mBtn wide" data-fulfil="1">✅ Отдать ${m.emoji || "📦"} ×${req.n} (💰 ${req.gold})</button>`
+                : `<p class="hint">Нужно ${m.emoji || "📦"} ${esc(m.name || req.res)} ×${req.n} — у вас ${have}.</p>`;
+            return `<h4 class="mGroup">📋 Просьба${done ? ` <small>(выполнено: ${done})</small>` : ""}</h4>
+                <p>“${esc(req.text)}”</p>${btn}`;
         }
         function render() {
             const talkBtn = social.canTalk(npc.id)
@@ -218,6 +232,7 @@
                 <p>“${esc(line)}”</p>
                 ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
                 ${talkBtn}
+                ${requestBlock()}
                 ${gifts}
                 ${likeHint}`, onClick);
         }
@@ -230,6 +245,15 @@
             if (b.dataset.talk) {
                 const r = social.talk(npc.id);
                 msg = r.already ? "Вы уже общались сегодня." : `💬 Приятная беседа. +${r.gained} к дружбе!`;
+            } else if (b.dataset.fulfil) {
+                const req = requests.current(npc.id);
+                if (!req) return;
+                const r = requests.fulfil(npc.id, resources ? resources.count(req.res) : 0);
+                if (!r.ok) { msg = r.msg; render(); return; }
+                resources.remove(r.res, r.take);
+                hero.gold += r.gold;
+                social.award(npc.id, r.friendship);
+                msg = `🎉 ${r.msg}`;
             } else if (b.dataset.gres) {
                 const key = b.dataset.gres;
                 if (!resources || resources.count(key) <= 0) return;
@@ -248,6 +272,46 @@
                 afterGift(r, loved, it.name);
             } else return;
             refresh(); render();
+        }
+        render();
+    }
+
+    // ---- Home storage chest --------------------------------------------------
+    // Move resources between the backpack and the chest at home. Keeps the
+    // bag tidy without losing anything.
+    function storage(ctx) {
+        const { resources, storage: chest, refresh } = ctx;
+        const RES = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
+        let msg = "";
+        function row(e, dir) {
+            const m = RES[e.res] || {};
+            return `<button class="mBtn ghost" data-${dir}="${e.res}">${m.emoji || "📦"} ${esc(m.name || e.res)} ×${e.n}</button>`;
+        }
+        function render() {
+            const bag = resources ? resources.entries() : [];
+            const kept = chest ? chest.entries() : [];
+            paint(`<h2>🧰 Домашний сундук</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <h4 class="mGroup">Положить из рюкзака</h4>
+                ${bag.length ? bag.map(e => row(e, "put")).join("") : `<p class="hint">Рюкзак пуст.</p>`}
+                <h4 class="mGroup">Взять из сундука</h4>
+                ${kept.length ? kept.map(e => row(e, "take")).join("") : `<p class="hint">В сундуке пусто.</p>`}`, onClick);
+        }
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            const put = b.dataset.put, take = b.dataset.take;
+            if (put) {
+                const n = resources.count(put);
+                if (n <= 0) return;
+                resources.remove(put, n); chest.add(put, n);
+                msg = `Убрано в сундук: ×${n}.`;
+            } else if (take) {
+                const n = chest.count(take);
+                if (n <= 0) return;
+                chest.remove(take, n); resources.add(take, n);
+                msg = `Взято из сундука: ×${n}.`;
+            } else return;
+            refresh && refresh(); render();
         }
         render();
     }
@@ -351,5 +415,5 @@
         render();
     }
 
-    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk };
+    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk, storage };
 })();

@@ -15,7 +15,7 @@
     const overlayClose = document.getElementById("overlayClose");
 
     // The active zone's data is (re)built by loadZone() on every map change.
-    let mapData, tilemap, interactables, enemies, portals, zoneName, npcs, resourceNodes, farmPlots;
+    let mapData, tilemap, interactables, enemies, portals, zoneName, npcs, resourceNodes, farmPlots, furniture;
 
     const player = new Player2D(0, 0, { w: 20, h: 20, speed: 130 });
 
@@ -29,6 +29,8 @@
     const social = new Social();
     const resources = new ResourceBag();
     const farm = new Farm();
+    const requests = new Requests();      // villager errands
+    const storage = new ResourceBag();    // the chest at home
     resources.add("seeds", 6);            // a starter pouch of seeds
 
     // Transient on-screen feedback (gathering, gifts) — fades on its own.
@@ -57,6 +59,18 @@
         });
         resourceNodes = (mapData.resources || []).map(r => new ResourceNode(r, ts));
         farmPlots = (mapData.farm || []).map(c => ({ col: c.col, row: c.row, px: c.col * ts + ts / 2, py: c.row * ts + ts / 2 }));
+        furniture = (mapData.furniture || []).map(f => ({ ...f }));
+        // Furniture occupies real space: block its footprint so the hero
+        // walks around the bed instead of through it (rugs stay walkable).
+        if (typeof Furniture !== "undefined") {
+            for (const f of furniture) {
+                const def = Furniture.KINDS[f.kind];
+                if (!def || def.walkable) continue;
+                const size = Furniture.size(f.kind);
+                for (let j = 0; j < size.h; j++)
+                    for (let i = 0; i < size.w; i++) tilemap.block(f.col + i, f.row + j);
+            }
+        }
         zoneName = mapData.name || id;
         const sp = spawn || mapData.spawn;
         player.x = sp.col * ts + 6;
@@ -73,7 +87,11 @@
         player: hero,
         adjustKarma(n) { hero.karma = (hero.karma || 0) + n; }
     };
-    const menuCtx = { hero, journal, host, refresh: refreshStats, social, resources };
+    const menuCtx = {
+        hero, journal, host, refresh: refreshStats, social, resources,
+        requests, storage,
+        get day() { return dayCount; }
+    };
 
     function refreshStats() {
         let html =
@@ -331,19 +349,39 @@
             return;
         }
         const it = sel.target;
+        // Doors are instant: step inside instead of opening a panel.
+        if (it.action === "enter" && it.to) { loadZone(it.to, it.spawn); return; }
+        if (it.action === "sleep") { sleepUntilMorning(); return; }
         paused = true;
         const dispatch = {
             shop: V2Menus.shop,
             forge: V2Menus.forge,
             quests: V2Menus.quests,
             npc: V2Menus.dialogue,
-            dungeon: V2Menus.dungeon
+            dungeon: V2Menus.dungeon,
+            storage: V2Menus.storage
         };
         const open = dispatch[it.action];
         if (open) { open(menuCtx); return; }
         overlayBody.innerHTML = `<h2>${it.emoji} ${escapeText(it.label)}</h2>
             <p>${escapeText(describe(it.action))}</p>`;
         overlay.classList.remove("hidden");
+    }
+
+    /**
+     * Sleeping in your own bed ends the day: the clock jumps to next morning,
+     * crops advance, and the hero wakes up rested. The one way to skip a night.
+     */
+    function sleepUntilMorning() {
+        dayCount += 1;
+        clockMin = 8 * 60;
+        farm.onNewDay(dayCount);
+        social.setDay(dayCount);
+        hero.health = hero.maxHealth;
+        if (hero.maxEnergy) hero.energy = hero.maxEnergy;
+        showFlash(`😴 Выспался. Наступил день ${dayCount}.`, 2);
+        refreshStats();
+        input.consumePressed();
     }
 
     function respawnHero() {
@@ -391,6 +429,8 @@
             case "forge": return "Кузница — улучшение снаряжения эссенциями ковки.";
             case "dungeon": return "Врата испытаний — вход в процедурное подземелье.";
             case "quests": return "Доска квестов — побочные и спутниковые задания.";
+            case "storage": return "Домашний сундук — здесь хранятся припасы.";
+            case "sleep": return "Кровать — поспать до утра.";
             default: return "Точка интереса.";
         }
     }
@@ -445,15 +485,18 @@
         }
         // Edge-triggered interaction.
         if ((input.wasPressed("KeyE") || input.wasPressed("Enter") || input.wasPressed("Space")) && nearest) {
-            if (nearest.kind === "resource") {
-                gatherFrom(nearest.target);      // quick action, keep playing
-            } else if (nearest.kind === "farm") {
-                workPlot(nearest.target);        // quick action, keep playing
+            // Hold on to the selection: entering a door reloads the zone and
+            // clears `nearest` underneath us.
+            const sel = nearest;
+            if (sel.kind === "resource") {
+                gatherFrom(sel.target);          // quick action, keep playing
+            } else if (sel.kind === "farm") {
+                workPlot(sel.target);            // quick action, keep playing
             } else {
-                openInteraction(nearest);
+                openInteraction(sel);
             }
             input.consumePressed();
-            if (nearest.kind !== "resource" && nearest.kind !== "farm") return;
+            if (sel.kind !== "resource" && sel.kind !== "farm") return;
         }
         input.consumePressed();
 
@@ -485,6 +528,7 @@
         renderer.drawMap(tilemap, camera);
         renderer.drawBuildings(mapData.buildings, camera, mapData.tileSize, light.night);
         renderer.drawFarm(farm, farmPlots, camera, mapData.tileSize);
+        renderer.drawFurniture(furniture, camera, mapData.tileSize, Math.floor(performance.now() / 380));
         renderer.drawResourceNodes(resourceNodes, camera);
         renderer.drawPortals(portals, camera);
         renderer.drawInteractables(interactables, camera);
@@ -510,11 +554,18 @@
 
     // Expose for debugging / future bridging.
     window.__v2 = {
-        player, tilemap, camera, input, loop,
+        player, camera, input, loop,
+        // `tilemap`/`mapData` are rebuilt on every zone change — expose them
+        // as getters so the handle never points at a stale map.
+        get tilemap() { return tilemap; },
+        get mapData() { return mapData; },
         social, resources, farm,
         get npcs() { return npcs; },
         get nodes() { return resourceNodes; },
         get farmPlots() { return farmPlots; },
+        get furniture() { return furniture; },
+        requests, storage, sleepUntilMorning,
+        get zone() { return zoneName; },
         get clock() { return clockMin; },
         get day() { return dayCount; }
     };

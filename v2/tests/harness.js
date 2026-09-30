@@ -22,6 +22,7 @@ const FILES = [
     "js/world/social.js",
     "js/world/resources.js",
     "js/world/farming.js",
+    "js/world/requests.js",
     "js/world/maps.js",
     "js/entities/mover.js",
     "js/entities/player.js",
@@ -36,7 +37,8 @@ const EXPORTED = [
     "TileMap", "MAPS", "getMap",
     "moveAndCollide", "Player2D", "Enemy2D", "detectEncounter",
     "NPC2D", "Social", "ResourceNode", "ResourceBag", "RESOURCES", "NODE_TYPES",
-    "Farm", "FarmPlot", "CROP"
+    "Farm", "FarmPlot", "CROP",
+    "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP"
 ];
 
 function loadEngine() {
