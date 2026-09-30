@@ -66,6 +66,18 @@
     input.attach(window);
     const renderer = new Renderer(ctx);
 
+    // Load character sprites; the renderer falls back to procedural/emoji art
+    // for any that fail to load, so the game always draws something.
+    (function loadSprites() {
+        const sprites = {};
+        ["hero", "goblin", "wolf", "skeleton"].forEach(k => {
+            const img = new Image();
+            img.src = "assets/sprites/" + k + ".png";
+            sprites[k] = img;
+        });
+        renderer.sprites = sprites;
+    })();
+
     // On-screen touch controls → feed the same Input as the keyboard.
     (function wireTouch() {
         const touch = document.getElementById("touch");

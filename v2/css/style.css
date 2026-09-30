@@ -114,6 +114,8 @@ header .tag { color: #8996ac; font-size: 14px; margin-top: 4px; }
 #bEnemy { border-color: #7a3b52; }
 #bHero { border-color: #3b5a7a; }
 .bSprite { font-size: 46px; line-height: 1; margin-bottom: 4px; }
+.bImg { width: 92px; height: 92px; object-fit: contain; }
+.bImg.heroImg { transform: scaleX(-1); }
 .bName { font-weight: 600; margin-bottom: 6px; }
 .bBar { height: 12px; background: #0d1017; border-radius: 999px; overflow: hidden; margin: 4px 0; }
 .bHp { height: 100%; background: linear-gradient(90deg, #e0533f, #f0a04b); }

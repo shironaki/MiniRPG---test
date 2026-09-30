@@ -16,6 +16,7 @@ function openBattle(hero, kind, level, callbacks = {}) {
 
     const esc = (s) => (typeof escapeHtml === "function" ? escapeHtml(s) : String(s));
     const elements = (typeof GAME_DATA !== "undefined" && GAME_DATA.elements) || {};
+    const SPRITE_KINDS = ["goblin", "wolf", "skeleton"];
 
     const bc = new Battle2D(hero, kind, level, {
         onUpdate: render,
@@ -51,10 +52,15 @@ function openBattle(hero, kind, level, callbacks = {}) {
         }).join("") + `</div>`;
     }
 
+    const enemyArt = SPRITE_KINDS.includes(kind)
+        ? `<img class="bImg" src="assets/sprites/${kind}.png" alt="" onerror="this.replaceWith(document.createTextNode('${bc.enemy.emoji || "👹"}'))">`
+        : null;
+    const heroArt = `<img class="bImg heroImg" src="assets/sprites/hero.png" alt="" onerror="this.remove()">`;
+
     function render() {
         const e = bc.enemy;
         enemyEl.innerHTML = `
-            <div class="bSprite">${e.emoji}</div>
+            <div class="bSprite">${enemyArt || e.emoji}</div>
             <div class="bName">${esc(e.name)}</div>
             ${bar(e.health, e.maxHealth, "bHp")}
             <div class="bNums">❤️ ${Math.max(0, e.health)} / ${e.maxHealth}</div>
@@ -63,6 +69,7 @@ function openBattle(hero, kind, level, callbacks = {}) {
 
         const p = bc.player;
         heroEl.innerHTML = `
+            <div class="bSprite">${heroArt}</div>
             <div class="bName">${esc(p.name)} · ур.${p.level}</div>
             ${bar(p.health, p.maxHealth, "bHp")}
             <div class="bNums">❤️ ${Math.max(0, p.health)} / ${p.maxHealth}</div>

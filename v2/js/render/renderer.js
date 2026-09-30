@@ -111,25 +111,55 @@ class Renderer {
         }
     }
 
+    // Return a sprite image only if it is attached and fully decoded.
+    _img(key) {
+        const img = this.sprites && this.sprites[key];
+        return (img && img.complete && img.naturalWidth > 0) ? img : null;
+    }
+
+    // Draw a sprite anchored by its bottom-centre (feet), preserving aspect.
+    _drawSprite(img, cx, bottomY, targetH, flip, bob) {
+        const ctx = this.ctx;
+        const ar = img.naturalWidth / img.naturalHeight;
+        const h = targetH, w = h * ar;
+        const y = bottomY - h - (bob || 0);
+        if (flip) {
+            ctx.save();
+            ctx.translate(cx, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(img, -w / 2, y, w, h);
+            ctx.restore();
+        } else {
+            ctx.drawImage(img, cx - w / 2, y, w, h);
+        }
+    }
+
     drawEnemies(enemies, camera) {
         const ctx = this.ctx;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = "20px serif";
         for (const e of enemies) {
             if (e.alive === false) continue;
             const s = camera.worldToScreen(e.x, e.y);
             const cx = s.x + e.w / 2;
+            const bottom = s.y + e.h;
             // shadow
             ctx.fillStyle = "rgba(0,0,0,0.28)";
             ctx.beginPath();
-            ctx.ellipse(cx, s.y + e.h, e.w * 0.45, 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, bottom, e.w * 0.5, 4, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillText(e.emoji || "👹", cx, s.y + e.h / 2);
+
+            const img = this._img(e.kind);
+            if (img) {
+                this._drawSprite(img, cx, bottom + 2, e.h * 2.2, false, 0);
+            } else {
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.font = "20px serif";
+                ctx.fillText(e.emoji || "👹", cx, s.y + e.h / 2);
+            }
         }
     }
 
-    // A small procedural character with a 4-frame walk cycle (swinging limbs).
+    // Draws the hero: a sprite when loaded, else a procedural walk-cycle figure.
     drawPlayer(player, camera) {
         const ctx = this.ctx;
         const s = camera.worldToScreen(player.x, player.y);
@@ -147,6 +177,13 @@ class Renderer {
         ctx.beginPath();
         ctx.ellipse(cx, s.y + h, w * 0.5, 4.5, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        // Sprite path (preferred).
+        const img = this._img("hero");
+        if (img) {
+            this._drawSprite(img, cx, s.y + h + 2, h * 2.4, player.facing === "left", bob);
+            return;
+        }
 
         const topY = s.y - bob;
         const legY = topY + h * 0.7;
