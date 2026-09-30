@@ -4,7 +4,7 @@
   "description": "Mini RPG 9.0 — The Lost Kingdom. A dependency-free browser RPG.",
   "private": true,
   "scripts": {
-    "test": "node tests/game.test.js && node tests/integration.test.js",
+    "test": "node tests/game.test.js && node tests/integration.test.js && node v2/tests/engine.test.js",
     "serve": "node scripts/serve.js"
   },
   "license": "MIT"

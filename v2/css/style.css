@@ -1,0 +1,96 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(circle at 50% -10%, #1b2540, #0a0d15 70%);
+    color: #eef2f8;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 18px;
+}
+
+#app { width: 100%; max-width: 760px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+header { text-align: center; }
+header h1 { font-size: 30px; letter-spacing: 0.5px; }
+header h1 span { color: #b9a6ff; }
+header .tag { color: #8996ac; font-size: 14px; margin-top: 4px; }
+
+#stage {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+#game {
+    background: #0d1017;
+    border: 1px solid #2a3a56;
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    image-rendering: pixelated;
+    touch-action: none;
+}
+
+#hud {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    background: rgba(13,16,23,0.72);
+    border: 1px solid #35496a;
+    color: #c5cede;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    white-space: nowrap;
+    pointer-events: none;
+    transition: color 0.15s, border-color 0.15s;
+}
+#hud.active { color: #ffd166; border-color: #ffd166; }
+
+#overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6,8,13,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    padding: 20px;
+}
+#overlay.hidden { display: none; }
+#overlayCard {
+    background: #141b2a;
+    border: 1px solid #35496a;
+    border-radius: 16px;
+    padding: 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+}
+#overlayBody h2 { font-size: 22px; margin-bottom: 10px; }
+#overlayBody p { color: #c5cede; line-height: 1.55; margin-bottom: 10px; }
+#overlayBody .hint { color: #8996ac; font-size: 13px; font-style: italic; }
+#overlayClose {
+    margin-top: 8px;
+    padding: 10px 22px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(145deg, #b9a6ff, #8a7bd8);
+    color: #10131a;
+    font-size: 15px;
+    cursor: pointer;
+}
+#overlayClose:hover { filter: brightness(1.08); }
+
+footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.pill {
+    background: #141b2a;
+    border: 1px solid #2a3a56;
+    color: #8996ac;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+}
