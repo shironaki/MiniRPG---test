@@ -315,7 +315,7 @@ class Battle {
 
 
         this.player.gold +=
-            this.enemy.gold;
+            (this.player.goldMultiplier ? Math.round(this.enemy.gold * this.player.goldMultiplier()) : this.enemy.gold);
 
 
         const levelMessages =
@@ -332,6 +332,14 @@ class Battle {
         this.log(
             `💰 Получено ${this.enemy.gold} золота.`
         );
+
+
+        // Chance to drop a forge essence for crafting upgrades.
+        const dropChance = (typeof GAME_DATA !== "undefined" && GAME_DATA.essenceDropChance) || 0;
+        if (typeof Craft !== "undefined" && Math.random() < dropChance) {
+            this.player.addItem(Craft.essence());
+            this.log("🔩 Из добычи выпала эссенция ковки.");
+        }
 
 
         levelMessages.forEach(

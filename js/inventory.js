@@ -105,11 +105,15 @@ class Inventory {
                 }
 
 
+                const rc = (typeof Craft !== "undefined" && item.rarity && item.rarity !== "common")
+                    ? Craft.rarityInfo(item.rarity) : null;
+                const nameStyle = rc ? ` style="color:${rc.color}"` : "";
+
                 return `
 
                     <div class="inventoryItem">
 
-                        <strong>
+                        <strong${nameStyle}>
                             ${index + 1}. ${item.emoji || "📦"} ${item.name}
                         </strong>
 

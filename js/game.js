@@ -40,6 +40,25 @@ class Game {
         return this.player.ally;
     }
 
+    // Spend a perk point to raise a perk by one rank. Returns a result object.
+    buyPerk(id) {
+        const defs = (typeof GAME_DATA !== "undefined" && GAME_DATA.perks) || [];
+        const def = defs.find(p => p.id === id);
+        if (!def) return { success: false, message: "Неизвестный навык." };
+        if (!this.player.perks) this.player.perks = {};
+        const rank = this.player.perks[id] || 0;
+        if (rank >= def.maxRank) return { success: false, message: "Достигнут максимальный ранг." };
+        const cost = def.cost || 1;
+        if ((this.player.perkPoints || 0) < cost) return { success: false, message: "Недостаточно очков навыков." };
+
+        this.player.perkPoints -= cost;
+        this.player.perks[id] = rank + 1;
+        if (def.maxHealth) { this.player.maxHealth += def.maxHealth; this.player.health += def.maxHealth; }
+        if (def.maxEnergy) { this.player.maxEnergy += def.maxEnergy; this.player.energy += def.maxEnergy; }
+        this.player.updateStats();
+        return { success: true, def, rank: rank + 1 };
+    }
+
     // Shift karma within [-100, 100].
     adjustKarma(delta) {
         if (!this.player) return 0;
@@ -127,6 +146,8 @@ class Game {
         if (this.player.karma === undefined) this.player.karma = 0;
         if (this.player.maxEnergy == null) this.player.maxEnergy = 30;
         if (this.player.energy == null) this.player.energy = this.player.maxEnergy;
+        if (this.player.perkPoints == null) this.player.perkPoints = 0;
+        if (!this.player.perks) this.player.perks = {};
         this.player.statuses = []; // effects never persist outside a battle
         this.player.inventory.forEach(item => Object.setPrototypeOf(item, Item.prototype));
         Object.values(this.player.equipment).filter(Boolean).forEach(item => Object.setPrototypeOf(item, Item.prototype));

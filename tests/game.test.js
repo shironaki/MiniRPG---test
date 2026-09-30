@@ -505,6 +505,158 @@ describe("Quest", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Crafting / rarity
+// ---------------------------------------------------------------------------
+describe("Crafting", () => {
+    it("defaults new items to common rarity and preserves it on clone", () => {
+        const { exports: g } = loadGame();
+        const s = g.ITEMS.sword.clone();
+        expect(s.rarity).toBe("common");
+        s.rarity = "rare";
+        expect(s.clone().rarity).toBe("rare");
+    });
+
+    it("refuses to upgrade without gold or essence", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        p.gold = 1000;
+        const sword = g.ITEMS.sword.clone();
+        expect(g.Craft.upgrade(p, sword).success).toBe(false); // no essence
+        p.addItem(g.Craft.essence());
+        p.gold = 0;
+        expect(g.Craft.upgrade(p, sword).success).toBe(false); // no gold
+    });
+
+    it("upgrades through rare and legendary, scaling bonus and consuming resources", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        p.gold = 1000;
+        const sword = g.ITEMS.sword.clone();
+        const base = sword.attackBonus;
+        p.addItem(g.Craft.essence());
+        const r1 = g.Craft.upgrade(p, sword);
+        expect(r1.success).toBe(true);
+        expect(sword.rarity).toBe("rare");
+        expect(sword.attackBonus).toBe(Math.round(base * 1.6));
+        expect(sword.name.startsWith("Редкий")).toBe(true);
+        expect(g.Craft.essenceCount(p)).toBe(0);
+        expect(p.gold).toBe(920);
+
+        p.addItem(g.Craft.essence());
+        p.addItem(g.Craft.essence());
+        const r2 = g.Craft.upgrade(p, sword);
+        expect(r2.success).toBe(true);
+        expect(sword.rarity).toBe("legendary");
+        expect(g.Craft.canUpgrade(sword)).toBe(false); // maxed
+    });
+
+    it("rejects upgrading non-equipment", () => {
+        const { exports: g } = loadGame();
+        const potion = g.ITEMS.potion.clone();
+        expect(g.Craft.canUpgrade(potion)).toBe(false);
+    });
+
+    it("persists rarity across save/resume", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.gold = 1000;
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.journal = new g.QuestJournal();
+        game.inventory = new g.Inventory(game.player);
+        const sword = g.ITEMS.sword.clone();
+        game.player.addItem(sword);
+        game.player.addItem(g.Craft.essence());
+        const weapon = game.player.inventory.find(i => i.type === "weapon");
+        g.Craft.upgrade(game.player, weapon);
+        game.saveSystem.save(game);
+
+        const game2 = new g.Game();
+        game2.resume();
+        const restored = game2.player.inventory.find(i => i.isEquipment && i.isEquipment());
+        expect(restored.rarity).toBe("rare");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Perks
+// ---------------------------------------------------------------------------
+describe("Perks", () => {
+    it("grants a perk point on each level-up", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        p.addExperience(100); // -> level 2
+        expect(p.level).toBe(2);
+        expect(p.perkPoints).toBe(1);
+    });
+
+    it("power raises attack and spends a point", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.perkPoints = 2;
+        const atk = game.player.attack;
+        const res = game.buyPerk("power");
+        expect(res.success).toBe(true);
+        expect(game.player.attack).toBe(atk + 3);
+        expect(game.player.perkPoints).toBe(1);
+    });
+
+    it("toughness raises and heals max HP instantly", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.perkPoints = 1;
+        const mh = game.player.maxHealth, hp = game.player.health;
+        game.buyPerk("toughness");
+        expect(game.player.maxHealth).toBe(mh + 15);
+        expect(game.player.health).toBe(hp + 15);
+    });
+
+    it("crit chance and gold multiplier scale with ranks", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.perkPoints = 10;
+        game.buyPerk("criticalEye");
+        expect(Math.abs(game.player.critChance() - 0.20) < 1e-9).toBe(true);
+        game.buyPerk("treasureHunter");
+        expect(Math.abs(game.player.goldMultiplier() - 1.15) < 1e-9).toBe(true);
+    });
+
+    it("refuses to buy with no points or beyond max rank", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.perkPoints = 0;
+        expect(game.buyPerk("power").success).toBe(false);
+        game.player.perkPoints = 99;
+        for (let i = 0; i < 5; i++) game.buyPerk("power"); // maxRank 5
+        expect(game.buyPerk("power").success).toBe(false);
+    });
+
+    it("persists perks and points across save/resume", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.perkPoints = 3;
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.journal = new g.QuestJournal();
+        game.inventory = new g.Inventory(game.player);
+        game.buyPerk("power");
+        game.saveSystem.save(game);
+
+        const game2 = new g.Game();
+        game2.resume();
+        expect(game2.player.perks.power).toBe(1);
+        expect(game2.player.perkPoints).toBe(2);
+        expect(typeof game2.player.critChance).toBe("function");
+    });
+});
+
+// ---------------------------------------------------------------------------
 // QuestJournal — branching side & companion quests
 // ---------------------------------------------------------------------------
 describe("QuestJournal", () => {

@@ -96,6 +96,25 @@ const GAME_DATA = {
             reward: { gold: 80, xp: 70, affinity: 25 }
         }
     ],
+
+    // ---- Crafting: essence materials drop from foes and fuel forge upgrades. ----
+    materials: {
+        essence: { name: "Эссенция ковки", type: "material", price: 0, emoji: "🔩", description: "Материал для улучшения снаряжения в кузнице." }
+    },
+    essenceDropChance: 0.28,
+
+    // ---- Perks: passive upgrades bought with perk points earned on level-up.
+    // `maxHealth`/`maxEnergy` apply instantly on purchase; `attack`/`defense`
+    // fold into updateStats(); crit/gold are read by combat helpers. ----
+    perks: [
+        { id: "power",          name: "Сила",          emoji: "⚔️", maxRank: 5, attack: 3,     desc: "+3 к атаке за ранг." },
+        { id: "guard",          name: "Стойкость",     emoji: "🛡️", maxRank: 5, defense: 2,    desc: "+2 к защите за ранг." },
+        { id: "toughness",      name: "Живучесть",     emoji: "❤️", maxRank: 5, maxHealth: 15, desc: "+15 к макс. HP за ранг." },
+        { id: "vigor",          name: "Энергичность",  emoji: "⚡", maxRank: 4, maxEnergy: 5,  desc: "+5 к макс. энергии за ранг." },
+        { id: "criticalEye",    name: "Меткий глаз",   emoji: "🎯", maxRank: 3, crit: 0.05,    desc: "+5% к шансу крита за ранг." },
+        { id: "treasureHunter", name: "Кладоискатель", emoji: "💰", maxRank: 3, gold: 0.15,    desc: "+15% золота с врагов за ранг." }
+    ],
+
     zones: {
         start:         { accent: "#b5892f", biome: "camp" },
         camp:          { accent: "#a9772f", biome: "camp" },

@@ -1,10 +1,10 @@
 class Item {
-    constructor(name, type, price, description, attackBonus = 0, defenseBonus = 0, healAmount = 0, emoji = "📦") {
+    constructor(name, type, price, description, attackBonus = 0, defenseBonus = 0, healAmount = 0, emoji = "📦", rarity = "common") {
         this.name = name; this.type = type; this.price = price; this.description = description;
-        this.attackBonus = attackBonus; this.defenseBonus = defenseBonus; this.healAmount = healAmount; this.emoji = emoji;
+        this.attackBonus = attackBonus; this.defenseBonus = defenseBonus; this.healAmount = healAmount; this.emoji = emoji; this.rarity = rarity;
     }
     isEquipment() { return ["weapon", "armor", "shield"].includes(this.type); }
-    clone() { return new Item(this.name, this.type, this.price, this.description, this.attackBonus, this.defenseBonus, this.healAmount, this.emoji); }
+    clone() { return new Item(this.name, this.type, this.price, this.description, this.attackBonus, this.defenseBonus, this.healAmount, this.emoji, this.rarity); }
 }
 
 const ITEMS = (function () {

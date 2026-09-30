@@ -189,6 +189,50 @@ describe("Integration: progressive UI", () => {
     });
 });
 
+describe("Integration: perks UI", () => {
+    it("hides the perks button until a point is earned, then buys via UI", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        ui.refreshMenus();
+        expect(sandbox.document.getElementById("perkButton").style.display).toBe("none");
+
+        ui.game.player.perkPoints = 2;
+        ui.refreshMenus();
+        expect(sandbox.document.getElementById("perkButton").style.display).toBe("");
+
+        const atk = ui.game.player.attack;
+        ui.openPerks();
+        ui.buyPerk("power");
+        expect(ui.game.player.attack).toBe(atk + 3);
+        expect(ui.game.player.perkPoints).toBe(1);
+        expect(/Сила/.test(sandbox.document.getElementById("perkList").innerHTML)).toBe(true);
+    });
+});
+
+describe("Integration: forge UI", () => {
+    it("reveals the forge once essence is held and upgrades an item via UI", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        ui.refreshMenus();
+        expect(sandbox.document.getElementById("forgeButton").style.display).toBe("none");
+
+        ui.game.player.gold = 500;
+        ui.game.player.addItem(ui.Craft.essence());
+        const sword = ui.ITEMS.sword.clone();
+        ui.game.player.addItem(sword);
+        ui.refreshMenus();
+        expect(sandbox.document.getElementById("forgeButton").style.display).toBe("");
+
+        ui.openForge();
+        // The sword is the only equipment in the bag -> index it and upgrade.
+        const idx = ui.game._forgeItems.findIndex(i => i.type === "weapon");
+        ui.upgradeItem(idx);
+        const weapon = ui.game.player.inventory.find(i => i.type === "weapon");
+        expect(weapon.rarity).toBe("rare");
+        expect(/Редкий/.test(sandbox.document.getElementById("forgeList").innerHTML)).toBe(true);
+    });
+});
+
 describe("Integration: audio safety", () => {
     it("all SFX calls are no-ops without a real AudioContext", () => {
         const { exports: ui } = loadFullGame();

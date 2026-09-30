@@ -240,14 +240,160 @@ document
     );
 
 
-// Progressive disclosure of village options: the quest board only appears
-// once the player has answered the Elder's call (accepted the first quest).
+// =============================================
+// НАВЫКИ (ПЕРКИ)
+// =============================================
+
+document
+    .getElementById("perkButton")
+    .addEventListener("click", openPerks);
+
+document
+    .getElementById("perkBackButton")
+    .addEventListener("click", () => showScreen("villageScreen"));
+
+
+// =============================================
+// КУЗНИЦА
+// =============================================
+
+document
+    .getElementById("forgeButton")
+    .addEventListener("click", openForge);
+
+document
+    .getElementById("forgeBackButton")
+    .addEventListener("click", () => showScreen("villageScreen"));
+
+
+// Progressive disclosure of village options: the quest board appears after the
+// Elder's call; the perks screen appears once you have a point (or a perk).
 function refreshMenus() {
     const questBtn = document.getElementById("questButton");
     if (questBtn) {
         const unlocked = Boolean(game && game.quest && game.quest.active);
         questBtn.style.display = unlocked ? "" : "none";
     }
+    const perkBtn = document.getElementById("perkButton");
+    if (perkBtn) {
+        const p = game && game.player;
+        const unlocked = p && (((p.perkPoints || 0) > 0) || (p.perks && Object.keys(p.perks).length > 0));
+        perkBtn.style.display = unlocked ? "" : "none";
+    }
+    const forgeBtn = document.getElementById("forgeButton");
+    if (forgeBtn) {
+        const p = game && game.player;
+        const unlocked = p && typeof Craft !== "undefined" && Craft.essenceCount(p) > 0;
+        forgeBtn.style.display = unlocked ? "" : "none";
+    }
+}
+
+
+function openPerks() {
+    showScreen("perkScreen");
+    renderPerks();
+}
+
+function renderPerks() {
+    const pointsEl = document.getElementById("perkPoints");
+    if (pointsEl) pointsEl.innerHTML = `🧠 Очки навыков: <strong>${(game.player && game.player.perkPoints) || 0}</strong>`;
+    const list = document.getElementById("perkList");
+    if (!list) return;
+    const defs = (typeof GAME_DATA !== "undefined" && GAME_DATA.perks) || [];
+    list.innerHTML = defs.map(def => {
+        const rank = (game.player.perks && game.player.perks[def.id]) || 0;
+        const maxed = rank >= def.maxRank;
+        const afford = (game.player.perkPoints || 0) >= (def.cost || 1);
+        const pips = "●".repeat(rank) + "○".repeat(def.maxRank - rank);
+        const action = maxed
+            ? `<span class="perkMax">МАКС</span>`
+            : `<button class="perkBuy" onclick="buyPerk('${def.id}')"${afford ? "" : " disabled"}>Улучшить</button>`;
+        return `<div class="perkCard ${maxed ? "maxed" : ""}">
+            <strong>${def.emoji} ${def.name}</strong>
+            <span class="perkPips">${pips}</span>
+            <p>${def.desc}</p>
+            ${action}
+        </div>`;
+    }).join("");
+}
+
+function buyPerk(id) {
+    const res = game.buyPerk(id);
+    if (res.success) {
+        addLog(`🧠 Навык улучшен: ${res.def.emoji} ${res.def.name} (ранг ${res.rank}).`);
+        if (typeof sfx !== "undefined") sfx.play("relic");
+    } else if (res.message) {
+        addLog(`⚠️ ${res.message}`);
+    }
+    game.updateUI();
+    renderPerks();
+}
+
+
+// =============================================
+// КУЗНИЦА (КРАФТ / РЕДКОСТЬ)
+// =============================================
+
+function forgeItems() {
+    // Every upgradeable piece the player owns: equipped slots + inventory gear.
+    const p = game.player;
+    const equipped = Object.values(p.equipment || {}).filter(Boolean);
+    const bag = (p.inventory || []).filter(i => i.isEquipment && i.isEquipment());
+    return equipped.concat(bag);
+}
+
+function openForge() {
+    showScreen("forgeScreen");
+    renderForge();
+}
+
+function renderForge() {
+    const p = game.player;
+    const resEl = document.getElementById("forgeResources");
+    if (resEl) resEl.innerHTML = `🔩 Эссенции: <strong>${Craft.essenceCount(p)}</strong> &nbsp;·&nbsp; 💰 Золото: <strong>${p.gold}</strong>`;
+    const list = document.getElementById("forgeList");
+    if (!list) return;
+
+    const items = forgeItems();
+    game._forgeItems = items;
+    if (!items.length) {
+        list.innerHTML = `<p class="muted">Нет снаряжения для улучшения. Найдите или купите оружие и броню.</p>`;
+        return;
+    }
+
+    list.innerHTML = items.map((item, idx) => {
+        const info = Craft.rarityInfo(item.rarity || "common");
+        const next = Craft.nextRarity(item.rarity || "common");
+        const bonus = item.attackBonus ? `⚔️ +${item.attackBonus}` : (item.defenseBonus ? `🛡️ +${item.defenseBonus}` : "");
+        let action;
+        if (!next) {
+            action = `<span class="perkMax">МАКС</span>`;
+        } else {
+            const cost = Craft.upgradeCost(item);
+            const afford = p.gold >= cost.gold && Craft.essenceCount(p) >= cost.essence;
+            action = `<button class="perkBuy" onclick="upgradeItem(${idx})"${afford ? "" : " disabled"}>💰${cost.gold} · 🔩${cost.essence}</button>`;
+        }
+        return `<div class="forgeCard" style="border-left-color:${info.color}">
+            <strong>${item.emoji} ${item.name}</strong>
+            <span class="rarityTag" style="color:${info.color}">${info.emoji} ${info.label}</span>
+            <span class="forgeBonus">${bonus}</span>
+            ${action}
+        </div>`;
+    }).join("");
+}
+
+function upgradeItem(idx) {
+    const item = (game._forgeItems || [])[idx];
+    if (!item) return;
+    const res = Craft.upgrade(game.player, item);
+    if (res.success) {
+        addLog(`🔨 Улучшено: ${item.emoji} ${item.name}!`);
+        if (typeof sfx !== "undefined") sfx.play("relic");
+    } else if (res.message) {
+        addLog(`⚠️ ${res.message}`);
+    }
+    game.updateUI();
+    renderForge();
 }
 
 
