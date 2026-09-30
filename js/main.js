@@ -504,6 +504,8 @@ function renderWorld() {
             : room.visited ? "Открыто"
             : "Неизведано";
 
+        const smallText = isCurrent ? "📍 ТЫ ЗДЕСЬ" : status;
+
         const classes = [
             "mapCell", "mapRoom",
             isCurrent ? "current" : "",
@@ -518,11 +520,13 @@ function renderWorld() {
 
         const badge = roomBadge(room, world);
         const badgeHtml = badge ? `<em class="mapBadge">${badge}</em>` : "";
+        const markerHtml = isCurrent ? `<em class="mapMarker">📍</em>` : "";
 
         return `<div class="${classes}" data-room="${id}" style="${pos}" title="${room.name}"${onclick}>
+            ${markerHtml}
             ${badgeHtml}
             <span>${room.name}</span>
-            <small>${status}</small>
+            <small>${smallText}</small>
         </div>`;
     }).join("");
 
@@ -550,6 +554,8 @@ function roomBadge(room, world) {
         case "trap": return room.trap && !room.trap.triggered && !room.trap.disarmed ? "⚠️" : "✅";
         case "relic": return "✨";
         case "rest": return "🔥";
+        case "recruit": return "🤝";
+        case "wanderer": return "🧍";
         case "miniboss": return "🗿";
         case "enemy": return "👹";
         case "boss": return "👑";
@@ -1033,6 +1039,51 @@ function renderLocation() {
         return;
     }
 
+    // Recruit a companion.
+    if (room.event === "recruit" && !room.recruitResolved) {
+        const template = (typeof ALLIES !== "undefined" && ALLIES[room.recruitType]) ? ALLIES[room.recruitType]() : null;
+        const name = template ? `${template.emoji} ${template.name}` : "Союзник";
+        const note = document.createElement("div");
+        note.className = "locationChoice";
+        note.innerHTML = `<p>🤝 ${name} готов присоединиться к тебе.${game.player.ally ? "<br><small>Он заменит текущего спутника.</small>" : ""}</p>`;
+        actions.appendChild(note);
+
+        const joinButton = document.createElement("button");
+        joinButton.textContent = "🤝 Взять в отряд";
+        joinButton.onclick = recruitHere;
+        actions.appendChild(joinButton);
+
+        const declineButton = document.createElement("button");
+        declineButton.textContent = "🚶 Отказаться";
+        declineButton.onclick = declineRecruit;
+        actions.appendChild(declineButton);
+        return;
+    }
+
+    // Wandering traveller: a moral choice with consequences.
+    if (room.event === "wanderer" && !room.wandererResolved) {
+        const note = document.createElement("div");
+        note.className = "locationChoice";
+        note.innerHTML = `<p>🧍 Измождённый путник просит о помощи. Как поступишь?</p>`;
+        actions.appendChild(note);
+
+        const helpButton = document.createElement("button");
+        helpButton.textContent = "❤️ Помочь (−15 💰)";
+        helpButton.onclick = () => resolveWanderer("help");
+        actions.appendChild(helpButton);
+
+        const robButton = document.createElement("button");
+        robButton.textContent = "🗡️ Ограбить";
+        robButton.onclick = () => resolveWanderer("rob");
+        actions.appendChild(robButton);
+
+        const ignoreButton = document.createElement("button");
+        ignoreButton.textContent = "🚶 Пройти мимо";
+        ignoreButton.onclick = () => resolveWanderer("ignore");
+        actions.appendChild(ignoreButton);
+        return;
+    }
+
     // Enemy still lurking here (e.g. after a successful flee): let the player re-engage.
     if (room.event === "enemy" && !room.cleared) {
         const fightButton = document.createElement("button");
@@ -1182,6 +1233,10 @@ function exploreRoom() {
 
         case "rest":
 
+        case "recruit":
+
+        case "wanderer":
+
             renderLocation();
 
             return;
@@ -1306,6 +1361,77 @@ function disarmTrap() {
 function claimRelic() {
     const relic = game.world.collectRelic();
     if (relic) { addLog(`✨ Получена ${relic}. Печать Стража ослабла: ${game.world.relics.length}/3.`); sfx.play("relic"); }
+    game.updateUI();
+    renderLocation();
+}
+
+function recruitHere() {
+    const room = game.world.getCurrentRoom();
+    const ally = game.recruitAlly(room.recruitType);
+    room.recruitResolved = true;
+    room.cleared = true;
+    room.event = "cleared";
+    if (ally) {
+        addLog(`🤝 ${ally.emoji} ${ally.name} присоединяется к отряду!`);
+        sfx.play("relic");
+    }
+    game.updateUI();
+    renderLocation();
+}
+
+function declineRecruit() {
+    const room = game.world.getCurrentRoom();
+    room.recruitResolved = true;
+    room.cleared = true;
+    room.event = "cleared";
+    addLog("🚶 Ты отказался от спутника.");
+    game.updateUI();
+    renderLocation();
+}
+
+function resolveWanderer(choice) {
+    const room = game.world.getCurrentRoom();
+    room.wandererResolved = true;
+    room.cleared = true;
+    room.event = "cleared";
+    const p = game.player;
+
+    if (choice === "help") {
+        let cost = "";
+        if (p.gold >= 15) { p.gold -= 15; cost = "Ты отдал 15 золота."; }
+        else {
+            const idx = p.inventory.findIndex(i => i.type === "potion");
+            if (idx >= 0) { p.inventory.splice(idx, 1); cost = "Ты отдал зелье."; }
+            else cost = "У тебя не было чем поделиться, но ты помог делом.";
+        }
+        game.adjustKarma(8);
+        addLog(`❤️ Ты помог путнику. ${cost} Карма выросла (☯️ ${game.karmaLabel()}).`);
+        if (p.ally) {
+            p.ally.changeAffinity(6);
+            addLog(`🙂 ${p.ally.name} одобряет поступок (привязанность ❤ ${p.ally.affinity}).`);
+        } else {
+            const ally = game.recruitAlly("healer");
+            if (ally) addLog(`🌿 Благодарный путник оказался травницей — ${ally.name} присоединяется к тебе!`);
+        }
+        sfx.play("relic");
+    } else if (choice === "rob") {
+        const gold = 25 + Math.floor(Math.random() * 36);
+        p.gold += gold;
+        game.adjustKarma(-10);
+        addLog(`🗡️ Ты ограбил путника (+${gold} 💰). Карма упала (☯️ ${game.karmaLabel()}).`);
+        if (p.ally) {
+            p.ally.changeAffinity(-12);
+            addLog(`😠 ${p.ally.name} осуждает тебя (привязанность ❤ ${p.ally.affinity}).`);
+            if (p.ally.hasLeft()) {
+                addLog(`💔 ${p.ally.name} покидает отряд, разочаровавшись в тебе.`);
+                p.ally = null;
+            }
+        }
+        sfx.play("hurt");
+    } else {
+        addLog("🚶 Ты прошёл мимо путника.");
+    }
+
     game.updateUI();
     renderLocation();
 }

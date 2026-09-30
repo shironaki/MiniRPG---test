@@ -82,6 +82,44 @@ describe("Integration: settings", () => {
     });
 });
 
+describe("Integration: moral choices", () => {
+    it("helping a wanderer raises karma and recruits a healer when soloing", () => {
+        const { exports: ui } = loadFullGame();
+        ui.game.start();
+        const room = ui.game.world.getCurrentRoom();
+        room.event = "wanderer"; room.wandererResolved = false;
+        const karmaBefore = ui.game.player.karma;
+        ui.resolveWanderer("help");
+        expect(ui.game.player.karma).toBeGreaterThan(karmaBefore);
+        expect(ui.game.player.ally !== null).toBe(true);
+        expect(ui.game.player.ally.role).toBe("healer");
+    });
+
+    it("robbing a wanderer lowers karma and can turn an ally away", () => {
+        const { exports: ui } = loadFullGame();
+        ui.game.start();
+        ui.game.recruitAlly("warrior");
+        ui.game.player.ally.affinity = 5; // fragile bond
+        const goldBefore = ui.game.player.gold;
+        const room = ui.game.world.getCurrentRoom();
+        room.event = "wanderer"; room.wandererResolved = false;
+        ui.resolveWanderer("rob");
+        expect(ui.game.player.karma).toBeLessThan(0);
+        expect(ui.game.player.gold).toBeGreaterThan(goldBefore);
+        expect(ui.game.player.ally).toBe(null); // disapproved and left
+    });
+
+    it("recruiting at a camp attaches the warrior companion", () => {
+        const { exports: ui } = loadFullGame();
+        ui.game.start();
+        const room = ui.game.world.getCurrentRoom();
+        room.event = "recruit"; room.recruitType = "warrior"; room.recruitResolved = false;
+        ui.recruitHere();
+        expect(ui.game.player.ally.role).toBe("warrior");
+        expect(room.recruitResolved).toBe(true);
+    });
+});
+
 describe("Integration: audio safety", () => {
     it("all SFX calls are no-ops without a real AudioContext", () => {
         const { exports: ui } = loadFullGame();

@@ -32,6 +32,30 @@ class Game {
         if (key in this.stats) this.stats[key]++;
     }
 
+    // Recruit (or replace) a companion. Returns the new ally.
+    recruitAlly(type) {
+        const factory = (typeof ALLIES !== "undefined") && ALLIES[type];
+        if (!factory) return null;
+        this.player.ally = factory();
+        return this.player.ally;
+    }
+
+    // Shift karma within [-100, 100].
+    adjustKarma(delta) {
+        if (!this.player) return 0;
+        this.player.karma = Math.max(-100, Math.min(100, (this.player.karma || 0) + (delta || 0)));
+        return this.player.karma;
+    }
+
+    karmaLabel() {
+        const k = this.player ? (this.player.karma || 0) : 0;
+        if (k >= 40) return "Герой";
+        if (k >= 10) return "Добрый";
+        if (k <= -40) return "Злодей";
+        if (k <= -10) return "Тёмный";
+        return "Нейтральный";
+    }
+
 
     start() {
 
@@ -96,8 +120,10 @@ class Game {
         if (!data?.player || !data?.world) return false;
 
         this.player = Object.assign(Object.create(Player.prototype), data.player);
+        if (this.player.karma === undefined) this.player.karma = 0;
         this.player.inventory.forEach(item => Object.setPrototypeOf(item, Item.prototype));
         Object.values(this.player.equipment).filter(Boolean).forEach(item => Object.setPrototypeOf(item, Item.prototype));
+        if (this.player.ally) Object.setPrototypeOf(this.player.ally, Ally.prototype);
         this.world = Object.assign(Object.create(World.prototype), data.world);
         Object.values(this.world.rooms).forEach(room => {
             Object.setPrototypeOf(room, Room.prototype);
@@ -154,7 +180,15 @@ class Game {
         document
             .getElementById("quickStats")
             .textContent =
-                `⭐ ${this.player.level} ур. · ✨ ${this.player.experience}/${this.player.experienceToNextLevel} · ⚔️ ${this.player.attack} · 🛡️ ${this.player.defense} · 🧰 ${this.player.trapSkill} · 💰 ${this.player.gold}`;
+                `⭐ ${this.player.level} ур. · ✨ ${this.player.experience}/${this.player.experienceToNextLevel} · ⚔️ ${this.player.attack} · 🛡️ ${this.player.defense} · 🧰 ${this.player.trapSkill} · 💰 ${this.player.gold} · ☯️ ${this.karmaLabel()}`;
+
+        const allyBox = document.getElementById("allyInfo");
+        if (allyBox) {
+            const ally = this.player.ally;
+            allyBox.innerHTML = ally
+                ? `<span class="allyChip">${ally.emoji} ${ally.name} · ${ally.tierLabel()} <small>❤ ${ally.affinity}</small></span>`
+                : "";
+        }
 
         if (!this.gameEnded) this.saveSystem.save(this);
     }

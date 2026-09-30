@@ -729,15 +729,43 @@ h2 {
     background:
         linear-gradient(
             145deg,
-            #795b20,
-            #473710
+            #c8971f,
+            #6d4f12
         );
 
-    border-color: #ffd166;
+    border: 2px solid #ffe08a;
+    color: #1a1206;
+    font-weight: 700;
 
     box-shadow:
-        0 0 12px
-        rgba(255, 209, 102, 0.4);
+        0 0 0 2px rgba(255, 224, 138, 0.55),
+        0 0 18px rgba(255, 209, 102, 0.85);
+
+    animation: currentPulse 1.6s ease-in-out infinite;
+    z-index: 3;
+}
+
+.mapRoom.current small { color: #2a1c05; font-weight: 700; }
+.mapRoom.current span { color: #1a1206; }
+
+@keyframes currentPulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(255, 224, 138, 0.55), 0 0 14px rgba(255, 209, 102, 0.6); }
+    50%      { box-shadow: 0 0 0 3px rgba(255, 224, 138, 0.85), 0 0 22px rgba(255, 209, 102, 1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mapRoom.current { animation: none; }
+}
+
+.mapMarker {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    font-style: normal;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+    z-index: 4;
 }
 
 .worldMapGrid {
@@ -863,6 +891,17 @@ header { position: relative; }
     margin-top: 8px;
 }
 
+.locationChoice {
+    margin: 6px 0 12px;
+    padding: 12px;
+    background: #1b2536;
+    border: 1px solid #35496a;
+    border-radius: 12px;
+    color: #d7e3f2;
+    font-size: 15px;
+}
+.locationChoice small { color: #9fb0c6; }
+
 .mapHint { font-size: 12px; color: #8fa1b8; margin-top: 8px; }
 
 .runStats {
@@ -921,5 +960,16 @@ header { position: relative; }
 #worldDescription h3 { margin-bottom: 5px; color: #e5eefc; }
 #worldDescription p { margin-top: 0; color: #aebdd1; }
 #quickStats { font-size: 13px; line-height: 1.55; }
+#allyInfo { margin-top: 6px; }
+.allyChip {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #223047;
+    border: 1px solid #3a5c86;
+    font-size: 13px;
+    color: #d7e3f2;
+}
+.allyChip small { color: #f2a1b3; margin-left: 4px; }
 #continueGameButton { background: linear-gradient(145deg, #4c714c, #31563c); }
 #locationActions button { background: linear-gradient(145deg, #617b3b, #435d26); }

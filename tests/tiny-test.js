@@ -43,6 +43,9 @@ function expect(actual) {
         toBeLessThanOrEqual(n) {
             if (!(actual <= n)) throw new Error(`expected ${format(actual)} <= ${format(n)}`);
         },
+        toBeLessThan(n) {
+            if (!(actual < n)) throw new Error(`expected ${format(actual)} < ${format(n)}`);
+        },
         toContain(sub) {
             if (!String(actual).includes(sub)) {
                 throw new Error(`expected ${format(actual)} to contain ${format(sub)}`);

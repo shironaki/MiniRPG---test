@@ -2,7 +2,7 @@ class Player {
     constructor(name) {
         this.name = (typeof name === "string" ? name : "").replace(/[<>&"]/g, "").trim().slice(0, 18) || "Герой"; this.level = 1; this.experience = 0; this.experienceToNextLevel = 100;
         this.maxHealth = 100; this.health = 100; this.baseAttack = 15; this.baseDefense = 5; this.attack = 15; this.defense = 5; this.gold = 100;
-        this.inventory = [ITEMS.potion.clone(), ITEMS.potion.clone()]; this.equipment = { weapon: null, armor: null, shield: null }; this.isDefending = false; this.trapSkill = 0;
+        this.inventory = [ITEMS.potion.clone(), ITEMS.potion.clone()]; this.equipment = { weapon: null, armor: null, shield: null }; this.isDefending = false; this.trapSkill = 0; this.karma = 0; this.ally = null;
     }
     updateStats() { this.attack = this.baseAttack + (this.equipment.weapon?.attackBonus || 0); this.defense = this.baseDefense + (this.equipment.armor?.defenseBonus || 0) + (this.equipment.shield?.defenseBonus || 0); }
     attackEnemy(enemy) { const critical = Math.random() < 0.15; const raw = this.attack + Math.floor(Math.random() * 9) + (critical ? this.attack : 0); return { damage: enemy.takeDamage(raw), critical }; }

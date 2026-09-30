@@ -16,12 +16,22 @@ class Shop {
     }
 
 
+    // Karma discount/markup: high karma (helpful hero) earns up to 15% off,
+    // low karma (ruthless) is charged up to 15% more.
+    priceFactor() {
+        const k = Math.max(-50, Math.min(50, this.player.karma || 0));
+        return 1 - (k / 50) * 0.15;
+    }
+
+    priceOf(item) {
+        return Math.max(1, Math.round(item.price * this.priceFactor()));
+    }
+
     buy(item) {
 
-        if (
-            this.player.gold <
-            item.price
-        ) {
+        const price = this.priceOf(item);
+
+        if (this.player.gold < price) {
 
             return {
                 success: false,
@@ -30,8 +40,7 @@ class Shop {
         }
 
 
-        this.player.gold -=
-            item.price;
+        this.player.gold -= price;
 
 
         this.player.addItem(item);
@@ -40,7 +49,7 @@ class Shop {
         return {
             success: true,
             message:
-                `🛒 Куплено: ${item.name}`
+                `🛒 Куплено: ${item.name} за ${price} 💰`
         };
     }
 
@@ -103,7 +112,7 @@ class Shop {
                     </p>
 
                     <p>
-                        💰 ${item.price}
+                        💰 ${this.priceOf(item)}
                     </p>
 
                     <button

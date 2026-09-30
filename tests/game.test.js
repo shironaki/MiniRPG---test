@@ -355,6 +355,23 @@ describe("World", () => {
         expect(enemy.maxHealth).toBeGreaterThan(0);
     });
 
+    it("offers a recruit at the camp exactly once", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        w.currentLocation = "camp";
+        const res = w.explore();
+        expect(res.type).toBe("recruit");
+        expect(w.rooms.camp.recruitType).toBe("warrior");
+    });
+
+    it("generates the wanderer event and reports it", () => {
+        const { exports: g } = loadGame({ random: () => 0.85 }); // roll into wanderer band
+        const w = new g.World();
+        w.currentLocation = "darkForest";
+        const res = w.explore();
+        expect(res.type).toBe("wanderer");
+    });
+
     it("uses zone-specific enemy pools with a safe fallback", () => {
         const { exports: g } = loadGame();
         const w = new g.World();
@@ -437,6 +454,17 @@ describe("Shop", () => {
         expect(res.success).toBe(true);
         expect(p.gold).toBe(20);
         expect(p.inventory.some((i) => i.name === "Железный меч")).toBe(true);
+    });
+
+    it("applies a karma discount/markup to prices", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        const shop = new g.Shop(p);
+        expect(shop.priceOf(g.ITEMS.sword)).toBe(80); // karma 0 -> full price
+        p.karma = 50;
+        expect(shop.priceOf(g.ITEMS.sword)).toBe(68); // -15%
+        p.karma = -50;
+        expect(shop.priceOf(g.ITEMS.sword)).toBe(92); // +15%
     });
 
     it("sell returns half price and removes the item", () => {
@@ -651,6 +679,119 @@ describe("Battle", () => {
         battle.playerFlee();
         expect(p.health).toBe(hpBefore);
         expect(game.calls.enemyDefeated).toBe(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Ally & relationships
+// ---------------------------------------------------------------------------
+describe("Ally", () => {
+    it("warrior and scout damage the enemy, healer restores the player", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        const enemy = g.createEnemy("goblin", 1);
+        const warrior = g.ALLIES.warrior();
+        const before = enemy.health;
+        const res = warrior.support(p, enemy);
+        expect(res.kind).toBe("attack");
+        expect(enemy.health).toBeLessThanOrEqual(before - 1);
+
+        const healer = g.ALLIES.healer();
+        p.health = 40;
+        const hres = healer.support(p, enemy);
+        expect(hres.kind).toBe("heal");
+        expect(p.health).toBeGreaterThan(40);
+    });
+
+    it("affinity clamps to 0..100 and drives tier + departure", () => {
+        const { exports: g } = loadGame();
+        const a = g.ALLIES.scout();
+        a.changeAffinity(1000);
+        expect(a.affinity).toBe(100);
+        expect(a.tier()).toBe(3);
+        a.changeAffinity(-1000);
+        expect(a.affinity).toBe(0);
+        expect(a.hasLeft()).toBe(true);
+    });
+
+    it("higher affinity means stronger support", () => {
+        const { exports: g } = loadGame();
+        const low = g.ALLIES.warrior(); low.affinity = 10;
+        const high = g.ALLIES.warrior(); high.affinity = 90;
+        const e1 = g.createEnemy("skeleton", 1);
+        const e2 = g.createEnemy("skeleton", 1);
+        const d1 = low.support(new g.Player("A"), e1).damage;
+        const d2 = high.support(new g.Player("A"), e2).damage;
+        expect(d2).toBeGreaterThan(d1);
+    });
+});
+
+describe("Battle with ally", () => {
+    it("an ally acts on the player's turn and can help finish the enemy", () => {
+        const { exports: g } = loadGame({ random: () => 0 });
+        const p = new g.Player("A");
+        p.ally = g.ALLIES.warrior();
+        const game = makeBattleGame(g, p);
+        const weakEnemy = g.createEnemy("goblin", 1);
+        weakEnemy.health = 6; // ally alone can finish after player's hit
+        const battle = new g.Battle(game, weakEnemy);
+        battle.playerAttack();
+        expect(weakEnemy.isDead()).toBe(true);
+        expect(game.calls.enemyDefeated).toBe(1);
+    });
+
+    it("battles still work with no ally (regression)", () => {
+        const { exports: g } = loadGame({ random: () => 0 });
+        const p = new g.Player("A");
+        const game = makeBattleGame(g, p);
+        const battle = new g.Battle(game, g.createEnemy("goblin", 1));
+        battle.playerAttack(); // must not throw without an ally
+        expect(battle.finished === true || battle.finished === false).toBe(true);
+    });
+});
+
+describe("Game companions & karma", () => {
+    it("recruitAlly attaches a working companion", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        const ally = game.recruitAlly("healer");
+        expect(ally.name).toBe("Травница Лия");
+        expect(typeof game.player.ally.support).toBe("function");
+        expect(game.recruitAlly("nonsense")).toBe(null);
+    });
+
+    it("adjustKarma clamps and karmaLabel reflects it", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.adjustKarma(1000);
+        expect(game.player.karma).toBe(100);
+        expect(game.karmaLabel()).toBe("Герой");
+        game.adjustKarma(-1000);
+        expect(game.player.karma).toBe(-100);
+        expect(game.karmaLabel()).toBe("Злодей");
+    });
+
+    it("persists ally + karma across save/resume with methods intact", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.inventory = new g.Inventory(game.player);
+        game.recruitAlly("scout");
+        game.player.ally.affinity = 55;
+        game.adjustKarma(25);
+        game.saveSystem.save(game);
+
+        const game2 = new g.Game();
+        game2.resume();
+        expect(game2.player.karma).toBe(25);
+        expect(game2.player.ally.name).toBe("Разведчик Кай");
+        expect(game2.player.ally.affinity).toBe(55);
+        expect(typeof game2.player.ally.support).toBe("function");
+        expect(game2.player.ally.tier()).toBe(2);
     });
 });
 

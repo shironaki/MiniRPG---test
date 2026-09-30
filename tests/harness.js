@@ -20,6 +20,7 @@ const JS_DIR = path.join(ROOT, "js");
 // Load order mirrors index.html (minus the DOM-wiring entry point main.js).
 const LOGIC_FILES = [
     "item.js",
+    "ally.js",
     "player.js",
     "inventory.js",
     "enemy.js",
@@ -36,7 +37,7 @@ const LOGIC_FILES = [
 ];
 
 const EXPORTED = [
-    "Item", "ITEMS", "Player", "Inventory", "Enemy", "createEnemy",
+    "Item", "ITEMS", "Ally", "ALLIES", "Player", "Inventory", "Enemy", "createEnemy",
     "Chest", "Trap", "Room", "Shop", "NPC", "Quest", "World",
     "Battle", "SaveSystem", "Game"
 ];
@@ -177,7 +178,7 @@ function loadFullGame(opts = {}) {
     sandbox.globalThis = sandbox;
 
     const ordered = [
-        "item.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
+        "item.js", "ally.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
         "room.js", "shop.js", "npc.js", "quest.js", "world.js", "battle.js",
         "save.js", "audio.js", "game.js", "main.js"
     ];
@@ -186,7 +187,7 @@ function loadFullGame(opts = {}) {
         .map((file) => fs.readFileSync(path.join(JS_DIR, file), "utf8"))
         .join("\n;\n");
 
-    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings };";
+    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings, resolveWanderer, recruitHere, declineRecruit };";
 
     vm.createContext(sandbox);
     vm.runInContext(source + uiExports, sandbox, { filename: "minirpg.full.js" });

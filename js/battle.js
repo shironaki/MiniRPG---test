@@ -48,7 +48,34 @@ class Battle {
         }
 
 
+        this.allyTurn();
+
+        if (this.finished) {
+            return;
+        }
+
+
         this.enemyTurn();
+    }
+
+
+    allyTurn() {
+
+        const ally = this.player.ally;
+
+        if (!ally || this.finished || this.enemy.isDead()) {
+            return;
+        }
+
+        const result = ally.support(this.player, this.enemy);
+
+        if (result && result.message) {
+            this.log(result.message);
+        }
+
+        if (this.enemy.isDead()) {
+            this.win();
+        }
     }
 
 
@@ -88,6 +115,13 @@ class Battle {
         this.log(
             this.player.defend()
         );
+
+
+        this.allyTurn();
+
+        if (this.finished) {
+            return;
+        }
 
 
         this.enemyTurn();
