@@ -48,8 +48,50 @@ class Renderer {
                 } else if (info.name === "water") {
                     ctx.fillStyle = "rgba(255,255,255,0.10)";
                     ctx.fillRect(sx + 4, sy + 6, ts - 8, 3);
+                } else if (info.name === "tree2") {
+                    ctx.fillStyle = "#0f2d17";
+                    ctx.beginPath();
+                    ctx.arc(sx + ts / 2, sy + ts / 2, ts * 0.42, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (info.name === "forest") {
+                    ctx.fillStyle = "rgba(20,60,30,0.5)";
+                    ctx.beginPath();
+                    ctx.arc(sx + ts * 0.32, sy + ts * 0.62, ts * 0.12, 0, Math.PI * 2);
+                    ctx.arc(sx + ts * 0.66, sy + ts * 0.4, ts * 0.1, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (info.name === "rock") {
+                    ctx.fillStyle = "rgba(0,0,0,0.22)";
+                    ctx.fillRect(sx + 3, sy + 3, ts - 6, ts - 6);
+                } else if (info.name === "dirt") {
+                    ctx.fillStyle = "rgba(0,0,0,0.12)";
+                    ctx.fillRect(sx + ts * 0.2, sy + ts * 0.55, 3, 3);
+                    ctx.fillRect(sx + ts * 0.62, sy + ts * 0.28, 3, 3);
+                } else if (info.name === "gate") {
+                    ctx.fillStyle = "rgba(255,225,150,0.35)";
+                    ctx.fillRect(sx + ts * 0.2, sy + ts * 0.15, ts * 0.6, ts * 0.7);
                 }
             }
+        }
+    }
+
+    drawPortals(list, camera) {
+        if (!list) return;
+        const ctx = this.ctx;
+        const t = (Date.now() % 1600) / 1600;         // 0..1 pulse
+        const glow = 0.35 + 0.25 * Math.sin(t * Math.PI * 2);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "20px serif";
+        for (const p of list) {
+            const s = camera.worldToScreen(p.px, p.py);
+            ctx.fillStyle = `rgba(201,162,75,${glow})`;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255,225,150,0.9)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillText(p.emoji || "🚪", s.x, s.y + 1);
         }
     }
 

@@ -13,7 +13,14 @@ const TILES = {
     "T": { name: "tree",   solid: true,  color: "#20502a" },
     "#": { name: "wall",   solid: true,  color: "#6b6152" },
     "H": { name: "house",  solid: true,  color: "#8a5a3b" },
-    "f": { name: "fence",  solid: true,  color: "#7a5a3a" }
+    "f": { name: "fence",  solid: true,  color: "#7a5a3a" },
+    // Wilds & cave tiles (added with the multi-zone world).
+    "F": { name: "forest", solid: false, color: "#2f5d33" },
+    "t": { name: "tree2",  solid: true,  color: "#173a1f" },
+    "d": { name: "dirt",   solid: false, color: "#5b4a34" },
+    "r": { name: "rock",   solid: true,  color: "#453f38" },
+    "b": { name: "bridge", solid: false, color: "#8a6a42" },
+    "g": { name: "gate",   solid: false, color: "#caa24b" }
 };
 
 const DEFAULT_TILE = { name: "void", solid: true, color: "#101319" };

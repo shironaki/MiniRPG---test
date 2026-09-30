@@ -246,4 +246,51 @@ describe("Enemy2D", () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Zones & portals (multi-map world)
+// ---------------------------------------------------------------------------
+describe("Zones & portals", () => {
+    it("village, forest and cave all exist with rectangular grids", () => {
+        const { MAPS } = loadEngine().exports;
+        for (const id of ["village", "forest", "cave"]) {
+            const m = MAPS[id];
+            expect(!!m).toBe(true);
+            const widths = new Set(m.rows.map(r => r.length));
+            expect(widths.size).toBe(1);
+        }
+    });
+
+    it("every portal links to a real zone and stands on a walkable tile", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        for (const id of Object.keys(MAPS)) {
+            const m = MAPS[id];
+            for (const p of (m.portals || [])) {
+                expect(!!MAPS[p.to]).toBe(true);                        // target exists
+                const ch = m.rows[p.row][p.col];
+                expect(tileInfo(ch).solid).toBe(false);                // portal walkable
+                const dest = MAPS[p.to];
+                const dch = dest.rows[p.spawn.row][p.spawn.col];
+                expect(tileInfo(dch).solid).toBe(false);               // spawn walkable
+            }
+        }
+    });
+
+    it("every zone spawn is on a non-solid tile", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        for (const id of Object.keys(MAPS)) {
+            const m = MAPS[id];
+            expect(tileInfo(m.rows[m.spawn.row][m.spawn.col]).solid).toBe(false);
+        }
+    });
+
+    it("forest<->cave and village<->forest links are reciprocal", () => {
+        const { MAPS } = loadEngine().exports;
+        const targets = (id) => (MAPS[id].portals || []).map(p => p.to);
+        expect(targets("village").includes("forest")).toBe(true);
+        expect(targets("forest").includes("village")).toBe(true);
+        expect(targets("forest").includes("cave")).toBe(true);
+        expect(targets("cave").includes("forest")).toBe(true);
+    });
+});
+
 run();
