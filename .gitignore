@@ -2,3 +2,4 @@ node_modules/
 *.log
 .DS_Store
 _preview_mobs.png
+_preview_world.png

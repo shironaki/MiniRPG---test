@@ -28,24 +28,15 @@ class Renderer {
                 const sx = Math.round(col * ts - camera.x);
                 const sy = Math.round(row * ts - camera.y);
 
-                // Pixel tile art (matches the character style).
+                // Pixel tile art (matches the character style). Building
+                // footprints ('house') are just a grass base here — the real
+                // structure is drawn as a whole in drawBuildings().
                 if (typeof TileArt !== "undefined") {
-                    // Houses are multi-tile buildings: pick the right piece from
-                    // the neighbours (roof on the top edge, wall/window/door below).
-                    if (info.name === "house") {
-                        const isH = (c, r) => tilemap.infoAt(c, r).name === "house";
-                        const above = isH(col, row - 1);
-                        const below = isH(col, row + 1);
-                        const left = isH(col - 1, row);
-                        const right = isH(col + 1, row);
-                        let part;
-                        if (!above) part = "houseRoof";
-                        else if (!below && left && right) part = "houseDoor";
-                        else part = ((col * 3 + row) % 2 === 0 && left && right) ? "houseWin" : "houseWall";
-                        TileArt.draw(ctx, part, sx, sy, ts, col, row);
+                    const name = info.name === "house" ? "grass" : info.name;
+                    if (TileArt.draw(ctx, name, sx, sy, ts, col, row)) {
+                        this._animateTile(ctx, name, sx, sy, ts, col, row);
                         continue;
                     }
-                    if (TileArt.draw(ctx, info.name, sx, sy, ts, col, row)) continue;
                 }
 
                 ctx.fillStyle = info.color || "#101319";
@@ -92,6 +83,45 @@ class Renderer {
                     ctx.fillRect(sx + ts * 0.2, sy + ts * 0.15, ts * 0.6, ts * 0.7);
                 }
             }
+        }
+    }
+
+    // Live foliage/water motion drawn over a (cached) ground tile.
+    _animateTile(ctx, name, sx, sy, ts, col, row) {
+        const now = Date.now();
+        if (name === "grass" || name === "grass2" || name === "forest") {
+            const hash = (col * 13 + row * 7);
+            if (hash % 2 !== 0) return;              // only some tiles, keep it cheap
+            const sway = Math.sin(now / 520 + hash) * (ts * 0.06);
+            ctx.strokeStyle = name === "forest"
+                ? "rgba(90,150,85,0.5)" : "rgba(130,205,120,0.55)";
+            ctx.lineWidth = Math.max(1, ts * 0.06);
+            const bx = sx + ts * (0.35 + (hash % 3) * 0.15), by = sy + ts * 0.66;
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.lineTo(bx + sway, by - ts * 0.26);
+            ctx.stroke();
+        } else if (name === "water") {
+            const glint = ((now / 55 + col * 17 + row * 9) % (ts + 10)) - 5;
+            ctx.fillStyle = "rgba(255,255,255,0.12)";
+            ctx.fillRect(sx + glint, sy + ts * (0.35 + ((row + col) % 3) * 0.16), ts * 0.22, 1);
+        }
+    }
+
+    // Whole buildings drawn from footprint metadata (roofs never misalign).
+    drawBuildings(buildings, camera, ts) {
+        if (!buildings || typeof BuildingArt === "undefined") return;
+        const ctx = this.ctx;
+        const now = Date.now();
+        for (const b of buildings) {
+            const sx = Math.round(b.col * ts - camera.x);
+            const sy = Math.round(b.row * ts - camera.y);
+            const wpx = b.w * ts, hpx = b.h * ts;
+            if (sx + wpx < 0 || sy + hpx < 0 || sx > camera.viewW || sy > camera.viewH) continue;
+            // soft ground shadow
+            ctx.fillStyle = "rgba(0,0,0,0.16)";
+            ctx.fillRect(sx + 2, sy + hpx - 2, wpx - 4, 3);
+            BuildingArt.draw(ctx, b.type, sx, sy, b.w, b.h, ts, now);
         }
     }
 

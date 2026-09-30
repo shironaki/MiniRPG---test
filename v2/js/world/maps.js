@@ -7,44 +7,51 @@ const MAPS = {
     village: {
         name: "Деревня",
         tileSize: 32,
-        // 24 wide x 16 tall. Border of trees, a plaza, houses and paths.
+        // 26 wide x 18 tall. Tree border, central plaza, a pond, a stream with a
+        // bridge, paths, and four distinct buildings (footprints are solid 'H';
+        // the real building art is drawn from the `buildings` metadata).
         rows: [
-            "TTTTTTTTTTTTTTTTTTTTTTTT",
-            "T......,..,....,.......T",
-            "T..HHH...,....,..HHH...T",
-            "T..HHH......p.....HHH..T",
-            "T..........,p,.........T",
-            "T....,....ppPpp....,...T",
-            "T........ppPPPpp.......T",
-            "T..,....ppPPPPPpp...,..T",
-            "T.......ppPPPPPpp......T",
-            "T........ppPPPpp....,..T",
-            "T....,....ppPpp........T",
-            "T..HHH......p......HHH.T",
-            "T..HHH...,.p...,..HHH..T",
-            "T......,...p.,....,....T",
-            "T....wwww..p......wwww.T",
-            "TTTTTTTTTTTgTTTTTTTTTTTT"
+            "TTTTTTTTTTTTTTTTTTTTTTTTTT",
+            "T,.......,.......,.......T",
+            "T.,HHHH...,.......,HHHH..T",
+            "T..HHHH.tt.,.....t.HHHH..T",
+            "T..HHHH.....,......HHHH..T",
+            "T....pppppppppppppppppp..T",
+            "T.....,.....pp,.......,..T",
+            "T.t...www..PppP,......t,.T",
+            "T.....www..PppP.,.......,T",
+            "T,.t..www,.PppP..,.....t.T",
+            "T.,.......,PppP...,......T",
+            "T..,.....wwwbbww...HHH...T",
+            "T..HHHH..wwwbbww...HHH...T",
+            "T.tHHHH.....pp.....HHH.t.T",
+            "T..HHHH.....pp,....HHH,..T",
+            "T....ppppppppppppppppp.,.T",
+            "T.......,...pp..,.......,T",
+            "TTTTTTTTTTTTppTTTTTTTTTTTT"
         ],
-        // Player spawn in tile coords (centre plaza).
-        spawn: { col: 11, row: 8 },
-        // Interactable points: { col,row, action, label, emoji }
+        // Player spawn on the central plaza.
+        spawn: { col: 12, row: 8 },
+        // Buildings drawn as whole structures over their solid footprints.
+        buildings: [
+            { col: 3,  row: 2,  w: 4, h: 3, type: "house" },
+            { col: 19, row: 2,  w: 4, h: 3, type: "shop" },
+            { col: 3,  row: 12, w: 4, h: 3, type: "forge" },
+            { col: 19, row: 11, w: 3, h: 4, type: "gate" }
+        ],
+        // Interactable points sit in front of each building's door.
         interactables: [
-            { col: 4,  row: 3,  action: "npc",     label: "Староста",  emoji: "🧑" },
-            { col: 19, row: 3,  action: "shop",    label: "Лавка",     emoji: "🛒" },
-            { col: 4,  row: 12, action: "forge",   label: "Кузница",   emoji: "🔨" },
-            { col: 19, row: 12, action: "dungeon", label: "Врата испытаний", emoji: "🚪" },
-            { col: 11, row: 4,  action: "quests",  label: "Доска квестов", emoji: "📜" }
+            { col: 5,  row: 5,  action: "npc",     label: "Староста",       emoji: "🧑" },
+            { col: 21, row: 5,  action: "shop",    label: "Лавка",          emoji: "🛒" },
+            { col: 5,  row: 15, action: "forge",   label: "Кузница",        emoji: "🔨" },
+            { col: 20, row: 15, action: "dungeon", label: "Врата испытаний", emoji: "🚪" },
+            { col: 13, row: 6,  action: "quests",  label: "Доска квестов",   emoji: "📜" }
         ],
-        // Roaming foes that wandered in from the wilds. { col,row, kind, emoji }
-        enemies: [
-            { col: 2,  row: 6,  kind: "goblin", emoji: "👹", wanderRadius: 80 },
-            { col: 21, row: 8,  kind: "wolf",   emoji: "🐺", wanderRadius: 90 },
-            { col: 6,  row: 13, kind: "goblin", emoji: "👹", wanderRadius: 70 }
-        ],
+        // The village is a peaceful zone — no enemies here (they roam the wilds).
+        enemies: [],
         // Walk onto a portal tile to travel. { col,row, to, spawn, label, emoji }
         portals: [
-            { col: 11, row: 15, to: "forest", spawn: { col: 11, row: 1 }, label: "Тропа в лес", emoji: "🌲" }
+            { col: 12, row: 16, to: "forest", spawn: { col: 11, row: 1 }, label: "Тропа в лес", emoji: "🌲" }
         ]
     },
 

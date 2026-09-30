@@ -331,6 +331,7 @@
     function render() {
         renderer.clear(camera.viewW, camera.viewH);
         renderer.drawMap(tilemap, camera);
+        renderer.drawBuildings(mapData.buildings, camera, mapData.tileSize);
         renderer.drawPortals(portals, camera);
         renderer.drawInteractables(interactables, camera);
         renderer.drawEnemies(enemies, camera);
