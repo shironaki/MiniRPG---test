@@ -49,7 +49,53 @@ const GAME_DATA = {
         potion: { name: "Зелье здоровья", type: "potion", price: 20,  description: "Восстанавливает 35 HP.", attackBonus: 0, defenseBonus: 0,  healAmount: 35, emoji: "🧪" }
     },
 
-    // ---- Per-zone theming: accent colour drives UI tint per location ----
+    // ---- Branching side quests & companion personal quests.
+    // `offer` gates WHO the quest is shown to (karma / ally role / affinity);
+    // `objective` is what to do; `reward` is what you get. ----
+    sideQuests: [
+        {
+            id: "cullWolves", giver: "Староста", title: "🐺 Волчья угроза",
+            desc: "Волки донимают торговцев на тропах. Истреби троих.",
+            offer: {},
+            objective: { type: "kill", enemy: "Волк", count: 3 },
+            reward: { gold: 120, xp: 70, karma: 5 }
+        },
+        {
+            id: "mercyRun", giver: "Староста", title: "🕊️ Путь милосердия",
+            desc: "Твоё доброе имя открыло особую просьбу: упокой 2 скелетов у святилища.",
+            offer: { minKarma: 10 },
+            objective: { type: "kill", enemy: "Скелет", count: 2 },
+            reward: { gold: 90, xp: 60, karma: 10 }
+        },
+        {
+            id: "darkBargain", giver: "Староста", title: "💀 Тёмная сделка",
+            desc: "Тёмный путь ведёт к наживе: одолей 3 любых врага без лишних вопросов.",
+            offer: { maxKarma: -10 },
+            objective: { type: "kill", enemy: "any", count: 3 },
+            reward: { gold: 220, xp: 50, karma: -5 }
+        },
+        {
+            id: "gromOath", giver: "ally", allyRole: "warrior", title: "🛡️ Клятва Грома",
+            desc: "Гром доверяет тебе достаточно, чтобы драться спина к спине. Победите 4 врага вместе.",
+            offer: { requiresAllyRole: "warrior", minAffinity: 40 },
+            objective: { type: "kill", enemy: "any", count: 4 },
+            reward: { gold: 100, xp: 80, affinity: 25 }
+        },
+        {
+            id: "liaHerbs", giver: "ally", allyRole: "healer", title: "🌿 Травы Лии",
+            desc: "Лия ищет редкие компоненты в старых тайниках. Открой для неё 2 сундука.",
+            offer: { requiresAllyRole: "healer", minAffinity: 40 },
+            objective: { type: "chest", count: 2 },
+            reward: { gold: 60, xp: 50, affinity: 25 }
+        },
+        {
+            id: "kaiTrail", giver: "ally", allyRole: "scout", title: "🏹 Тропа Кая",
+            desc: "Кай хочет проверить твою хватку в бою. Одержи 3 победы под его наблюдением.",
+            offer: { requiresAllyRole: "scout", minAffinity: 40 },
+            objective: { type: "kill", enemy: "any", count: 3 },
+            reward: { gold: 80, xp: 70, affinity: 25 }
+        }
+    ],
     zones: {
         start:         { accent: "#b5892f", biome: "camp" },
         camp:          { accent: "#a9772f", biome: "camp" },

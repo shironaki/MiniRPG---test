@@ -95,6 +95,10 @@ class Game {
             new Quest();
 
 
+        this.journal =
+            new QuestJournal();
+
+
         this.world =
             new World();
 
@@ -135,6 +139,8 @@ class Game {
         });
         this.world.getCurrentRoom().visited = true;
         this.quest = Object.assign(Object.create(Quest.prototype), data.quest || new Quest());
+        this.journal = Object.assign(Object.create(QuestJournal.prototype), data.journal || new QuestJournal());
+        if (!this.journal.accepted) this.journal.accepted = {};
         this.inventory = new Inventory(this.player);
         this.shop = new Shop(this.player);
         this.npc = new NPC("Староста");
@@ -315,6 +321,18 @@ class Game {
   enemyDefeated(enemy) {
 
     this.bumpStat("kills");
+
+    // Branching side / companion quests advance on every kill (guardians and
+    // the boss included), so this runs before any early returns below.
+    if (this.journal) {
+        this.journal.onEnemyDefeated(enemy).forEach(id => {
+            const e = this.journal.entry(id);
+            const d = this.journal.def(id);
+            if (!e || !d) return;
+            if (e.completed) addLog(`🏆 Задание «${d.title}» выполнено! Забери награду в журнале.`);
+            else addLog(`📜 «${d.title}»: ${e.progress}/${d.objective.count}`);
+        });
+    }
 
     /*
     ========================================

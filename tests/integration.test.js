@@ -140,6 +140,34 @@ describe("Integration: location & map art", () => {
     });
 });
 
+describe("Integration: quest journal", () => {
+    it("accept via UI, progress on kills, then claim the reward", () => {
+        const { exports: ui } = loadFullGame();
+        ui.game.start();
+        ui.acceptQuest("cullWolves");
+        expect(ui.game.journal.isAccepted("cullWolves")).toBe(true);
+
+        const gold = ui.game.player.gold;
+        ui.game.enemyDefeated({ name: "Волк" });
+        ui.game.enemyDefeated({ name: "Волк" });
+        ui.game.enemyDefeated({ name: "Волк" });
+        expect(ui.game.journal.entry("cullWolves").completed).toBe(true);
+
+        ui.claimQuest("cullWolves");
+        expect(ui.game.player.gold).toBe(gold + 120);
+        expect(ui.game.journal.entry("cullWolves").claimed).toBe(true);
+    });
+
+    it("renderQuest shows offers gated by the player's state", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        ui.renderQuest();
+        const html = sandbox.document.getElementById("questList").innerHTML;
+        expect(/Волчья угроза/.test(html)).toBe(true); // always-available offer
+        expect(/Тёмная сделка/.test(html)).toBe(false); // needs low karma
+    });
+});
+
 describe("Integration: audio safety", () => {
     it("all SFX calls are no-ops without a real AudioContext", () => {
         const { exports: ui } = loadFullGame();

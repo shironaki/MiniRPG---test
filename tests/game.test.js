@@ -505,6 +505,80 @@ describe("Quest", () => {
 });
 
 // ---------------------------------------------------------------------------
+// QuestJournal — branching side & companion quests
+// ---------------------------------------------------------------------------
+describe("QuestJournal", () => {
+    it("offers quests based on karma", () => {
+        const { exports: g } = loadGame();
+        const j = new g.QuestJournal();
+        const p = new g.Player("A");
+        expect(j.available(p).some(d => d.id === "mercyRun")).toBe(false);
+        p.karma = 20;
+        expect(j.available(p).some(d => d.id === "mercyRun")).toBe(true);
+        p.karma = -20;
+        expect(j.available(p).some(d => d.id === "darkBargain")).toBe(true);
+    });
+
+    it("gates companion quests on ally role and affinity", () => {
+        const { exports: g } = loadGame();
+        const j = new g.QuestJournal();
+        const p = new g.Player("A");
+        expect(j.available(p).some(d => d.id === "gromOath")).toBe(false);
+        p.ally = g.ALLIES.warrior(); p.ally.affinity = 45;
+        expect(j.available(p).some(d => d.id === "gromOath")).toBe(true);
+        p.ally.affinity = 20;
+        expect(j.available(p).some(d => d.id === "gromOath")).toBe(false);
+    });
+
+    it("advances kill objectives only for the right foe and completes", () => {
+        const { exports: g } = loadGame();
+        const j = new g.QuestJournal();
+        const p = new g.Player("A");
+        j.accept("cullWolves", p);
+        j.onEnemyDefeated({ name: "Гоблин" });
+        expect(j.entry("cullWolves").progress).toBe(0);
+        j.onEnemyDefeated({ name: "Волк" });
+        j.onEnemyDefeated({ name: "Волк" });
+        j.onEnemyDefeated({ name: "Волк" });
+        expect(j.entry("cullWolves").completed).toBe(true);
+        expect(j.entry("cullWolves").progress).toBe(3); // never overshoots
+    });
+
+    it("advances chest objectives", () => {
+        const { exports: g } = loadGame();
+        const j = new g.QuestJournal();
+        const p = new g.Player("A"); p.ally = g.ALLIES.healer(); p.ally.affinity = 50;
+        j.accept("liaHerbs", p);
+        j.onChestOpened(); j.onChestOpened();
+        expect(j.entry("liaHerbs").completed).toBe(true);
+    });
+
+    it("pays the reward once, granting gold/xp/karma/affinity", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.ally = g.ALLIES.warrior(); game.player.ally.affinity = 45;
+        game.journal = new g.QuestJournal();
+        game.journal.accept("gromOath", game.player);
+        game.journal.accepted.gromOath.completed = true;
+        const gold = game.player.gold, aff = game.player.ally.affinity;
+        const res = game.journal.claim("gromOath", game);
+        expect(res === null).toBe(false);
+        expect(game.player.gold).toBe(gold + 100);
+        expect(game.player.ally.affinity).toBe(aff + 25);
+        expect(game.journal.claim("gromOath", game)).toBe(null); // no double pay
+    });
+
+    it("refuses to accept a quest whose conditions aren't met", () => {
+        const { exports: g } = loadGame();
+        const j = new g.QuestJournal();
+        const p = new g.Player("A"); // neutral, no ally
+        expect(j.accept("darkBargain", p)).toBe(null);
+        expect(j.isAccepted("darkBargain")).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Shop
 // ---------------------------------------------------------------------------
 describe("Shop", () => {
@@ -609,6 +683,26 @@ describe("SaveSystem + Game.resume", () => {
     it("resume returns false when there is no save", () => {
         const { exports: g } = loadGame();
         expect(new g.Game().resume()).toBe(false);
+    });
+
+    it("persists the quest journal with progress and methods intact", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.journal = new g.QuestJournal();
+        game.journal.accept("cullWolves", game.player);
+        game.journal.onEnemyDefeated({ name: "Волк" });
+        game.inventory = new g.Inventory(game.player);
+        game.saveSystem.save(game);
+
+        const game2 = new g.Game();
+        expect(game2.resume()).toBe(true);
+        expect(game2.journal.entry("cullWolves").progress).toBe(1);
+        expect(typeof game2.journal.onEnemyDefeated).toBe("function");
+        game2.journal.onEnemyDefeated({ name: "Волк" });
+        expect(game2.journal.entry("cullWolves").progress).toBe(2);
     });
 
     it("persists run stats across save/resume", () => {

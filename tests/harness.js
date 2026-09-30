@@ -39,7 +39,7 @@ const LOGIC_FILES = [
 
 const EXPORTED = [
     "GAME_DATA", "Item", "ITEMS", "Ally", "ALLIES", "Player", "Inventory", "Enemy", "createEnemy",
-    "Chest", "Trap", "Room", "Shop", "NPC", "Quest", "World",
+    "Chest", "Trap", "Room", "Shop", "NPC", "Quest", "QuestJournal", "World",
     "Battle", "SaveSystem", "Game"
 ];
 
@@ -188,7 +188,7 @@ function loadFullGame(opts = {}) {
         .map((file) => fs.readFileSync(path.join(JS_DIR, file), "utf8"))
         .join("\n;\n");
 
-    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings, resolveWanderer, recruitHere, declineRecruit, renderBattleSkills, useSkill };";
+    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings, resolveWanderer, recruitHere, declineRecruit, renderBattleSkills, useSkill, acceptQuest, claimQuest, renderQuest };";
 
     vm.createContext(sandbox);
     vm.runInContext(source + uiExports, sandbox, { filename: "minirpg.full.js" });

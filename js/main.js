@@ -233,12 +233,45 @@ document
 
 function renderQuest() {
 
+    const journalHtml = game.journal ? game.journal.render(game.player) : "";
+
     document
         .getElementById(
             "questList"
         )
         .innerHTML =
-            game.quest.render();
+            game.quest.render() + journalHtml;
+}
+
+
+function acceptQuest(id) {
+    if (!game.journal) return;
+    const def = game.journal.accept(id, game.player);
+    if (def) {
+        addLog(`📜 Взято задание: ${def.title}`);
+        if (typeof sfx !== "undefined") sfx.play("relic");
+    }
+    game.updateUI();
+    renderQuest();
+}
+
+
+function claimQuest(id) {
+    if (!game.journal) return;
+    const res = game.journal.claim(id, game);
+    if (res) {
+        const r = res.reward;
+        const parts = [];
+        if (r.gold) parts.push(`💰 +${r.gold}`);
+        if (r.xp) parts.push(`✨ +${r.xp} XP`);
+        if (r.karma) parts.push(`☯️ ${r.karma > 0 ? "+" : ""}${r.karma}`);
+        if (r.affinity) parts.push(`❤ +${r.affinity}`);
+        addLog(`🏆 Награда за «${res.def.title}»: ${parts.join(", ")}`);
+        res.levelMsgs.forEach(m => addLog(m));
+        if (typeof sfx !== "undefined") sfx.play("win");
+    }
+    game.updateUI();
+    renderQuest();
 }
 
 
@@ -1394,6 +1427,16 @@ function openChest() {
     addLog(
         result.message
     );
+
+    if (result.success && game.journal) {
+        game.journal.onChestOpened().forEach(id => {
+            const e = game.journal.entry(id);
+            const d = game.journal.def(id);
+            if (!e || !d) return;
+            if (e.completed) addLog(`🏆 Задание «${d.title}» выполнено! Забери награду в журнале.`);
+            else addLog(`📜 «${d.title}»: ${e.progress}/${d.objective.count}`);
+        });
+    }
 
 
     room.cleared =

@@ -1081,6 +1081,46 @@ header { position: relative; }
     filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.7));
 }
 
+/* Quest journal */
+.questGroup { margin: 16px 0 8px; color: #ffd166; font-size: 15px; text-align: left; }
+.questCard {
+    text-align: left;
+    background: #1b2536;
+    border: 1px solid #35496a;
+    border-left: 4px solid #6ea8e6;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+}
+.questCard.offer { border-left-color: #ffd166; }
+.questCard.done { border-left-color: #58c977; }
+.questCard strong { color: #eef2f8; font-size: 15px; }
+.questCard p { margin: 6px 0; color: #c5cede; font-size: 13px; }
+.questTag {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #9fb0c6;
+}
+.questReward { color: #ffd166 !important; font-weight: 600; }
+.questState { font-weight: 600; }
+.questAccept, .questClaim {
+    margin-top: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: #10131a;
+}
+.questAccept { background: linear-gradient(145deg, #ffd166, #e0a92e); }
+.questClaim { background: linear-gradient(145deg, #58c977, #37995a); color: #fff; }
+.questAccept:hover, .questClaim:hover { filter: brightness(1.1); }
+.questEmpty { color: #8fa1b8; font-size: 13px; }
+
 .locationChoice {
     margin: 6px 0 12px;
     padding: 12px;

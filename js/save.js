@@ -10,6 +10,8 @@ class SaveSystem {
 
             quest: game.quest,
 
+            journal: game.journal,
+
             stats: game.stats
 
         };
