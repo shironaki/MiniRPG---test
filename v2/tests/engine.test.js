@@ -306,6 +306,122 @@ describe("Zones & portals", () => {
         expect(targets("forest").includes("cave")).toBe(true);
         expect(targets("cave").includes("forest")).toBe(true);
     });
+
+    it("village NPC schedule stops and resource nodes are on walkable tiles", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        const v = MAPS.village;
+        for (const npc of (v.npcs || [])) {
+            for (const s of npc.schedule) {
+                expect(tileInfo(v.rows[s.row][s.col]).solid).toBe(false);
+            }
+        }
+        for (const r of (v.resources || [])) {
+            expect(tileInfo(v.rows[r.row][r.col]).solid).toBe(false);
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Living NPCs — daily schedule
+// ---------------------------------------------------------------------------
+describe("NPC2D schedule", () => {
+    function makeMap(exports) {
+        const { TileMap } = exports;
+        // 5x5 open grass field (no walls inside) for deterministic movement.
+        return new TileMap([".....", ".....", ".....", ".....", "....."], 32);
+    }
+    const def = {
+        id: "t", name: "Test", schedule: [
+            { from: 0, col: 0, row: 0 },
+            { from: 600, col: 4, row: 4 },
+            { from: 1200, col: 0, row: 4 }
+        ]
+    };
+
+    it("selects the last stop whose start has passed (and wraps before dawn)", () => {
+        const { NPC2D } = loadEngine().exports;
+        const n = new NPC2D(def, 32);
+        expect(n.stopAt(0).col).toBe(0);
+        expect(n.stopAt(700).col).toBe(4);
+        expect(n.stopAt(1300).col).toBe(0);
+        expect(n.stopAt(1300).row).toBe(4);
+        // Before the first stop's minute it wraps to the previous day's last stop.
+        const n2 = new NPC2D({ id: "x", schedule: [{ from: 300, col: 2, row: 2 }, { from: 900, col: 1, row: 1 }] }, 32);
+        expect(n2.stopAt(100).col).toBe(1);
+    });
+
+    it("places on the scheduled tile and walks toward the active stop", () => {
+        const { NPC2D } = loadEngine().exports;
+        const ex = loadEngine().exports;
+        const map = makeMap(ex);
+        const n = new NPC2D(def, 32);
+        n.placeAt(0);
+        expect(Math.round(n.x)).toBe((32 - n.w) / 2);
+        // At minute 700 the target is (4,4); after stepping it should move +x/+y.
+        const x0 = n.x, y0 = n.y;
+        for (let i = 0; i < 30; i++) n.update(0.1, map, 700);
+        expect(n.x > x0).toBe(true);
+        expect(n.y > y0).toBe(true);
+        expect(n.moving).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Social / friendship
+// ---------------------------------------------------------------------------
+describe("Social friendship", () => {
+    it("talk once per day; hearts grow from points", () => {
+        const { Social } = loadEngine().exports;
+        const s = new Social();
+        s.setDay(1);
+        const r1 = s.talk("a");
+        expect(r1.gained > 0).toBe(true);
+        const r2 = s.talk("a");            // same day → blocked
+        expect(r2.already).toBe(true);
+        s.setDay(2);
+        expect(s.talk("a").already).toBe(false);
+        expect(s.hearts("a")).toBe(Math.floor(s.points("a") / 100));
+    });
+
+    it("liked gifts grant more, capped once per day", () => {
+        const { Social } = loadEngine().exports;
+        const s = new Social();
+        s.setDay(1);
+        const plain = s.gift("a", false);
+        s.setDay(2);
+        const loved = s.gift("a", true);
+        expect(loved.gained > plain.gained).toBe(true);
+        expect(s.gift("a", true).already).toBe(true); // second gift same day blocked
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Resource gathering
+// ---------------------------------------------------------------------------
+describe("Resource nodes & bag", () => {
+    it("depletes over hits then regrows after cooldown", () => {
+        const { ResourceNode } = loadEngine().exports;
+        const node = new ResourceNode({ type: "tree", col: 1, row: 1 }, 32);
+        let total = 0, felled = false;
+        while (!node.depleted) { const r = node.hit(); total += r.amount; felled = felled || r.felled; }
+        expect(felled).toBe(true);
+        expect(total > node.maxHits).toBe(true);   // bonus on the felling hit
+        expect(node.hit()).toBe(null);              // nothing while depleted
+        node.update(node.regrow + 1);
+        expect(node.depleted).toBe(false);          // regrown
+    });
+
+    it("bag tallies, removes and lists entries", () => {
+        const { ResourceBag } = loadEngine().exports;
+        const bag = new ResourceBag();
+        bag.add("wood", 3); bag.add("wood", 2); bag.add("stone", 1);
+        expect(bag.count("wood")).toBe(5);
+        expect(bag.remove("wood", 4)).toBe(4);
+        expect(bag.count("wood")).toBe(1);
+        expect(bag.remove("stone", 9)).toBe(1);     // can't remove more than held
+        expect(bag.total()).toBe(1);
+        expect(bag.entries().length).toBe(1);
+    });
 });
 
 run();

@@ -125,6 +125,131 @@ class Renderer {
         }
     }
 
+    // Gatherable resource nodes (trees/rocks/bushes/herbs) drawn procedurally.
+    drawResourceNodes(nodes, camera) {
+        if (!nodes) return;
+        const ctx = this.ctx;
+        const now = Date.now();
+        for (const n of nodes) {
+            const s = camera.worldToScreen(n.px, n.py);
+            if (s.x < -40 || s.y < -40 || s.x > camera.viewW + 40 || s.y > camera.viewH + 40) continue;
+            const wob = n.shakeT > 0 ? Math.sin(now / 40) * 2.2 * (n.shakeT / 0.32) : 0;
+            const cx = s.x + wob, by = s.y + 14;   // by ~ ground line
+
+            // ground shadow
+            ctx.fillStyle = "rgba(0,0,0,0.22)";
+            ctx.beginPath();
+            ctx.ellipse(s.x, by + 2, 11, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (n.type === "tree") {
+                // trunk
+                ctx.fillStyle = "#5c3a22";
+                ctx.fillRect(cx - 2.5, by - (n.depleted ? 5 : 14), 5, n.depleted ? 6 : 15);
+                if (!n.depleted) {
+                    // layered canopy
+                    ctx.fillStyle = "#2f6b34";
+                    ctx.beginPath(); ctx.arc(cx, by - 20, 12, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "#3a8040";
+                    ctx.beginPath(); ctx.arc(cx - 5, by - 24, 8, 0, Math.PI * 2);
+                    ctx.arc(cx + 6, by - 22, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "rgba(255,255,255,0.10)";
+                    ctx.beginPath(); ctx.arc(cx - 4, by - 26, 3, 0, Math.PI * 2); ctx.fill();
+                } else {
+                    // stump rings
+                    ctx.fillStyle = "#7a5030";
+                    ctx.beginPath(); ctx.ellipse(cx, by - 5, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = "#5c3a22"; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.ellipse(cx, by - 5, 2.4, 1.3, 0, 0, Math.PI * 2); ctx.stroke();
+                }
+            } else if (n.type === "rock") {
+                if (!n.depleted) {
+                    ctx.fillStyle = "#8a8f98";
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 11, by); ctx.lineTo(cx - 7, by - 11);
+                    ctx.lineTo(cx + 3, by - 13); ctx.lineTo(cx + 11, by - 4);
+                    ctx.lineTo(cx + 8, by); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = "#a9aeb6";
+                    ctx.beginPath(); ctx.moveTo(cx - 5, by - 9); ctx.lineTo(cx + 1, by - 11);
+                    ctx.lineTo(cx + 2, by - 5); ctx.lineTo(cx - 4, by - 4); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = "#5f646c";
+                    ctx.fillRect(cx + 3, by - 6, 4, 4);
+                } else {
+                    ctx.fillStyle = "#6b7078";
+                    ctx.fillRect(cx - 6, by - 3, 4, 3);
+                    ctx.fillRect(cx, by - 2, 5, 3);
+                    ctx.fillRect(cx - 2, by - 5, 3, 3);
+                }
+            } else if (n.type === "bush") {
+                ctx.fillStyle = n.depleted ? "#2c4a2c" : "#2f7a3a";
+                ctx.beginPath();
+                ctx.arc(cx - 5, by - 4, 6, 0, Math.PI * 2);
+                ctx.arc(cx + 5, by - 4, 6, 0, Math.PI * 2);
+                ctx.arc(cx, by - 8, 7, 0, Math.PI * 2); ctx.fill();
+                if (!n.depleted) {
+                    ctx.fillStyle = "#5aa6ff";
+                    ctx.beginPath(); ctx.arc(cx - 3, by - 6, 1.6, 0, Math.PI * 2);
+                    ctx.arc(cx + 4, by - 5, 1.6, 0, Math.PI * 2);
+                    ctx.arc(cx + 1, by - 9, 1.6, 0, Math.PI * 2); ctx.fill();
+                }
+            } else if (n.type === "herb") {
+                ctx.strokeStyle = n.depleted ? "#3a5a34" : "#4fae53";
+                ctx.lineWidth = 1.6;
+                for (let i = -1; i <= 1; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + i * 3, by);
+                    ctx.lineTo(cx + i * 5, by - (n.depleted ? 3 : 10));
+                    ctx.stroke();
+                }
+                if (!n.depleted) {
+                    ctx.fillStyle = "#e8d24a";
+                    ctx.beginPath(); ctx.arc(cx, by - 10, 2, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+        }
+    }
+
+    // Living townsfolk — drawn with the hero rig using each NPC's palette.
+    drawNPCs(npcs, camera) {
+        if (!npcs) return;
+        const ctx = this.ctx;
+        for (const n of npcs) {
+            const s = camera.worldToScreen(n.x, n.y);
+            const cx = s.x + n.w / 2;
+            const bottom = s.y + n.h;
+            ctx.fillStyle = "rgba(0,0,0,0.26)";
+            ctx.beginPath();
+            ctx.ellipse(cx, bottom, n.w * 0.5, 4.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (typeof CharacterRig !== "undefined") {
+                CharacterRig.draw(ctx, {
+                    x: cx, y: bottom + 2, H: n.h * 1.7,
+                    facing: n.facing, phase: n.animTime * 8,
+                    moving: n.moving, now: Date.now(), look: n.look || null
+                });
+            } else {
+                ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.font = "20px serif";
+                ctx.fillText(n.emoji || "🧑", cx, s.y + n.h / 2);
+            }
+
+            // small floating name tag
+            ctx.save();
+            ctx.font = "10px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const label = n.name || "";
+            const tw = ctx.measureText(label).width + 8;
+            const ty = bottom - n.h * 1.7 - 8;
+            ctx.fillStyle = "rgba(13,16,23,0.55)";
+            ctx.fillRect(cx - tw / 2, ty - 7, tw, 13);
+            ctx.fillStyle = "rgba(240,235,220,0.95)";
+            ctx.fillText(label, cx, ty);
+            ctx.restore();
+        }
+    }
+
     // Full-screen day/night tint drawn over the world (below the DOM HUD).
     drawNightOverlay(light, camera) {
         if (!light || light.a <= 0.002) return;

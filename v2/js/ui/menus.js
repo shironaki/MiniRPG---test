@@ -172,6 +172,86 @@
         render();
     }
 
+    // ---- Townsfolk (living NPC social panel) ---------------------------------
+    function townsfolk(ctx) {
+        const { npc, social, hero, resources, refresh } = ctx;
+        let msg = "";
+        // pick one greeting line for this visit
+        const line = npc.dialogue[Math.floor(Math.random() * npc.dialogue.length)];
+        const RES = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
+
+        function likes(name, resKey) {
+            return npc.likes.some(l =>
+                (resKey && resKey === l) ||
+                (name && name.toLowerCase().includes(String(l).toLowerCase())));
+        }
+        function heartBar() {
+            const h = social.hearts(npc.id);
+            return "❤️".repeat(h) + "🤍".repeat(10 - h);
+        }
+        function render() {
+            const talkBtn = social.canTalk(npc.id)
+                ? `<button class="mBtn wide" data-talk="1">💬 Поговорить</button>`
+                : `<p class="hint">Вы уже общались сегодня.</p>`;
+            // gifts: resources first, then equippable/consumable items
+            let gifts = "";
+            if (social.canGift(npc.id)) {
+                const resBtns = (resources ? resources.entries() : []).map(e => {
+                    const m = RES[e.res] || {};
+                    const love = likes(m.name, e.res) ? " 💖" : "";
+                    return `<button class="mBtn ghost" data-gres="${e.res}">${m.emoji || "📦"} ${esc(m.name || e.res)} ×${e.n}${love}</button>`;
+                }).join("");
+                const itemBtns = hero.inventory.map((it, i) => {
+                    const love = likes(it.name) ? " 💖" : "";
+                    return `<button class="mBtn ghost" data-gitem="${i}">${it.emoji || "📦"} ${esc(it.name)}${love}</button>`;
+                }).join("");
+                const any = resBtns + itemBtns;
+                gifts = `<h4 class="mGroup">Подарить</h4>${any || `<p class="hint">Нет предметов для подарка.</p>`}`;
+            } else {
+                gifts = `<p class="hint">Подарок уже вручён сегодня.</p>`;
+            }
+            const likeHint = npc.likes.length
+                ? `<p class="hint">Любит подарки: ${npc.likes.map(esc).join(", ")}.</p>` : "";
+            paint(`<h2>${npc.emoji} ${esc(npc.name)}</h2>
+                <p class="hint">${esc(npc.role || "Житель деревни")}</p>
+                <p class="qr">${heartBar()} <small>${social.points(npc.id)}/1000</small></p>
+                <p>“${esc(line)}”</p>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                ${talkBtn}
+                ${gifts}
+                ${likeHint}`, onClick);
+        }
+        function afterGift(r, loved, label) {
+            if (r.already) { msg = "Вы уже дарили подарок сегодня."; return; }
+            msg = (loved ? `😍 ${npc.name} обожает ${label}! ` : `🙂 ${npc.name}: «Спасибо!» `) + `+${r.gained} к дружбе.`;
+        }
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.talk) {
+                const r = social.talk(npc.id);
+                msg = r.already ? "Вы уже общались сегодня." : `💬 Приятная беседа. +${r.gained} к дружбе!`;
+            } else if (b.dataset.gres) {
+                const key = b.dataset.gres;
+                if (!resources || resources.count(key) <= 0) return;
+                const m = RES[key] || {};
+                const loved = likes(m.name, key);
+                const r = social.gift(npc.id, loved);
+                if (!r.already) resources.remove(key, 1);
+                afterGift(r, loved, m.name || key);
+            } else if (b.dataset.gitem !== undefined) {
+                const idx = +b.dataset.gitem;
+                const it = hero.inventory[idx];
+                if (!it) return;
+                const loved = likes(it.name);
+                const r = social.gift(npc.id, loved);
+                if (!r.already) hero.inventory.splice(idx, 1);
+                afterGift(r, loved, it.name);
+            } else return;
+            refresh(); render();
+        }
+        render();
+    }
+
     // ---- Procedural dungeon --------------------------------------------------
     function dungeon(ctx) {
         const dg = Dungeon.generate(ctx.hero.level);
@@ -248,11 +328,17 @@
                 else if (it.type === "potion") btn = `<button class="mBtn" data-use="${i}">Выпить</button>`;
                 return `<div class="row"><span>${it.emoji || "📦"} ${esc(it.name)} <small>${statLine(it)}</small></span>${btn}</div>`;
             }).join("") : `<p class="hint">Рюкзак пуст.</p>`;
+            const RES = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
+            const bag = ctx.resources ? ctx.resources.entries() : [];
+            const res = bag.length
+                ? `<div class="row">${bag.map(e => { const m = RES[e.res] || {}; return `<span>${m.emoji || "📦"} ${esc(m.name || e.res)}: ${e.n}</span>`; }).join(" &nbsp; ")}</div>`
+                : `<p class="hint">Ресурсы не собраны. Руби деревья 🌳, добывай камень 🪨, собирай ягоды 🫐 и травы 🌿.</p>`;
             paint(`<h2>🎒 Снаряжение</h2>
                 <p class="gold">⚔️ ${ctx.hero.attack} · 🛡️ ${ctx.hero.defense} · ❤️ ${ctx.hero.health}/${ctx.hero.maxHealth}</p>
                 ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
                 <h4 class="mGroup">Экипировка</h4>${eq}
-                <h4 class="mGroup">Рюкзак</h4>${inv}`, onClick);
+                <h4 class="mGroup">Рюкзак</h4>${inv}
+                <h4 class="mGroup">Ресурсы</h4>${res}`, onClick);
         }
         function onClick(e) {
             const b = e.target.closest("button"); if (!b) return;
@@ -265,5 +351,5 @@
         render();
     }
 
-    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory };
+    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk };
 })();

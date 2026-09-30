@@ -19,10 +19,13 @@ const FILES = [
     "js/engine/camera.js",
     "js/world/tiles.js",
     "js/world/tilemap.js",
+    "js/world/social.js",
+    "js/world/resources.js",
     "js/world/maps.js",
     "js/entities/mover.js",
     "js/entities/player.js",
-    "js/entities/enemy.js"
+    "js/entities/enemy.js",
+    "js/entities/npc.js"
 ];
 
 const EXPORTED = [
@@ -30,7 +33,8 @@ const EXPORTED = [
     "Input", "Camera",
     "TILES", "DEFAULT_TILE", "tileInfo",
     "TileMap", "MAPS", "getMap",
-    "moveAndCollide", "Player2D", "Enemy2D", "detectEncounter"
+    "moveAndCollide", "Player2D", "Enemy2D", "detectEncounter",
+    "NPC2D", "Social", "ResourceNode", "ResourceBag", "RESOURCES", "NODE_TYPES"
 ];
 
 function loadEngine() {

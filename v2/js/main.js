@@ -15,14 +15,23 @@
     const overlayClose = document.getElementById("overlayClose");
 
     // The active zone's data is (re)built by loadZone() on every map change.
-    let mapData, tilemap, interactables, enemies, portals, zoneName;
+    let mapData, tilemap, interactables, enemies, portals, zoneName, npcs, resourceNodes;
 
     const player = new Player2D(0, 0, { w: 20, h: 20, speed: 130 });
 
     // In-game clock in minutes (0..1440). A full day passes in DAY_REAL_SEC.
     let clockMin = 8 * 60;                 // start the day at 08:00
+    let dayCount = 1;                      // increments each dawn (clock wrap)
     const DAY_REAL_SEC = 300;             // 5 real minutes = one full day
     const MIN_PER_SEC = 1440 / DAY_REAL_SEC;
+
+    // Persistent social & gathering state (survive zone changes).
+    const social = new Social();
+    const resources = new ResourceBag();
+
+    // Transient on-screen feedback (gathering, gifts) — fades on its own.
+    let flash = "", flashT = 0;
+    function showFlash(text, secs) { flash = text; flashT = secs || 1.6; }
 
     // Build (or rebuild) the world for a zone and drop the hero at `spawn`.
     function loadZone(id, spawn) {
@@ -39,6 +48,12 @@
         portals = (mapData.portals || []).map(p => ({
             ...p, px: p.col * ts + ts / 2, py: p.row * ts + ts / 2
         }));
+        npcs = (mapData.npcs || []).map(def => {
+            const n = new NPC2D(def, ts);
+            n.placeAt(clockMin);
+            return n;
+        });
+        resourceNodes = (mapData.resources || []).map(r => new ResourceNode(r, ts));
         zoneName = mapData.name || id;
         const sp = spawn || mapData.spawn;
         player.x = sp.col * ts + 6;
@@ -55,15 +70,22 @@
         player: hero,
         adjustKarma(n) { hero.karma = (hero.karma || 0) + n; }
     };
-    const menuCtx = { hero, journal, host, refresh: refreshStats };
+    const menuCtx = { hero, journal, host, refresh: refreshStats, social, resources };
 
     function refreshStats() {
-        statsEl.innerHTML =
+        let html =
             `<span>❤️ ${Math.max(0, hero.health)}/${hero.maxHealth}</span>` +
             `<span>⚡ ${hero.energy}/${hero.maxEnergy}</span>` +
             `<span>⭐ ур.${hero.level}</span>` +
             `<span>💰 ${hero.gold}</span>` +
             `<span>☯️ ${hero.karma || 0}</span>`;
+        const bag = resources.entries();
+        if (bag.length) {
+            const meta = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
+            html += `<span class="sep">·</span>` + bag.map(e =>
+                `<span>${(meta[e.res] && meta[e.res].emoji) || "📦"} ${e.n}</span>`).join("");
+        }
+        statsEl.innerHTML = html;
     }
 
     const camera = new Camera(canvas.width, canvas.height);
@@ -221,16 +243,54 @@
         window.addEventListener("mouseup", end);
     })();
 
+    // Nearest interactable across static spots, living NPCs and resource nodes.
     function findNearest() {
         let best = null, bestD = INTERACT_RADIUS;
         for (const it of interactables) {
             const d = Math.hypot(it.px - player.centerX, it.py - player.centerY);
-            if (d <= bestD) { bestD = d; best = it; }
+            if (d <= bestD) { bestD = d; best = { kind: "spot", target: it, emoji: it.emoji, label: it.label }; }
+        }
+        for (const n of npcs) {
+            const d = Math.hypot(n.centerX - player.centerX, n.centerY - player.centerY);
+            if (d <= bestD) { bestD = d; best = { kind: "npc", target: n, emoji: n.emoji, label: n.name }; }
+        }
+        for (const r of resourceNodes) {
+            if (r.depleted) continue;
+            const d = Math.hypot(r.centerX - player.centerX, r.centerY - player.centerY);
+            if (d <= bestD) {
+                bestD = d;
+                const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[r.res] : null;
+                best = { kind: "resource", target: r, emoji: (meta && meta.emoji) || "🌿", label: gatherVerb(r.type) };
+            }
         }
         return best;
     }
 
-    function openInteraction(it) {
+    function gatherVerb(type) {
+        return type === "tree" ? "Рубить дерево"
+            : type === "rock" ? "Добыть камень"
+            : type === "herb" ? "Собрать травы" : "Собрать ягоды";
+    }
+
+    // A quick, non-pausing gather. Adds to the bag and gives feedback.
+    function gatherFrom(node) {
+        const r = node.hit();
+        if (!r) return;
+        resources.add(r.res, r.amount);
+        const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[r.res] : null;
+        const em = (meta && meta.emoji) || "📦";
+        showFlash(r.felled ? `${em} +${r.amount} — собрано!` : `${em} +${r.amount}`, 1.2);
+        journal.onResourceGathered && journal.onResourceGathered(r.res, r.amount);
+        refreshStats();
+    }
+
+    function openInteraction(sel) {
+        if (sel.kind === "npc") {
+            paused = true;
+            V2Menus.townsfolk(Object.assign({ npc: sel.target }, menuCtx));
+            return;
+        }
+        const it = sel.target;
         paused = true;
         const dispatch = {
             shop: V2Menus.shop,
@@ -330,7 +390,11 @@
     }
 
     function update(dt) {
+        const prev = clockMin;
         clockMin = (clockMin + dt * MIN_PER_SEC) % 1440;
+        if (clockMin < prev) dayCount += 1;      // wrapped past midnight → new day
+        social.setDay(dayCount);
+        if (flashT > 0) flashT = Math.max(0, flashT - dt);
         if (paused) return;
         // Open the backpack/equipment panel anywhere with I.
         if (input.wasPressed("KeyI")) {
@@ -341,14 +405,20 @@
         }
         // Edge-triggered interaction.
         if ((input.wasPressed("KeyE") || input.wasPressed("Enter") || input.wasPressed("Space")) && nearest) {
-            openInteraction(nearest);
+            if (nearest.kind === "resource") {
+                gatherFrom(nearest.target);      // quick action, keep playing
+            } else {
+                openInteraction(nearest);
+            }
             input.consumePressed();
-            return;
+            if (nearest.kind !== "resource") return;
         }
         input.consumePressed();
 
         player.update(dt, input.axis(), tilemap);
         for (const e of enemies) e.update(dt, tilemap);
+        for (const n of npcs) n.update(dt, tilemap, clockMin);
+        for (const r of resourceNodes) r.update(dt);
         camera.follow(player.centerX, player.centerY, tilemap.pixelWidth, tilemap.pixelHeight);
         nearest = findNearest();
 
@@ -372,16 +442,23 @@
         renderer.clear(camera.viewW, camera.viewH);
         renderer.drawMap(tilemap, camera);
         renderer.drawBuildings(mapData.buildings, camera, mapData.tileSize, light.night);
+        renderer.drawResourceNodes(resourceNodes, camera);
         renderer.drawPortals(portals, camera);
         renderer.drawInteractables(interactables, camera);
         renderer.drawEnemies(enemies, camera);
+        renderer.drawNPCs(npcs, camera);
         renderer.drawPlayer(player, camera);
         renderer.drawNightOverlay(light, camera);
 
-        hud.textContent = nearest
-            ? `Нажми E — ${nearest.emoji} ${nearest.label}`
-            : `📍 ${zoneName} · ${clockLabel(clockMin)} · E — действие · I — рюкзак`;
-        hud.classList.toggle("active", !!nearest);
+        if (flashT > 0) {
+            hud.textContent = flash;
+            hud.classList.add("active");
+        } else {
+            hud.textContent = nearest
+                ? `Нажми E — ${nearest.emoji} ${nearest.label}`
+                : `📍 ${zoneName} · День ${dayCount} · ${clockLabel(clockMin)} · E — действие · I — рюкзак`;
+            hud.classList.toggle("active", !!nearest);
+        }
     }
 
     refreshStats();
