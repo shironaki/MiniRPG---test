@@ -180,41 +180,41 @@ class Renderer {
         ctx.ellipse(cx, s.y + h, w * 0.5, 4.5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Sprite path (preferred): a lively walk cycle synthesised from a single
-        // sprite — vertical bob, squash/stretch, a slight lean and footstep dust.
+        // Frame-based walk cycle (real leg movement) when the sheet is loaded.
+        const walk = this.sprites && this.sprites.heroWalk;
+        const framesReady = walk && walk.length === 4 &&
+            walk.every(im => im && im.complete && im.naturalWidth > 0);
+        if (framesReady) {
+            const idx = player.moving ? (player.frame % 4) : 1; // idle = passing pose
+            const img = walk[idx];
+            const ar = img.naturalWidth / img.naturalHeight;
+            const hh = h * 2.6;
+            const ww = hh * ar;
+            const flip = player.facing === "left" ? -1 : 1;
+            // subtle idle breathing (scale only — no hopping)
+            const breathe = player.moving ? 1 : 1 + Math.sin(Date.now() / 700) * 0.012;
+
+            // footstep dust on the contact frames
+            if (player.moving && (idx === 0 || idx === 2)) {
+                ctx.fillStyle = "rgba(210,198,175,0.22)";
+                ctx.beginPath();
+                ctx.ellipse(cx, s.y + h + 2, 5, 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.save();
+            ctx.translate(cx, s.y + h + 2);
+            ctx.scale(flip, 1);
+            ctx.drawImage(img, -ww / 2, -hh * breathe, ww, hh * breathe);
+            ctx.restore();
+            return;
+        }
+
+        // Fallback: single static sprite (bob only) if the walk sheet is missing.
         const img = this._img("hero");
         if (img) {
-            const t = player.animTime;
-            let lift = 0, sqx = 1, sqy = 1, lean = 0;
-            if (player.moving) {
-                const ph = t * 9;                    // step cadence
-                const sn = Math.sin(ph), a = Math.abs(sn);
-                lift = a * 2.6;                      // bob up on each step
-                sqy = 1 - a * 0.05;                  // squash tall on footfall
-                sqx = 1 + a * 0.04;
-                lean = sn * 0.05;                    // gentle body sway
-                // footstep dust puff at the down-phase
-                if (a < 0.28) {
-                    const off = player.facing === "right" ? -6 : player.facing === "left" ? 6 : 0;
-                    ctx.fillStyle = "rgba(210,198,175,0.25)";
-                    ctx.beginPath();
-                    ctx.ellipse(cx + off, s.y + h + 2, 5, 2, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            } else {
-                lift = Math.sin(Date.now() / 600) * 0.5;   // idle breathing
-                sqy = 1 + Math.sin(Date.now() / 600) * 0.012;
-            }
-            const ar = img.naturalWidth / img.naturalHeight;
-            const hh = h * 2.4 * sqy;
-            const ww = hh * ar * sqx;
-            const flip = player.facing === "left" ? -1 : 1;
-            ctx.save();
-            ctx.translate(cx, s.y + h + 2 - lift);
-            ctx.rotate(lean * flip);
-            ctx.scale(flip, 1);
-            ctx.drawImage(img, -ww / 2, -hh, ww, hh);
-            ctx.restore();
+            const lift = player.moving ? Math.abs(Math.sin(player.animTime * 9)) * 2.6 : 0;
+            this._drawSprite(img, cx, s.y + h + 2, h * 2.4, player.facing === "left", lift);
             return;
         }
 

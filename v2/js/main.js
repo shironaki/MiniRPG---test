@@ -75,6 +75,12 @@
             img.src = "assets/sprites/" + k + ".png";
             sprites[k] = img;
         });
+        // Hero walk-cycle frames for real limb animation while moving.
+        sprites.heroWalk = [0, 1, 2, 3].map(i => {
+            const img = new Image();
+            img.src = "assets/sprites/hero_walk_" + i + ".png";
+            return img;
+        });
         renderer.sprites = sprites;
     })();
 
