@@ -578,6 +578,35 @@ describe("Interiors", () => {
         }
     });
 
+    it("interior NPCs stand on free floor, never in a wall or in furniture", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        const sizes = { bed: [1, 2], table: [2, 1], counter: [2, 1], fireplace: [2, 1], rug: [2, 2] };
+        for (const id of ["shop_in", "forge_in"]) {
+            const m = MAPS[id];
+            expect(m.npcs.length > 0).toBe(true);
+            const blocked = new Set();
+            for (const f of (m.furniture || [])) {
+                if (f.kind === "rug") continue;                 // rugs are walkable
+                const [w, h] = sizes[f.kind] || [1, 1];
+                for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) blocked.add((f.col + i) + "," + (f.row + j));
+            }
+            for (const npc of m.npcs) {
+                expect(npc.schedule.length > 0).toBe(true);
+                for (const stop of npc.schedule) {
+                    expect(tileInfo(m.rows[stop.row][stop.col]).solid).toBe(false);
+                    expect(blocked.has(stop.col + "," + stop.row)).toBe(false);
+                }
+            }
+        }
+    });
+
+    it("every villager with a request pool exists somewhere in the world", () => {
+        const { MAPS, REQUEST_POOL } = loadEngine().exports;
+        const ids = new Set();
+        for (const m of Object.values(MAPS)) for (const n of (m.npcs || [])) ids.add(n.id);
+        for (const id of Object.keys(REQUEST_POOL)) expect(ids.has(id)).toBe(true);
+    });
+
     it("blocked cells make furniture solid without changing the tile", () => {
         const { TileMap, MAPS } = loadEngine().exports;
         const m = MAPS.home;

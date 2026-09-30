@@ -220,6 +220,7 @@ const MAPS = {
     // render/furniture.js and (unless walkable) block movement.
 
     home: {
+        warm: true,   // lamp-lit room: a soft warm tint instead of daylight
         name: "Твой дом",
         tileSize: 32,
         indoor: true,
@@ -254,6 +255,7 @@ const MAPS = {
     },
 
     shop_in: {
+        warm: true,   // lamp-lit room: a soft warm tint instead of daylight
         name: "Лавка",
         tileSize: 32,
         indoor: true,
@@ -284,12 +286,33 @@ const MAPS = {
             { col: 4, row: 3, action: "shop", label: "Прилавок", emoji: "🛒" },
             { col: 5, row: 3, action: "shop", label: "Прилавок", emoji: "🛒" }
         ],
+        // The shopkeeper works behind her counter all day.
+        npcs: [
+            {
+                id: "tomila", name: "Томила", emoji: "👩‍🦰", role: "Торговка",
+                look: { shirt: "#8e5aa8", shirtSh: "#6d4184", hair: "#c75b3a", hairSh: "#95412a", hat: null, pants: "#3f4a6b", pantsSh: "#2c3550" },
+                likes: ["herb", "veg", "Эссенция"],
+                speed: 20,
+                dialogue: [
+                    "Свежий товар! Ну, почти свежий.",
+                    "Продашь лишнее — куплю не глядя. Почти.",
+                    "Слыхал? В лесу опять волки шалят.",
+                    "Кузнец опять забыл заплатить за гвозди."
+                ],
+                schedule: [
+                    { from: 0,   col: 4, row: 1, activity: "counter" },
+                    { from: 600, col: 6, row: 1, activity: "counter" },
+                    { from: 900, col: 5, row: 1, activity: "counter" }
+                ]
+            }
+        ],
         portals: [
             { col: 5, row: 8, to: "village", spawn: { col: 21, row: 6 }, label: "На улицу", emoji: "🚪" }
         ]
     },
 
     forge_in: {
+        warm: true,   // lamp-lit room: a soft warm tint instead of daylight
         name: "Кузница",
         tileSize: 32,
         indoor: true,
@@ -317,6 +340,27 @@ const MAPS = {
         interactables: [
             { col: 5, row: 3, action: "forge", label: "Наковальня", emoji: "🔨" },
             { col: 4, row: 2, action: "forge", label: "Наковальня", emoji: "🔨" }
+        ],
+        // The smith moves between his fire and his anvil.
+        npcs: [
+            {
+                id: "kuzma", name: "Кузьма", emoji: "🧔‍♂️", role: "Кузнец",
+                look: { shirt: "#7a4a2a", shirtSh: "#5a3319", hair: "#2f2a26", hairSh: "#1c1917", hat: null, pants: "#3a3833", pantsSh: "#282622" },
+                likes: ["stone", "wood", "Эссенция"],
+                speed: 26,
+                dialogue: [
+                    "Металл любит терпение. И уголь. Много угля.",
+                    "Принесёшь камня — сделаю что-нибудь путное.",
+                    "Руки в саже, зато совесть чистая.",
+                    "Хороший молот переживёт хозяина."
+                ],
+                schedule: [
+                    { from: 0,   col: 3, row: 2, activity: "fire" },
+                    { from: 480, col: 5, row: 4, activity: "anvil" },
+                    { from: 780, col: 3, row: 3, activity: "fire" },
+                    { from: 1080, col: 6, row: 5, activity: "rest" }
+                ]
+            }
         ],
         portals: [
             { col: 5, row: 8, to: "village", spawn: { col: 5, row: 16 }, label: "На улицу", emoji: "🚪" }

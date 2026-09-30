@@ -142,6 +142,25 @@ describe("v2 smoke › playing", () => {
         expect(r.gold > 0).toBe(true);
     });
 
+    it("meets the shopkeeper inside the shop and can chat with her", () => {
+        const g = boot();
+        g.tick(16.7);
+        const door = g.globals.MAPS.village.interactables.find(i => i.to === "shop_in");
+        standOn(g.v2, door.col, door.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        expect(g.v2.zone).toBe("Лавка");
+        const her = g.v2.npcs[0];
+        expect(!!her).toBe(true);
+        // stand right on her so she — not the nearby counter — is the target
+        g.v2.player.x = her.centerX - 10;
+        g.v2.player.y = her.centerY - 10;
+        g.tick(16.7);
+        g.tap("KeyE"); g.tick(16.7);
+        const panel = g.html("overlayBody");
+        expect(panel.includes(her.name)).toBe(true);     // her panel opened
+        expect(panel.includes("дружб") || panel.includes("Поговорить")).toBe(true);
+    });
+
     it("the home chest stores resources and gives them back", () => {
         const g = boot();
         g.tick(16.7);

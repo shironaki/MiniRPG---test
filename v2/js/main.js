@@ -522,7 +522,10 @@
     function render() {
         // Indoor zones (the cave) ignore the outdoor day/night lighting.
         const indoor = !!mapData.indoor;
-        const light = indoor ? { a: 0, night: 0 } : lightingFor(clockMin);
+        // Lamp-lit rooms get a gentle warm wash; the cave stays plain dark.
+        const light = indoor
+            ? (mapData.warm ? { r: 255, g: 176, b: 88, a: 0.12, night: 0 } : { a: 0, night: 0 })
+            : lightingFor(clockMin);
 
         renderer.clear(camera.viewW, camera.viewH);
         renderer.drawMap(tilemap, camera);
