@@ -9,7 +9,11 @@ class Player2D {
         this.y = y;
         this.w = opts.w || 20;
         this.h = opts.h || 20;
-        this.speed = opts.speed || 120;      // pixels per second
+        this.maxSpeed = opts.speed || 120;   // pixels per second
+        this.accel = opts.accel || 900;      // ramp-up (px/s^2)
+        this.friction = opts.friction || 1100; // ramp-down when no input
+        this.vx = 0;
+        this.vy = 0;
         this.facing = "down";
         this.moving = false;
         this.animTime = 0;
@@ -20,6 +24,7 @@ class Player2D {
     get box() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
     get centerX() { return this.x + this.w / 2; }
     get centerY() { return this.y + this.h / 2; }
+    get speed() { return Math.hypot(this.vx, this.vy); }
 
     // Current animation frame index (0 = idle/standing when not moving).
     get frame() {
@@ -27,34 +32,49 @@ class Player2D {
         return Math.floor(this.animTime / this.frameDuration) % this.frameCount;
     }
 
-    // dt in seconds. `axis` is { x, y } each in {-1,0,1} (from Input.axis()).
+    // dt in seconds. `axis` is { x, y } (analog from a stick, or {-1,0,1} keys).
+    // Movement uses acceleration + friction so the hero eases in and glides to a
+    // stop instead of teleporting — it feels grounded rather than "floaty".
     update(dt, axis, tilemap) {
-        let vx = axis.x, vy = axis.y;
-        this.moving = (vx !== 0 || vy !== 0);
+        const ax = axis.x, ay = axis.y;
+        const hasInput = (ax !== 0 || ay !== 0);
 
-        if (this.moving) {
-            // Normalise diagonal speed.
-            const len = Math.hypot(vx, vy) || 1;
-            vx /= len; vy /= len;
-            const dx = vx * this.speed * dt;
-            const dy = vy * this.speed * dt;
+        // Desired velocity (normalised so diagonals aren't faster).
+        let dvx = ax, dvy = ay;
+        if (hasInput) { const len = Math.hypot(dvx, dvy) || 1; dvx /= len; dvy /= len; }
 
-            if (tilemap) {
-                const res = moveAndCollide(this.box, dx, dy, tilemap);
-                this.x = res.x;
-                this.y = res.y;
-            } else {
-                this.x += dx; this.y += dy;
-            }
+        const approach = (cur, tgt, step) =>
+            cur < tgt ? Math.min(cur + step, tgt) : Math.max(cur - step, tgt);
 
-            // Facing follows the dominant input axis (vertical wins ties).
-            if (Math.abs(axis.y) >= Math.abs(axis.x)) this.facing = axis.y < 0 ? "up" : "down";
-            else this.facing = axis.x < 0 ? "left" : "right";
-
-            this.animTime += dt;
+        if (hasInput) {
+            this.vx = approach(this.vx, dvx * this.maxSpeed, this.accel * dt);
+            this.vy = approach(this.vy, dvy * this.maxSpeed, this.accel * dt);
         } else {
-            this.animTime = 0;
+            this.vx = approach(this.vx, 0, this.friction * dt);
+            this.vy = approach(this.vy, 0, this.friction * dt);
         }
+
+        const dx = this.vx * dt, dy = this.vy * dt;
+        if (tilemap) {
+            const res = moveAndCollide(this.box, dx, dy, tilemap);
+            if (res.hitX) this.vx = 0;
+            if (res.hitY) this.vy = 0;
+            this.x = res.x;
+            this.y = res.y;
+        } else {
+            this.x += dx; this.y += dy;
+        }
+
+        this.moving = this.speed > 4;
+
+        // Facing follows live input (vertical wins ties); kept while gliding.
+        if (hasInput) {
+            if (Math.abs(ay) >= Math.abs(ax)) this.facing = ay < 0 ? "up" : "down";
+            else this.facing = ax < 0 ? "left" : "right";
+        }
+
+        if (this.moving) this.animTime += dt;
+        else this.animTime = 0;
     }
 }
 

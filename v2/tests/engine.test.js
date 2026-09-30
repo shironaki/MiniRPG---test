@@ -207,6 +207,21 @@ describe("Player2D", () => {
         p.update(1, { x: 1, y: 0 }, m); // slam into the right wall
         expect(p.x + p.w <= 64).toBe(true);
     });
+    it("accelerates from rest and glides to a stop (inertia)", () => {
+        const { Player2D } = loadEngine().exports;
+        const p = new Player2D(0, 0, { speed: 200, accel: 800, friction: 800 });
+        p.update(0.05, { x: 1, y: 0 }, null);
+        const early = p.speed;
+        expect(early > 0 && early < 200).toBe(true);      // not instant full speed
+        for (let i = 0; i < 30; i++) p.update(0.05, { x: 1, y: 0 }, null);
+        expect(p.speed > 150).toBe(true);                 // ramps toward max
+        // release input -> should still glide briefly, then settle
+        p.update(0.05, { x: 0, y: 0 }, null);
+        expect(p.speed < 200).toBe(true);
+        for (let i = 0; i < 30; i++) p.update(0.05, { x: 0, y: 0 }, null);
+        expect(p.speed).toBe(0);
+        expect(p.moving).toBe(false);
+    });
 });
 
 // ---------------------------------------------------------------------------

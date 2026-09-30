@@ -253,12 +253,10 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
     transition: transform 0.03s linear;
 }
 
-/* Control-scheme toggle */
-#ctrlToggle {
+/* Control-scheme toggle + fullscreen button */
+#ctrlToggle, #fsBtn {
     position: fixed;
     top: 8px;
-    right: 8px;
-    display: none;
     width: 40px;
     height: 40px;
     border-radius: 10px;
@@ -267,7 +265,10 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
     color: #eef2f8;
     font-size: 18px;
     z-index: 16;
+    cursor: pointer;
 }
+#fsBtn { right: 8px; display: block; }
+#ctrlToggle { right: 56px; display: none; }
 .tbtn {
     width: 54px;
     height: 54px;
@@ -295,38 +296,35 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
     #ctrlToggle { display: block; }
 }
 
-/* Phones: fill the screen so nothing needs scrolling */
-@media (max-width: 768px) {
-    html, body { height: 100%; overflow: hidden; }
-    body { padding: 0; }
-    #app {
-        height: 100vh;
-        height: 100dvh;
-        gap: 0;
-        max-width: 100%;
-        justify-content: flex-start;
-    }
-    header { padding: 5px 0; }
-    header h1 { font-size: 17px; letter-spacing: 0; }
-    header .tag { display: none; }
-    footer { display: none; }
-    #stage { flex: 1 1 auto; width: 100%; min-height: 0; }
-    #game {
-        position: absolute;
-        inset: 0;
-        width: 100% !important;
-        height: 100% !important;
-        border: 0;
-        border-radius: 0;
-        box-shadow: none;
-    }
-    #stats { font-size: 11px; gap: 6px; padding: 4px 8px; top: 6px; left: 6px; }
-    #hud { font-size: 11px; bottom: 84px; padding: 5px 10px; white-space: normal; max-width: 60vw; text-align: center; }
-    #overlay, #battle { padding: 10px; }
-    #overlayCard { max-width: 100%; padding: 16px; }
-    #overlayBody { max-height: 64vh; }
-    #battleCard { max-width: 100%; }
+/* Immersive mode (touch devices or fullscreen): fill the whole screen so
+   nothing ever needs page scrolling — including landscape phones. */
+html.immersive, body.immersive { padding: 0; height: 100%; overflow: hidden; }
+body.immersive #app {
+    height: 100vh;
+    height: 100dvh;
+    gap: 0;
+    max-width: 100%;
+    justify-content: flex-start;
 }
+body.immersive header { padding: 5px 0; }
+body.immersive header h1 { font-size: 17px; letter-spacing: 0; }
+body.immersive header .tag { display: none; }
+body.immersive footer { display: none; }
+body.immersive #stage { flex: 1 1 auto; width: 100%; min-height: 0; }
+body.immersive #game {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+body.immersive #stats { font-size: 11px; gap: 6px; padding: 4px 8px; top: 6px; left: 6px; }
+body.immersive #hud { font-size: 11px; bottom: 92px; padding: 5px 10px; white-space: normal; max-width: 60vw; text-align: center; }
+body.immersive #overlay, body.immersive #battle { padding: 10px; }
+body.immersive #overlayCard, body.immersive #battleCard { max-width: 100%; padding: 16px; }
+body.immersive #overlayBody { max-height: 64vh; }
 .pill {
     background: #141b2a;
     border: 1px solid #2a3a56;

@@ -149,7 +149,9 @@ class Renderer {
 
             const img = this._img(e.kind);
             if (img) {
-                this._drawSprite(img, cx, bottom + 2, e.h * 2.2, false, 0);
+                // Gentle idle bob (phase offset per-enemy so they aren't in sync).
+                const bob = Math.sin(Date.now() / 480 + (e.x + e.y) * 0.05) * 1.2;
+                this._drawSprite(img, cx, bottom + 2, e.h * 2.2, false, bob);
             } else {
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
@@ -178,10 +180,41 @@ class Renderer {
         ctx.ellipse(cx, s.y + h, w * 0.5, 4.5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Sprite path (preferred).
+        // Sprite path (preferred): a lively walk cycle synthesised from a single
+        // sprite — vertical bob, squash/stretch, a slight lean and footstep dust.
         const img = this._img("hero");
         if (img) {
-            this._drawSprite(img, cx, s.y + h + 2, h * 2.4, player.facing === "left", bob);
+            const t = player.animTime;
+            let lift = 0, sqx = 1, sqy = 1, lean = 0;
+            if (player.moving) {
+                const ph = t * 9;                    // step cadence
+                const sn = Math.sin(ph), a = Math.abs(sn);
+                lift = a * 2.6;                      // bob up on each step
+                sqy = 1 - a * 0.05;                  // squash tall on footfall
+                sqx = 1 + a * 0.04;
+                lean = sn * 0.05;                    // gentle body sway
+                // footstep dust puff at the down-phase
+                if (a < 0.28) {
+                    const off = player.facing === "right" ? -6 : player.facing === "left" ? 6 : 0;
+                    ctx.fillStyle = "rgba(210,198,175,0.25)";
+                    ctx.beginPath();
+                    ctx.ellipse(cx + off, s.y + h + 2, 5, 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else {
+                lift = Math.sin(Date.now() / 600) * 0.5;   // idle breathing
+                sqy = 1 + Math.sin(Date.now() / 600) * 0.012;
+            }
+            const ar = img.naturalWidth / img.naturalHeight;
+            const hh = h * 2.4 * sqy;
+            const ww = hh * ar * sqx;
+            const flip = player.facing === "left" ? -1 : 1;
+            ctx.save();
+            ctx.translate(cx, s.y + h + 2 - lift);
+            ctx.rotate(lean * flip);
+            ctx.scale(flip, 1);
+            ctx.drawImage(img, -ww / 2, -hh, ww, hh);
+            ctx.restore();
             return;
         }
 

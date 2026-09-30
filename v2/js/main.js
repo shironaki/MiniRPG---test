@@ -105,26 +105,39 @@
     let nearest = null;
     const INTERACT_RADIUS = 44;
 
+    // Immersive = touch device OR fullscreen: the canvas fills the whole stage
+    // (which itself fills the viewport), so nothing ever needs page scrolling.
+    function immersive() {
+        return !!document.fullscreenElement ||
+            window.matchMedia("(pointer: coarse)").matches;
+    }
+
     function resize() {
-        const isMobile = window.matchMedia("(max-width: 768px)").matches;
+        const imm = immersive();
+        document.body.classList.toggle("immersive", imm);
+        document.documentElement.classList.toggle("immersive", imm);
         const dpr = window.devicePixelRatio || 1;
         const ts = mapData.tileSize;
         let cw, ch, zoom;
-        if (isMobile) {
-            // Canvas fills the stage exactly (CSS makes #game absolute:inset:0),
-            // so the whole playfield fits the screen with no page scrolling.
+        if (immersive()) {
             cw = stage.clientWidth || window.innerWidth;
-            ch = stage.clientHeight || Math.round(window.innerHeight * 0.7);
+            ch = stage.clientHeight || window.innerHeight;
             canvas.style.width = "";
             canvas.style.height = "";
-            zoom = Math.max(1, 54 / ts);
+            zoom = Math.max(1, 56 / ts);
         } else {
-            const w = Math.min(stage.clientWidth, 720);
-            cw = w;
-            ch = Math.round(w * 9 / 16);
+            // Desktop windowed: use most of the viewport (much bigger than before),
+            // keeping a pleasant 16:9 and never overflowing width or height.
+            const vw = stage.clientWidth || window.innerWidth;
+            const vh = window.innerHeight;
+            let w = Math.min(vw, 1200);
+            let h = Math.min(Math.round(w * 9 / 16), Math.round(vh * 0.76));
+            w = Math.round(h * 16 / 9);
+            if (w > vw) { w = vw; h = Math.round(w * 9 / 16); }
+            cw = w; ch = h;
             canvas.style.width = w + "px";
-            canvas.style.height = ch + "px";
-            zoom = Math.max(1, 44 / ts);
+            canvas.style.height = h + "px";
+            zoom = Math.max(1, 46 / ts);
         }
         canvas.width = Math.max(1, Math.round(cw * dpr));
         canvas.height = Math.max(1, Math.round(ch * dpr));
@@ -133,6 +146,22 @@
     }
     window.addEventListener("resize", resize);
     window.addEventListener("orientationchange", () => setTimeout(resize, 100));
+    document.addEventListener("fullscreenchange", () => setTimeout(resize, 50));
+
+    // Fullscreen toggle.
+    (function wireFullscreen() {
+        const fsBtn = document.getElementById("fsBtn");
+        if (!fsBtn) return;
+        fsBtn.addEventListener("click", () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen && document.exitFullscreen();
+            } else {
+                const el = document.documentElement;
+                (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el);
+            }
+        });
+    })();
+
     loadZone("village");
 
     // ---- Control scheme (virtual joystick <-> D-pad), remembered locally -----
