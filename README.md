@@ -19,6 +19,7 @@ to unlock the treasury, defeat the Guardian and claim the treasure.
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | История всех работ по коммитам |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Процесс: ветки, коммиты, чек-лист перед PR |
 | [`docs/OWNER-SETUP.md`](docs/OWNER-SETUP.md) | Для владельца: защита ветки `main` и прав доступа на GitHub, как проверять чужую работу |
+| [`docs/WORKER-BRIEF.md`](docs/WORKER-BRIEF.md) | Готовые тексты: что передать новому разработчику и стартовый промпт для его ИИ-агента |
 
 Кратко о главном: ветка `main` **заморожена**, работа ведётся в новой ветке от
 `arena/01a0eee6-minirpg-test`, файлы `LICENSE`, `js/main.js` и `v2/js/main.js`
