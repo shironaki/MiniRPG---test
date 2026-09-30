@@ -59,21 +59,52 @@
     input.attach(window);
     const renderer = new Renderer(ctx);
 
+    // On-screen touch controls → feed the same Input as the keyboard.
+    (function wireTouch() {
+        const touch = document.getElementById("touch");
+        if (!touch) return;
+        touch.querySelectorAll("[data-key]").forEach(btn => {
+            const code = btn.dataset.key;
+            const down = (e) => { e.preventDefault(); input.press(code); };
+            const up = (e) => { e.preventDefault(); input.release(code); };
+            btn.addEventListener("touchstart", down, { passive: false });
+            btn.addEventListener("touchend", up, { passive: false });
+            btn.addEventListener("touchcancel", up);
+            btn.addEventListener("mousedown", down);
+            btn.addEventListener("mouseup", up);
+            btn.addEventListener("mouseleave", up);
+        });
+        touch.querySelectorAll("[data-tap]").forEach(btn => {
+            const code = btn.dataset.tap;
+            const tap = (e) => { e.preventDefault(); input.press(code); input.release(code); };
+            btn.addEventListener("touchstart", tap, { passive: false });
+            btn.addEventListener("mousedown", tap);
+        });
+    })();
+
     let paused = false;
     let nearest = null;
     const INTERACT_RADIUS = 44;
 
     function resize() {
         const wrap = canvas.parentElement;
-        const w = Math.min(wrap.clientWidth, 720);
-        const h = Math.round(w * 9 / 16);
+        const isMobile = window.matchMedia("(max-width: 768px)").matches;
+        const availW = wrap.clientWidth;
+        const w = isMobile ? availW : Math.min(availW, 720);
+        // Taller playfield on phones (portrait); 16:9 on wider screens.
+        const h = isMobile
+            ? Math.min(Math.round(w * 1.15), Math.round(window.innerHeight * 0.62))
+            : Math.round(w * 9 / 16);
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
+        // Zoom so a tile is a comfortable on-screen size (bigger on touch).
+        const targetTilePx = isMobile ? 54 : 44;
+        const zoom = Math.max(1, targetTilePx / mapData.tileSize);
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
         canvas.style.width = w + "px";
         canvas.style.height = h + "px";
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        camera.resize(w, h);
+        ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
+        camera.resize(w / zoom, h / zoom);
     }
     window.addEventListener("resize", resize);
     resize();

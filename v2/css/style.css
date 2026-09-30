@@ -208,6 +208,63 @@ header .tag { color: #8996ac; font-size: 14px; margin-top: 4px; }
 .qr { color: #ffd166; font-size: 13px; }
 
 footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* On-screen touch controls */
+#touch {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+    pointer-events: none;
+    z-index: 15;
+}
+#touch > * { pointer-events: auto; }
+#dpad { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.drow { display: flex; gap: 6px; }
+.tbtn {
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+    background: rgba(34,48,73,0.82);
+    border: 1px solid #4a6a9a;
+    color: #eef2f8;
+    font-size: 20px;
+    line-height: 1;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+.tbtn:active { background: rgba(74,106,154,0.95); transform: scale(0.94); }
+.tbtn.big { width: 66px; height: 66px; font-size: 24px; border-radius: 50%; }
+#tactions { display: flex; gap: 14px; align-items: center; }
+
+/* Show touch controls on touch devices */
+@media (pointer: coarse) {
+    #touch { display: flex; }
+}
+
+/* Compact layout on phones so the game gets the space */
+@media (max-width: 768px) {
+    body { padding: 6px; }
+    #app { gap: 8px; max-width: 100%; }
+    header h1 { font-size: 22px; }
+    header .tag { display: none; }
+    footer { display: none; }
+    #game { border-radius: 10px; }
+    #stats { font-size: 11px; gap: 6px; padding: 4px 8px; top: 6px; left: 6px; }
+    #hud { font-size: 11px; bottom: 8px; padding: 5px 10px; }
+    #overlayCard { max-width: 100%; padding: 16px; }
+    #overlayBody { max-height: 56vh; }
+    #battleCard { max-width: 100%; }
+}
 .pill {
     background: #141b2a;
     border: 1px solid #2a3a56;

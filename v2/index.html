@@ -43,6 +43,22 @@
         </footer>
     </div>
 
+    <!-- On-screen controls for touch devices -->
+    <div id="touch">
+        <div id="dpad">
+            <button class="tbtn" data-key="ArrowUp" aria-label="Вверх">▲</button>
+            <div class="drow">
+                <button class="tbtn" data-key="ArrowLeft" aria-label="Влево">◀</button>
+                <button class="tbtn" data-key="ArrowDown" aria-label="Вниз">▼</button>
+                <button class="tbtn" data-key="ArrowRight" aria-label="Вправо">▶</button>
+            </div>
+        </div>
+        <div id="tactions">
+            <button class="tbtn big" data-tap="KeyI" aria-label="Рюкзак">🎒</button>
+            <button class="tbtn big" data-tap="KeyE" aria-label="Действие">Е</button>
+        </div>
+    </div>
+
     <!-- Shared helpers + reused v1 combat engine -->
     <script src="../js/util.js"></script>
     <script src="../js/data.js"></script>
