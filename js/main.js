@@ -514,6 +514,8 @@ function renderWorld() {
         </div>`;
     }).join("");
 
+    drawMapConnectors(map);
+
     document
         .getElementById("worldDescription")
         .innerHTML = `
@@ -524,6 +526,50 @@ function renderWorld() {
         `;
 }
 
+// Draw connector lines between centres of connected, visible rooms.
+// Purely decorative; safely no-ops outside a real DOM (tests) or when hidden.
+function drawMapConnectors(map) {
+    if (!document.createElementNS || typeof map.querySelectorAll !== "function") return;
+
+    const world = game.world;
+    const width = map.clientWidth;
+    const height = map.clientHeight;
+    if (!width || !height) return;
+
+    const cells = {};
+    map.querySelectorAll("[data-room]").forEach(cell => { cells[cell.dataset.room] = cell; });
+
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "mapLines");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+
+    const drawn = new Set();
+    Object.keys(world.connections).forEach(id => {
+        const a = cells[id];
+        if (!a || !world.isVisible(id)) return;
+        Object.values(world.connections[id]).forEach(dest => {
+            if (!dest) return;
+            const key = [id, dest].sort().join("|");
+            if (drawn.has(key)) return;
+            const b = cells[dest];
+            if (!b || !world.isVisible(dest)) return;
+            drawn.add(key);
+
+            const line = document.createElementNS(NS, "line");
+            line.setAttribute("x1", a.offsetLeft + a.offsetWidth / 2);
+            line.setAttribute("y1", a.offsetTop + a.offsetHeight / 2);
+            line.setAttribute("x2", b.offsetLeft + b.offsetWidth / 2);
+            line.setAttribute("y2", b.offsetTop + b.offsetHeight / 2);
+            svg.appendChild(line);
+        });
+    });
+
+    map.insertBefore(svg, map.firstChild);
+}
+
 // Click-to-move on the map: one step to an adjacent, connected room only.
 function moveToRoom(id) {
     const result = game.world.moveTo(id);
@@ -531,6 +577,7 @@ function moveToRoom(id) {
         addLog(result.message);
         return;
     }
+    game.bumpStat("steps");
     addLog(`🗺️ Ты переместился: ${result.room.name}`);
     renderLocation();
     showScreen("locationScreen");
@@ -578,6 +625,8 @@ function movePlayer(direction) {
 
         return;
     }
+
+    game.bumpStat("steps");
 
     addLog(
         `🗺️ Ты переместился: ${result.room.name}`
@@ -1095,24 +1144,15 @@ function exploreRoom() {
 
 function startRandomEnemy() {
 
-    const enemies = [
+    const room = game.world.getCurrentRoom();
 
-        "goblin",
-        "wolf",
-        "skeleton"
-
-    ];
-
-
-    const randomIndex =
-        Math.floor(
-            Math.random() *
-            enemies.length
-        );
-
-
+    // Reuse the enemy type stored for this room so a foe the player fled from
+    // returns as the same kind. Fall back to a random pick for safety.
+    const pool = game.world.enemyPool || ["goblin", "wolf", "skeleton"];
     const enemyType =
-        enemies[randomIndex];
+        room.enemyType || pool[Math.floor(Math.random() * pool.length)];
+
+    if (!room.enemyType) room.enemyType = enemyType;
 
 
     const enemy =
@@ -1139,6 +1179,8 @@ function openChest() {
         room.chest.open(
             game.player
         );
+
+    if (result.success) game.bumpStat("chests");
 
 
     addLog(
@@ -1195,6 +1237,7 @@ function activateTrap() {
 function disarmTrap() {
     const room = game.world.getCurrentRoom();
     const result = room.trap.disarm(game.player);
+    if (result.success) game.bumpStat("traps");
     addLog(result.message);
     room.cleared = true;
     game.updateUI();

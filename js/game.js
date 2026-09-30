@@ -19,6 +19,17 @@ class Game {
         this.gameEnded = false;
 
         this.saveSystem = new SaveSystem();
+
+        this.stats = this.emptyStats();
+    }
+
+    emptyStats() {
+        return { steps: 0, kills: 0, chests: 0, traps: 0 };
+    }
+
+    bumpStat(key) {
+        if (!this.stats) this.stats = this.emptyStats();
+        if (key in this.stats) this.stats[key]++;
     }
 
 
@@ -66,6 +77,8 @@ class Game {
 
         this.gameEnded = false;
 
+        this.stats = this.emptyStats();
+
 
         addLog(`🎮 Добро пожаловать, ${this.player.name}! В рюкзаке уже есть два зелья.`);
 
@@ -98,6 +111,7 @@ class Game {
         this.npc = new NPC("Староста");
         this.battle = null;
         this.gameEnded = false;
+        this.stats = Object.assign(this.emptyStats(), data.stats || {});
         addLog(`💾 Приключение ${this.player.name} продолжено.`);
         showScreen("villageScreen");
         this.updateUI();
@@ -217,6 +231,8 @@ class Game {
 
   enemyDefeated(enemy) {
 
+    this.bumpStat("kills");
+
     if (this.quest) {
 
         this.quest.enemyDefeated(
@@ -317,6 +333,25 @@ class Game {
         }, 450);
     }
 
+    renderStats() {
+        const s = this.stats || this.emptyStats();
+        const relics = this.world ? this.world.relics.length : 0;
+        return `
+            <div class="runStats">
+                <h3>📊 Итоги забега</h3>
+                <div class="runStatsGrid">
+                    <span>⭐ Уровень: ${this.player ? this.player.level : 1}</span>
+                    <span>💰 Золото: ${this.player ? this.player.gold : 0}</span>
+                    <span>👣 Шагов: ${s.steps}</span>
+                    <span>⚔️ Побед: ${s.kills}</span>
+                    <span>📦 Сундуков: ${s.chests}</span>
+                    <span>🧰 Ловушек снято: ${s.traps}</span>
+                    <span>✨ Рун: ${relics}/3</span>
+                </div>
+            </div>
+        `;
+    }
+
     gameOver() {
 
         this.gameEnded = true;
@@ -342,6 +377,8 @@ class Game {
 
                 Приключение окончено.
 
+                ${this.renderStats()}
+
             `;
     }
 
@@ -366,6 +403,8 @@ class Game {
 
                 Ты нашёл сокровище
                 и завершил приключение!
+
+                ${this.renderStats()}
 
             `;
     }

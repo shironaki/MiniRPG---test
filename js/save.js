@@ -8,7 +8,9 @@ class SaveSystem {
 
             world: game.world,
 
-            quest: game.quest
+            quest: game.quest,
+
+            stats: game.stats
 
         };
 

@@ -36,6 +36,7 @@ class World {
             treasury: { north: "marsh", south: null, east: null, west: "ruins" }
         };
         this.relicRooms = { archive: "Руна прилива", shrine: "Руна пламени", catacomb: "Руна праха" }; this.treasureFound = false;
+        this.enemyPool = ["goblin", "wolf", "skeleton"];
         this.rooms.start.visited = true;
     }
     getCurrentRoom() { return this.rooms[this.currentLocation]; }
@@ -73,7 +74,7 @@ class World {
     }
     eventResult(room) {
         const results = { enemy: ["enemy", "👹 Шорох становится всё ближе — тебя заметили!"], chest: ["chest", "📦 Среди обломков блеснул запертый сундук."], trap: ["trap", "⚠️ На пути виден подозрительный механизм."], rest: ["rest", "🔥 Ты нашёл безопасное место для короткого привала."], nothing: ["nothing", "🌙 Пока здесь тихо, но подземелье не спит."] };
-        const [type, message] = results[room.event] || results.nothing; if (type === "chest") room.chest = new Chest(); if (type === "trap") room.trap = new Trap(); if (type === "nothing") room.cleared = true; return { type, message };
+        const [type, message] = results[room.event] || results.nothing; if (type === "chest") room.chest = new Chest(); if (type === "trap") room.trap = new Trap(); if (type === "enemy") room.enemyType = this.enemyPool[Math.floor(Math.random() * this.enemyPool.length)]; if (type === "nothing") room.cleared = true; return { type, message };
     }
     collectRelic() { const room = this.getCurrentRoom(); if (!this.relicRooms[room.id] || this.relics.includes(room.id)) return null; this.relics.push(room.id); room.cleared = true; room.event = "cleared"; return this.relicRooms[room.id]; }
 }

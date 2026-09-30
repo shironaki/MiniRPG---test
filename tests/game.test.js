@@ -317,6 +317,19 @@ describe("World", () => {
         expect(game2.world.directionTo("darkForest")).toBe("east");
     });
 
+    it("stores a valid enemy type on the room for consistent re-encounters", () => {
+        const { exports: g } = loadGame({ random: () => 0.1 }); // roll -> enemy event
+        const w = new g.World();
+        w.currentLocation = "darkForest";
+        const res = w.explore();
+        expect(res.type).toBe("enemy");
+        const type = w.rooms.darkForest.enemyType;
+        expect(w.enemyPool.includes(type)).toBe(true);
+        // A created enemy of that type is well-formed.
+        const enemy = g.createEnemy(type, 1);
+        expect(enemy.maxHealth).toBeGreaterThan(0);
+    });
+
     it("every room is reachable from start", () => {
         const { exports: g } = loadGame();
         const w = new g.World();
@@ -402,6 +415,19 @@ describe("NPC", () => {
         npc.talk(p, q); // second talk: no double reward
         expect(p.gold).toBe(goldAfter);
     });
+
+    it("surfaces level-up messages triggered by the quest reward", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        p.experience = 90; // reward XP (50) will push past 100 -> level up
+        const npc = new g.NPC("Староста");
+        const q = new g.Quest();
+        q.start();
+        q.completed = true;
+        const dialogue = npc.talk(p, q);
+        expect(p.level).toBe(2);
+        expect(dialogue).toContain("уровень");
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -433,6 +459,54 @@ describe("SaveSystem + Game.resume", () => {
     it("resume returns false when there is no save", () => {
         const { exports: g } = loadGame();
         expect(new g.Game().resume()).toBe(false);
+    });
+
+    it("persists run stats across save/resume", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.inventory = new g.Inventory(game.player);
+        game.bumpStat("steps");
+        game.bumpStat("steps");
+        game.bumpStat("kills");
+        game.saveSystem.save(game);
+
+        const game2 = new g.Game();
+        game2.resume();
+        expect(game2.stats.steps).toBe(2);
+        expect(game2.stats.kills).toBe(1);
+        expect(game2.stats.chests).toBe(0);
+    });
+});
+
+describe("Game stats", () => {
+    it("bumpStat only touches known counters and enemyDefeated counts kills", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.bumpStat("nonsense"); // ignored
+        expect(game.stats.kills).toBe(0);
+        game.enemyDefeated(g.createEnemy("wolf", 1));
+        expect(game.stats.kills).toBe(1);
+    });
+
+    it("renderStats reflects current progress", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("Гер");
+        game.player.gold = 340;
+        game.world = new g.World();
+        game.world.relics = ["archive", "shrine"];
+        game.stats = { steps: 12, kills: 5, chests: 2, traps: 1 };
+        const html = game.renderStats();
+        expect(html).toContain("Шагов: 12");
+        expect(html).toContain("Побед: 5");
+        expect(html).toContain("Рун: 2/3");
+        expect(html).toContain("340");
     });
 });
 

@@ -745,7 +745,23 @@ h2 {
     grid-auto-rows: 62px;
     gap: 7px;
     max-width: 460px;
+    position: relative;
 }
+
+.mapLines {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.mapLines line {
+    stroke: #3c4d68;
+    stroke-width: 3;
+    stroke-linecap: round;
+}
+
+.worldMapGrid .mapCell { position: relative; z-index: 1; }
 
 .worldMapGrid .mapCell {
     width: auto;
@@ -792,6 +808,46 @@ h2 {
 .worldMapGrid .mapRoom.locked { border-color: #b56; }
 
 .mapHint { font-size: 12px; color: #8fa1b8; margin-top: 8px; }
+
+.runStats {
+    margin-top: 18px;
+    padding: 14px;
+    background: #151d29;
+    border: 1px solid #34445d;
+    border-radius: 12px;
+    text-align: left;
+}
+.runStats h3 { margin: 0 0 10px; font-size: 15px; color: #e5eefc; text-align: center; }
+.runStatsGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 14px;
+    color: #c3d0e2;
+}
+
+/* Snappier taps on the interactive map cells */
+.worldMapGrid .mapRoom.reachable {
+    -webkit-tap-highlight-color: rgba(110, 168, 255, 0.35);
+    touch-action: manipulation;
+}
+
+/* Bigger, full-width tap targets on phones */
+@media (max-width: 480px) {
+    #miniMap { padding: 10px; }
+    .worldMapGrid {
+        max-width: 100%;
+        gap: 5px;
+        grid-auto-rows: 66px;
+    }
+    .worldMapGrid .mapCell { height: 66px; font-size: 17px; }
+    .worldMapGrid .mapRoom span { font-size: 9.5px; }
+    .worldMapGrid .mapRoom small { font-size: 8.5px; }
+    .worldMapGrid .mapRoom.reachable {
+        box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.55);
+    }
+    .mapHint { font-size: 11px; }
+}
 
 .equipment { text-align: left; margin-bottom: 14px; }
 .equipment h3 { color: #c8d8ed; font-size: 15px; margin: 0 0 7px; }
