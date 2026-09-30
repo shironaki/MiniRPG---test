@@ -206,7 +206,7 @@ class Renderer {
             CharacterRig.draw(ctx, {
                 x: cx,
                 y: s.y + h + 2,
-                H: h * 2.1,
+                H: h * 1.7,
                 facing: player.facing,
                 phase: player.animTime * 8,
                 moving: player.moving,

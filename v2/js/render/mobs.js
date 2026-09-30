@@ -113,33 +113,43 @@
     }
 
     function buildWolf(frame) {
-        const W = 20, H = 15, g = blank(W, H), p = PAL.wolf;
+        const W = 22, H = 16, g = blank(W, H), p = PAL.wolf;
         const step = frame % 2;
-        // tail
-        rect(g, 1, 4, 4, 2, p.fur); px(g, 1, 3, p.fur);
+        // bushy raised tail (left)
+        rect(g, 0, 3, 3, 4, p.furSh);
+        px(g, 1, 2, p.furSh); px(g, 2, 2, p.fur);
+        rect(g, 2, 4, 2, 3, p.fur);
         // body
-        rect(g, 4, 4, 11, 5, p.fur);
-        rect(g, 4, 8, 11, 1, p.belly);
-        // haunch
-        rect(g, 4, 3, 4, 2, p.fur);
-        // head (right side)
-        rect(g, 14, 3, 5, 5, p.fur);
-        rect(g, 18, 5, 2, 2, p.fur);       // snout
-        px(g, 19, 6, p.nose);              // nose
-        px(g, 17, 5, p.eye);               // eye
-        // ear
-        px(g, 15, 1, p.fur); px(g, 15, 2, p.fur); px(g, 16, 2, p.fur);
-        // legs (front pair + back pair, alternate)
-        const a = step ? 0 : 1, b = step ? 1 : 0;
-        rect(g, 5, 9, 2, 4 + a, p.furSh);   // back-far
-        rect(g, 8, 9, 2, 4 + b, p.fur);     // back-near
-        rect(g, 13, 9, 2, 4 + b, p.furSh);  // front-far
-        rect(g, 16, 9, 2, 4 + a, p.fur);    // front-near
+        rect(g, 4, 6, 11, 4, p.fur);
+        rect(g, 4, 6, 11, 1, p.furSh);      // darker back/saddle
+        rect(g, 5, 9, 9, 1, p.belly);       // light belly
+        // haunch (back), a bit taller
+        rect(g, 3, 5, 4, 4, p.fur);
+        rect(g, 3, 5, 4, 1, p.furSh);
+        // neck up to head (head on the right)
+        rect(g, 14, 4, 4, 5, p.fur);
+        // head + muzzle
+        rect(g, 16, 4, 4, 4, p.fur);
+        rect(g, 19, 6, 3, 2, p.fur);        // muzzle points right
+        px(g, 21, 7, p.nose);               // nose
+        px(g, 21, 6, p.furSh);
+        px(g, 18, 6, p.eye);                // eye
+        // upright ears (two triangles)
+        px(g, 15, 2, p.furSh); px(g, 15, 3, p.fur); px(g, 16, 3, p.fur);
+        px(g, 18, 2, p.furSh); px(g, 18, 3, p.fur); px(g, 17, 3, p.fur);
+        // legs: back pair + front pair, alternating for a trot
+        const a = step ? 1 : 0, b = step ? 0 : 1;
+        // back legs
+        rect(g, 5, 10, 2, 4 + a, p.furSh); px(g, 5, 13 + a, p.nose);
+        rect(g, 8, 10, 2, 4 + b, p.fur); px(g, 8, 13 + b, p.nose);
+        // front legs
+        rect(g, 13, 10, 2, 4 + b, p.furSh); px(g, 13, 13 + b, p.nose);
+        rect(g, 16, 10, 2, 4 + a, p.fur); px(g, 16, 13 + a, p.nose);
         return { w: W, h: H, grid: outline(g, p.outline) };
     }
 
     const BUILDERS = { goblin: buildGoblin, skeleton: buildSkeleton, wolf: buildWolf };
-    const HEIGHT_SCALE = { goblin: 1.9, skeleton: 2.1, wolf: 1.5 };
+    const HEIGHT_SCALE = { goblin: 1.7, skeleton: 1.85, wolf: 1.35 };
 
     function heightScale(kind) { return HEIGHT_SCALE[kind] || 2.0; }
 
@@ -176,8 +186,8 @@
         if (!cv) return;
         const scale = o.H / h;
         const drawW = w * scale, drawH = h * scale;
-        // wolves face left by default (head on the right) -> flip when moving right
-        const flip = kind === "wolf" ? o.facing === "right" : o.facing === "left";
+        // art faces right by default -> flip only when facing left
+        const flip = o.facing === "left";
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         ctx.translate(o.x, o.y);
