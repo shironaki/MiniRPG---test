@@ -35,6 +35,9 @@
         { w: 20, h: 20, kind: e.kind, emoji: e.emoji, wanderRadius: e.wanderRadius }
     ));
 
+    // Persistent v1 hero drives stats/progression; Player2D handles position.
+    const hero = new Player("Герой");
+
     const camera = new Camera(canvas.width, canvas.height);
     const input = new Input();
     input.attach(window);
@@ -76,17 +79,33 @@
         overlay.classList.remove("hidden");
     }
 
-    function openEncounter(foe) {
-        paused = true;
-        const kindName = { goblin: "Гоблин", wolf: "Волк", skeleton: "Скелет" }[foe.kind] || "Враг";
-        overlayBody.innerHTML = `<h2>${foe.emoji} ${escapeText(kindName)}!</h2>
-            <p>Дикий противник преграждает путь. Бой начнётся здесь же в 2D.</p>
-            <p class="hint">Подключение боевой системы (стихии, скиллы, статусы) — следующий шаг 2.0.</p>`;
-        overlay.classList.remove("hidden");
-        // Nudge the hero back to its home-ish tile so the fight doesn't loop.
-        foe.x = foe.homeX; foe.y = foe.homeY;
+    function respawnHero() {
         player.x = mapData.spawn.col * mapData.tileSize + 6;
         player.y = mapData.spawn.row * mapData.tileSize + 6;
+        input.consumePressed();
+    }
+
+    function openEncounter(foe) {
+        paused = true;
+        openBattle(hero, foe.kind, hero.level, {
+            onWin() {
+                foe.alive = false;          // defeated foe leaves the map
+                respawnHero();
+                paused = false;
+            },
+            onFlee() {
+                foe.x = foe.homeX; foe.y = foe.homeY;
+                respawnHero();
+                paused = false;
+            },
+            onLose() {
+                // Full heal + respawn: a forgiving overworld defeat for the prototype.
+                hero.health = hero.maxHealth;
+                foe.x = foe.homeX; foe.y = foe.homeY;
+                respawnHero();
+                paused = false;
+            }
+        });
     }
     function closeInteraction() {
         paused = false;

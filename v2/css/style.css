@@ -85,6 +85,75 @@ header .tag { color: #8996ac; font-size: 14px; margin-top: 4px; }
 }
 #overlayClose:hover { filter: brightness(1.08); }
 
+/* Battle screen */
+#battle {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 20%, #2a1b3e, #0a0d15 75%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    padding: 16px;
+}
+#battle.hidden { display: none; }
+#battleCard {
+    width: 100%;
+    max-width: 460px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.fighter {
+    background: #141b2a;
+    border: 1px solid #35496a;
+    border-radius: 14px;
+    padding: 12px 14px;
+    text-align: center;
+}
+#bEnemy { border-color: #7a3b52; }
+#bHero { border-color: #3b5a7a; }
+.bSprite { font-size: 46px; line-height: 1; margin-bottom: 4px; }
+.bName { font-weight: 600; margin-bottom: 6px; }
+.bBar { height: 12px; background: #0d1017; border-radius: 999px; overflow: hidden; margin: 4px 0; }
+.bHp { height: 100%; background: linear-gradient(90deg, #e0533f, #f0a04b); }
+.bEn { height: 100%; background: linear-gradient(90deg, #4aa3ff, #9bd0ff); }
+.bNums { font-size: 12px; color: #c5cede; }
+.bElement { font-size: 12px; color: #ffb37a; margin-top: 4px; }
+.bStatuses { margin-top: 6px; display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+.bStatus { background: #0d1017; border: 1px solid #35496a; border-radius: 8px; padding: 1px 6px; font-size: 12px; }
+#bLog {
+    background: #0d1017;
+    border: 1px solid #2a3a56;
+    border-radius: 12px;
+    padding: 8px 12px;
+    height: 96px;
+    overflow-y: auto;
+    font-size: 13px;
+    color: #c5cede;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+#bActions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.bBtn {
+    padding: 9px 14px;
+    border: none;
+    border-radius: 10px;
+    background: #223049;
+    color: #eef2f8;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid #35496a;
+}
+.bBtn:hover:not(:disabled) { border-color: #b9a6ff; background: #2a3a56; }
+.bBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.bBtn.skill { background: #2a2340; }
+.bBtn.flee { background: #3a2330; }
+#bResult { text-align: center; }
+#bResult.hidden { display: none; }
+#bResult h2 { font-size: 24px; margin-bottom: 10px; }
+
 footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .pill {
     background: #141b2a;

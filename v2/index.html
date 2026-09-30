@@ -25,6 +25,16 @@
             </div>
         </div>
 
+        <div id="battle" class="hidden">
+            <div id="battleCard">
+                <div id="bEnemy" class="fighter"></div>
+                <div id="bHero" class="fighter"></div>
+                <div id="bLog"></div>
+                <div id="bActions"></div>
+                <div id="bResult" class="hidden"></div>
+            </div>
+        </div>
+
         <footer>
             <span class="pill">🕹️ WASD / ⬆⬇⬅➡</span>
             <span class="pill">🅴 действие</span>
@@ -32,8 +42,15 @@
         </footer>
     </div>
 
-    <!-- Shared helpers reused from v1 -->
+    <!-- Shared helpers + reused v1 combat engine -->
     <script src="../js/util.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/item.js"></script>
+    <script src="../js/craft.js"></script>
+    <script src="../js/ally.js"></script>
+    <script src="../js/player.js"></script>
+    <script src="../js/enemy.js"></script>
+    <script src="../js/battle.js"></script>
 
     <!-- Engine -->
     <script src="js/engine/vec.js"></script>
@@ -50,6 +67,10 @@
     <script src="js/entities/mover.js"></script>
     <script src="js/entities/player.js"></script>
     <script src="js/entities/enemy.js"></script>
+
+    <!-- Battle bridge -->
+    <script src="js/battle/battle2d.js"></script>
+    <script src="js/battle/battleui.js"></script>
 
     <!-- Render + bootstrap -->
     <script src="js/render/renderer.js"></script>
