@@ -120,6 +120,26 @@ describe("Integration: moral choices", () => {
     });
 });
 
+describe("Integration: location & map art", () => {
+    it("shows the lurking enemy sprite on the location screen", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        const room = ui.game.world.getCurrentRoom();
+        room.explored = true; room.event = "enemy"; room.cleared = false; room.enemyType = "skeleton";
+        ui.renderLocation();
+        expect(/skeleton\.png/.test(sandbox.document.getElementById("locationArt").innerHTML)).toBe(true);
+    });
+
+    it("falls back to the hero sprite for peaceful rooms", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        const room = ui.game.world.getCurrentRoom();
+        room.explored = true; room.event = "rest";
+        ui.renderLocation();
+        expect(/hero\.png/.test(sandbox.document.getElementById("locationArt").innerHTML)).toBe(true);
+    });
+});
+
 describe("Integration: audio safety", () => {
     it("all SFX calls are no-ops without a real AudioContext", () => {
         const { exports: ui } = loadFullGame();

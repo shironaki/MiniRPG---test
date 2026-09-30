@@ -188,7 +188,7 @@ function loadFullGame(opts = {}) {
         .map((file) => fs.readFileSync(path.join(JS_DIR, file), "utf8"))
         .join("\n;\n");
 
-    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings, resolveWanderer, recruitHere, declineRecruit };";
+    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings, resolveWanderer, recruitHere, declineRecruit, renderBattleSkills, useSkill };";
 
     vm.createContext(sandbox);
     vm.runInContext(source + uiExports, sandbox, { filename: "minirpg.full.js" });

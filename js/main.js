@@ -523,10 +523,11 @@ function renderWorld() {
         const badge = roomBadge(room, world);
         const badgeHtml = badge ? `<em class="mapBadge">${badge}</em>` : "";
         const markerHtml = isCurrent ? `<em class="mapMarker">📍</em>` : "";
+        const thumbHtml = mapCreatureThumb(room);
 
         return `<div class="${classes}" data-room="${id}" style="${pos};--cell-accent:${zoneAccent}" title="${room.name}"${onclick}>
             ${markerHtml}
-            ${badgeHtml}
+            ${thumbHtml || badgeHtml}
             <span>${room.name}</span>
             <small>${smallText}</small>
         </div>`;
@@ -542,6 +543,18 @@ function renderWorld() {
             <p>✨ Руны для сокровищницы: ${world.relics.length}/3</p>
             <p class="mapHint">👆 Нажми на соседнюю комнату — или используй стрелки / WASD / свайпы.</p>
         `;
+}
+
+// Small creature sprite for a map cell when a fightable foe is present.
+// Returns "" (falls back to the emoji badge) when there is nothing to show.
+function mapCreatureThumb(room) {
+    let key = null;
+    if (room.event === "enemy" && !room.cleared && room.enemyType) key = room.enemyType;
+    else if (room.event === "miniboss" && room.guardianType && !room.guardianDefeated) key = room.guardianType;
+    else if (room.event === "boss") key = "boss";
+    if (!key || typeof game === "undefined" || !game.spriteFor) return "";
+    const path = game.spriteFor("enemy", key);
+    return path ? `<img class="mapThumb" src="${path}" alt="" onerror="this.remove()">` : "";
 }
 
 // Status badge for a map cell: what a discovered room currently holds.
@@ -847,6 +860,76 @@ function spriteFallback(img, emoji) {
     if (img && img.replaceWith) img.replaceWith(div);
 }
 
+// Render the unlocked skill buttons for the current battle, disabling any the
+// player can't currently afford.
+function renderBattleSkills() {
+    const box = document.getElementById("battleSkills");
+    if (!box) return;
+    const skills = (typeof GAME_DATA !== "undefined" && GAME_DATA.skills) || {};
+    const p = game.player;
+    if (!p || !game.battle) { box.innerHTML = ""; return; }
+    box.innerHTML = "";
+    Object.keys(skills).forEach(id => {
+        const s = skills[id];
+        if (p.level < s.level) return; // not yet unlocked
+        const btn = document.createElement("button");
+        btn.className = "skillButton";
+        btn.innerHTML = `${s.emoji} ${s.name} <small>⚡${s.cost}</small>`;
+        btn.title = s.desc || "";
+        btn.disabled = (p.energy || 0) < s.cost;
+        btn.onclick = () => useSkill(id);
+        box.appendChild(btn);
+    });
+}
+
+function useSkill(id) {
+    if (!game.battle) return;
+    const skill = ((typeof GAME_DATA !== "undefined" && GAME_DATA.skills) || {})[id];
+    const res = game.battle.playerUseSkill(id);
+    if (res && res.success) {
+        sfx.play(skill && skill.type === "heal" ? "heal" : "attack");
+    }
+    if (game.gameEnded) sfx.play("lose");
+    else if (!game.battle) sfx.play("win"); // enemy defeated
+    if (game.battle) {
+        game.showEnemy();
+        renderBattleSkills();
+    }
+    game.updateUI();
+}
+
+// Pick the sprite that best represents what's happening in a room:
+// the lurking creature, a recruitable ally, or the hero exploring.
+function locationArtSubject(room) {
+    const enemies = (typeof GAME_DATA !== "undefined" && GAME_DATA.enemies) || {};
+    if (room.event === "enemy" && !room.cleared && room.enemyType) {
+        return { kind: "enemy", key: room.enemyType, emoji: (enemies[room.enemyType] || {}).emoji || "👹", frame: "danger" };
+    }
+    if (room.event === "miniboss" && room.guardianType && !room.guardianDefeated) {
+        return { kind: "enemy", key: room.guardianType, emoji: (enemies[room.guardianType] || {}).emoji || "🗿", frame: "danger" };
+    }
+    if (room.event === "boss") {
+        return { kind: "enemy", key: "boss", emoji: "👑", frame: "danger" };
+    }
+    if (room.event === "recruit" && !room.recruitResolved && room.recruitType) {
+        const a = (typeof ALLIES !== "undefined" && ALLIES[room.recruitType]) ? ALLIES[room.recruitType]() : null;
+        return { kind: "ally", key: room.recruitType, emoji: a ? a.emoji : "🤝", frame: "friendly" };
+    }
+    return { kind: "hero", key: "hero", emoji: "🧑", frame: "calm" };
+}
+
+function renderLocationArt(room) {
+    const box = document.getElementById("locationArt");
+    if (!box) return;
+    const subject = locationArtSubject(room);
+    const path = (typeof game !== "undefined" && game.spriteFor) ? game.spriteFor(subject.kind, subject.key) : null;
+    const art = path
+        ? `<img class="locationSprite" src="${path}" alt="" onerror="spriteFallback(this,'${subject.emoji}')">`
+        : `<div class="fighterEmoji">${subject.emoji}</div>`;
+    box.className = `locationArt ${subject.frame}`;
+    box.innerHTML = art;
+}
+
 function renderLocation() {
 
     const room =
@@ -859,6 +942,8 @@ function renderLocation() {
     if (locScreen && zone && locScreen.style && locScreen.style.setProperty) {
         locScreen.style.setProperty("--zone-accent", zone.accent);
     }
+
+    renderLocationArt(room);
 
 
     document

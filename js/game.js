@@ -121,6 +121,9 @@ class Game {
 
         this.player = Object.assign(Object.create(Player.prototype), data.player);
         if (this.player.karma === undefined) this.player.karma = 0;
+        if (this.player.maxEnergy == null) this.player.maxEnergy = 30;
+        if (this.player.energy == null) this.player.energy = this.player.maxEnergy;
+        this.player.statuses = []; // effects never persist outside a battle
         this.player.inventory.forEach(item => Object.setPrototypeOf(item, Item.prototype));
         Object.values(this.player.equipment).filter(Boolean).forEach(item => Object.setPrototypeOf(item, Item.prototype));
         if (this.player.ally) Object.setPrototypeOf(this.player.ally, Ally.prototype);
@@ -180,7 +183,7 @@ class Game {
         document
             .getElementById("quickStats")
             .textContent =
-                `⭐ ${this.player.level} ур. · ✨ ${this.player.experience}/${this.player.experienceToNextLevel} · ⚔️ ${this.player.attack} · 🛡️ ${this.player.defense} · 🧰 ${this.player.trapSkill} · 💰 ${this.player.gold} · ☯️ ${this.karmaLabel()}`;
+                `⭐ ${this.player.level} ур. · ✨ ${this.player.experience}/${this.player.experienceToNextLevel} · ⚔️ ${this.player.attack} · 🛡️ ${this.player.defense} · ⚡ ${this.player.energy}/${this.player.maxEnergy} · 🧰 ${this.player.trapSkill} · 💰 ${this.player.gold} · ☯️ ${this.karmaLabel()}`;
 
         const allyBox = document.getElementById("allyInfo");
         if (allyBox) {
@@ -231,7 +234,18 @@ class Game {
         return null;
     }
 
-    // Markup for one combatant: sprite (with emoji fallback), name and HP bar.
+    // Small chips for the active status effects on a combatant.
+    statusChips(statuses) {
+        if (!statuses || !statuses.length) return "";
+        const defs = (typeof GAME_DATA !== "undefined" && GAME_DATA.statuses) || {};
+        return `<div class="statusChips">` + statuses.map(s => {
+            const d = defs[s.type] || {};
+            return `<span class="statusChip" title="${d.name || s.type}">${d.emoji || "✨"}${s.turns}</span>`;
+        }).join("") + `</div>`;
+    }
+
+    // Markup for one combatant: sprite (with emoji fallback), name, HP (and,
+    // for the hero, an energy bar), plus any status effects.
     fighterHtml(opts) {
         const pct = Math.max(0, Math.min(100, (opts.health / opts.maxHealth) * 100));
         const art = opts.sprite
@@ -240,11 +254,19 @@ class Game {
         const allyBadge = opts.allyBadge
             ? `<div class="fighterAlly">${opts.allyBadge}</div>`
             : "";
+        let energyHtml = "";
+        if (opts.energy != null && opts.maxEnergy) {
+            const epct = Math.max(0, Math.min(100, (opts.energy / opts.maxEnergy) * 100));
+            energyHtml = `<div class="bar energyBar"><div class="energy" style="width:${epct}%"></div></div>
+            <p class="fighterEnergy">⚡ ${opts.energy} / ${opts.maxEnergy}</p>`;
+        }
         return `
             <div class="fighterArt ${opts.side}">${art}${allyBadge}</div>
             <div class="fighterName">${opts.emoji} ${opts.name}</div>
             <div class="bar"><div class="health" style="width:${pct}%"></div></div>
-            <p class="fighterHp">❤️ ${opts.health} / ${opts.maxHealth}</p>`;
+            <p class="fighterHp">❤️ ${opts.health} / ${opts.maxHealth}</p>
+            ${energyHtml}
+            ${this.statusChips(opts.statuses)}`;
     }
 
     showEnemy() {
@@ -264,6 +286,9 @@ class Game {
                 sprite: this.spriteFor("hero"),
                 health: p.health,
                 maxHealth: p.maxHealth,
+                energy: p.energy,
+                maxEnergy: p.maxEnergy,
+                statuses: p.statuses,
                 allyBadge: ally ? `${ally.emoji} ${ally.name}` : ""
             });
         }
@@ -275,12 +300,15 @@ class Game {
                 emoji: enemy.emoji,
                 sprite: this.spriteFor("enemy", enemy.key),
                 health: enemy.health,
-                maxHealth: enemy.maxHealth
+                maxHealth: enemy.maxHealth,
+                statuses: enemy.statuses
             });
             enemyEl.classList.remove("hitFlash");
             void enemyEl.offsetWidth;
             enemyEl.classList.add("hitFlash");
         }
+
+        if (typeof renderBattleSkills === "function") renderBattleSkills();
     }
 
 

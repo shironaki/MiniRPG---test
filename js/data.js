@@ -11,15 +11,33 @@
  */
 const GAME_DATA = {
 
-    // ---- Enemies (base stats at level 1; scaling applied in createEnemy) ----
+    // ---- Enemies (base stats at level 1; scaling applied in createEnemy).
+    // `inflict`/`inflictChance` let a foe apply a status effect on a hit. ----
     enemies: {
         goblin:       { name: "Гоблин",          health: 52,  attack: 11, defense: 3,  experience: 32,  gold: 28,  emoji: "👹" },
-        wolf:         { name: "Волк",            health: 68,  attack: 14, defense: 4,  experience: 44,  gold: 38,  emoji: "🐺" },
+        wolf:         { name: "Волк",            health: 68,  attack: 14, defense: 4,  experience: 44,  gold: 38,  emoji: "🐺", inflict: "poison", inflictChance: 0.30 },
         skeleton:     { name: "Скелет",          health: 84,  attack: 17, defense: 6,  experience: 60,  gold: 50,  emoji: "💀" },
-        tideWraith:   { name: "Дух прилива",     health: 120, attack: 19, defense: 7,  experience: 110, gold: 80,  emoji: "🌊" },
-        flameWarden:  { name: "Страж пламени",   health: 130, attack: 21, defense: 8,  experience: 125, gold: 90,  emoji: "🔥" },
-        boneColossus: { name: "Костяной колосс", health: 145, attack: 22, defense: 9,  experience: 140, gold: 100, emoji: "☠️" },
-        boss:         { name: "Страж сокровища", health: 190, attack: 24, defense: 10, experience: 220, gold: 250, emoji: "👑" }
+        tideWraith:   { name: "Дух прилива",     health: 120, attack: 19, defense: 7,  experience: 110, gold: 80,  emoji: "🌊", inflict: "poison", inflictChance: 0.40 },
+        flameWarden:  { name: "Страж пламени",   health: 130, attack: 21, defense: 8,  experience: 125, gold: 90,  emoji: "🔥", inflict: "burn", inflictChance: 0.45 },
+        boneColossus: { name: "Костяной колосс", health: 145, attack: 22, defense: 9,  experience: 140, gold: 100, emoji: "☠️", inflict: "burn", inflictChance: 0.35 },
+        boss:         { name: "Страж сокровища", health: 190, attack: 24, defense: 10, experience: 220, gold: 250, emoji: "👑", inflict: "burn", inflictChance: 0.30 }
+    },
+
+    // ---- Status effects. `damage` is per-turn (bypasses defense); stun skips
+    // the target's turn. Duration is set when the effect is applied. ----
+    statuses: {
+        poison: { name: "Яд",         emoji: "🟢", damage: 6 },
+        burn:   { name: "Горение",    emoji: "🔥", damage: 9 },
+        stun:   { name: "Оглушение",  emoji: "💫" }
+    },
+
+    // ---- Active skills, unlocked by level, costing energy (⚡). ----
+    skills: {
+        powerStrike: { name: "Мощный удар",       emoji: "💥", cost: 12, level: 1, type: "attack", mult: 1.8, desc: "Сильный удар (×1.8 урона)." },
+        secondWind:  { name: "Второе дыхание",    emoji: "💚", cost: 16, level: 2, type: "heal",   heal: 30,  desc: "Восстановить 30 HP." },
+        poisonStab:  { name: "Ядовитый клинок",   emoji: "🗡️", cost: 14, level: 2, type: "attack", mult: 0.8, status: "poison", duration: 3, desc: "Урон + яд на 3 хода." },
+        shieldBash:  { name: "Оглушающий удар",   emoji: "🌀", cost: 15, level: 3, type: "attack", mult: 1.0, status: "stun", duration: 1, chance: 0.6, desc: "Урон + шанс оглушить врага." },
+        flameSlash:  { name: "Огненный разрез",   emoji: "🔥", cost: 18, level: 4, type: "attack", mult: 1.2, status: "burn", duration: 3, desc: "Урон + горение на 3 хода." }
     },
 
     // ---- Items (shop stock and loot) ----

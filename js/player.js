@@ -2,6 +2,7 @@ class Player {
     constructor(name) {
         this.name = (typeof name === "string" ? name : "").replace(/[<>&"]/g, "").trim().slice(0, 18) || "Герой"; this.level = 1; this.experience = 0; this.experienceToNextLevel = 100;
         this.maxHealth = 100; this.health = 100; this.baseAttack = 15; this.baseDefense = 5; this.attack = 15; this.defense = 5; this.gold = 100;
+        this.maxEnergy = 30; this.energy = 30; this.statuses = [];
         this.inventory = [ITEMS.potion.clone(), ITEMS.potion.clone()]; this.equipment = { weapon: null, armor: null, shield: null }; this.isDefending = false; this.trapSkill = 0; this.karma = 0; this.ally = null;
     }
     updateStats() { this.attack = this.baseAttack + (this.equipment.weapon?.attackBonus || 0); this.defense = this.baseDefense + (this.equipment.armor?.defenseBonus || 0) + (this.equipment.shield?.defenseBonus || 0); }
@@ -13,6 +14,6 @@ class Player {
     removeItem(item) { const i = this.inventory.indexOf(item); if (i < 0) return false; this.inventory.splice(i, 1); return true; }
     equip(item) { if (!item?.isEquipment()) return { success: false, message: "❌ Этот предмет нельзя экипировать." }; const slot = item.type; const previous = this.equipment[slot]; this.equipment[slot] = item; this.removeItem(item); if (previous) this.inventory.push(previous); this.updateStats(); return { success: true, message: `${item.emoji || "⚔️"} ${item.name} экипирован.` }; }
     unequip(slot) { const item = this.equipment[slot]; if (!item) return { success: false, message: "❌ Этот слот уже пуст." }; this.equipment[slot] = null; this.inventory.push(item); this.updateStats(); return { success: true, message: `📦 ${item.name} снят и возвращён в рюкзак.` }; }
-    addExperience(amount) { this.experience += amount; const messages = []; while (this.experience >= this.experienceToNextLevel) { this.experience -= this.experienceToNextLevel; this.level++; this.maxHealth += 20; this.health = this.maxHealth; this.baseAttack += 4; this.baseDefense += 2; this.experienceToNextLevel = Math.floor(this.experienceToNextLevel * 1.3); this.updateStats(); messages.push(`🌟 Новый уровень: ${this.level}! Здоровье полностью восстановлено.`); } return messages; }
+    addExperience(amount) { this.experience += amount; const messages = []; while (this.experience >= this.experienceToNextLevel) { this.experience -= this.experienceToNextLevel; this.level++; this.maxHealth += 20; this.health = this.maxHealth; this.baseAttack += 4; this.baseDefense += 2; this.maxEnergy += 5; this.energy = this.maxEnergy; this.experienceToNextLevel = Math.floor(this.experienceToNextLevel * 1.3); this.updateStats(); messages.push(`🌟 Новый уровень: ${this.level}! Здоровье полностью восстановлено.`); } return messages; }
     isDead() { return this.health <= 0; }
 }

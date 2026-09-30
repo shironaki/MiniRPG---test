@@ -358,6 +358,48 @@ h2 {
 
 .fighter .bar { width: 100%; max-width: 180px; }
 
+.energyBar { height: 8px; margin-top: 2px; }
+.energyBar .energy {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #3aa0ff, #7fd0ff);
+    transition: width 0.25s ease;
+}
+.fighterEnergy { font-size: 11px; color: #bfe0ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); margin: 0; }
+
+.statusChips { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 4px; min-height: 18px; }
+.statusChip {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+/* Skill bar */
+#battleSkills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+.skillButton {
+    flex: 1 1 45%;
+    min-width: 140px;
+    background: linear-gradient(145deg, #2a3b57, #1a2740);
+    border: 1px solid #3f5c86;
+    color: #eaf1fb;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+.skillButton small { color: #bfe0ff; font-weight: 700; margin-left: 4px; }
+.skillButton:hover:not(:disabled) { border-color: #6ea8e6; filter: brightness(1.12); }
+.skillButton:disabled { opacity: 0.45; cursor: not-allowed; }
+
 .fighterAlly {
     margin-top: 4px;
     font-size: 11px;
@@ -996,6 +1038,47 @@ header { position: relative; }
     padding-left: 12px;
     margin-left: 2px;
     text-align: left;
+}
+
+/* Location illustration */
+#locationArt {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 150px;
+    margin: 6px auto 14px;
+    padding: 8px 8px 0;
+    border-radius: 16px;
+    background:
+        radial-gradient(ellipse at bottom, color-mix(in srgb, var(--zone-accent, #3a4a63) 45%, transparent), rgba(9, 13, 22, 0.15) 70%),
+        rgba(9, 13, 22, 0.25);
+    border: 1px solid color-mix(in srgb, var(--zone-accent, #3a4a63) 55%, transparent);
+}
+
+.locationSprite {
+    max-height: 140px;
+    max-width: 90%;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.6));
+    animation: heroIdle 2.6s ease-in-out infinite;
+}
+
+#locationArt.danger .locationSprite { animation: enemyIdle 2.2s ease-in-out infinite; }
+#locationArt.danger { border-color: rgba(224, 96, 96, 0.6); }
+#locationArt.friendly { border-color: rgba(96, 200, 130, 0.55); }
+#locationArt .fighterEmoji { font-size: 76px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .locationSprite { animation: none; }
+}
+
+/* Creature thumbnail on the mini-map */
+.mapThumb {
+    height: 30px;
+    max-width: 90%;
+    image-rendering: pixelated;
+    align-self: center;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.7));
 }
 
 .locationChoice {

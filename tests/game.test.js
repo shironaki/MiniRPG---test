@@ -791,6 +791,97 @@ describe("Ally", () => {
     });
 });
 
+describe("Combat: skills & status effects", () => {
+    it("refills energy at the start of every battle", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        p.energy = 1;
+        new g.Battle(makeBattleGame(g, p), g.createEnemy("goblin", 1));
+        expect(p.energy).toBe(p.maxEnergy);
+    });
+
+    it("a skill spends energy and damages the enemy", () => {
+        const { exports: g } = loadGame({ random: () => 0.99 }); // no crit / no status proc
+        const p = new g.Player("A");
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("goblin", 1));
+        const hp = battle.enemy.health;
+        const energy = p.energy;
+        const res = battle.playerUseSkill("powerStrike");
+        expect(res.success).toBe(true);
+        expect(battle.enemy.health).toBeLessThan(hp);
+        expect(p.energy).toBe(energy - g.GAME_DATA.skills.powerStrike.cost);
+    });
+
+    it("refuses a skill when energy is too low", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("goblin", 1));
+        p.energy = 0;
+        const hp = battle.enemy.health;
+        const res = battle.playerUseSkill("powerStrike");
+        expect(res.success).toBe(false);
+        expect(battle.enemy.health).toBe(hp);
+    });
+
+    it("refuses a skill the player hasn't unlocked yet", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A"); // level 1
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("goblin", 1));
+        const res = battle.playerUseSkill("flameSlash"); // needs level 4
+        expect(res.success).toBe(false);
+    });
+
+    it("poison deals damage over time and expires", () => {
+        const { exports: g } = loadGame();
+        const p = new g.Player("A");
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("skeleton", 1));
+        battle.applyStatus(battle.enemy, "poison", 2);
+        const hp = battle.enemy.health;
+        const t1 = battle.tickStatuses(battle.enemy, { name: "e", emoji: "x" });
+        expect(hp - battle.enemy.health).toBe(g.GAME_DATA.statuses.poison.damage);
+        expect(battle.enemy.statuses[0].turns).toBe(1);
+        battle.tickStatuses(battle.enemy, { name: "e", emoji: "x" });
+        expect(battle.enemy.statuses.length).toBe(0); // expired
+        expect(t1.stunned).toBe(false);
+    });
+
+    it("a stunned enemy skips its attack", () => {
+        const { exports: g } = loadGame({ random: () => 0.99 });
+        const p = new g.Player("A");
+        const hp = p.health;
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("goblin", 1));
+        battle.applyStatus(battle.enemy, "stun", 1);
+        battle.enemyTurn();
+        expect(p.health).toBe(hp); // no damage taken
+    });
+
+    it("some foes inflict a lingering effect on the player", () => {
+        const { exports: g } = loadGame({ random: () => 0 }); // guarantees the proc
+        const p = new g.Player("A");
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("wolf", 1));
+        battle.enemyTurn();
+        expect(p.statuses.some(s => s.type === "poison")).toBe(true);
+    });
+
+    it("secondWind restores health", () => {
+        const { exports: g } = loadGame({ random: () => 0.99 });
+        const p = new g.Player("A"); p.level = 2; p.health = 40;
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("goblin", 1));
+        battle.playerUseSkill("secondWind");
+        expect(p.health).toBeGreaterThan(40);
+    });
+
+    it("clears the player's statuses when the fight is won", () => {
+        const { exports: g } = loadGame({ random: () => 0 });
+        const p = new g.Player("A"); p.baseAttack = 100000; p.updateStats();
+        const battle = new g.Battle(makeBattleGame(g, p), g.createEnemy("goblin", 1));
+        p.statuses = [{ type: "poison", turns: 3 }];
+        battle.playerAttack(); // crit kills, win() runs
+        expect(battle.finished).toBe(true);
+        expect(p.statuses.length).toBe(0);
+    });
+});
+
 describe("Battle with ally", () => {
     it("an ally acts on the player's turn and can help finish the enemy", () => {
         const { exports: g } = loadGame({ random: () => 0 });
