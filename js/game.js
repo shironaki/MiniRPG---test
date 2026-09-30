@@ -91,6 +91,7 @@ class Game {
             if (room.chest) Object.setPrototypeOf(room.chest, Chest.prototype);
             if (room.trap) Object.setPrototypeOf(room.trap, Trap.prototype);
         });
+        this.world.getCurrentRoom().visited = true;
         this.quest = Object.assign(Object.create(Quest.prototype), data.quest || new Quest());
         this.inventory = new Inventory(this.player);
         this.shop = new Shop(this.player);

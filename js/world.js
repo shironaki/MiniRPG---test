@@ -1,4 +1,15 @@
 class World {
+    // Spatial layout of the dungeon (x → east, y → north). Kept on the
+    // prototype via the getter below so it is NOT serialised into saves and is
+    // always available after a resume(). Verified consistent with connections.
+    static COORDS = {
+        start: { x: 0, y: 0 }, ancientHall: { x: 0, y: 1 }, archive: { x: 0, y: 2 },
+        camp: { x: 0, y: -1 }, darkForest: { x: 1, y: 0 }, shrine: { x: 1, y: 1 },
+        ruins: { x: 1, y: -1 }, marsh: { x: 2, y: 0 }, treasury: { x: 2, y: -1 },
+        abandonedWing: { x: -1, y: 0 }, catacomb: { x: -1, y: 1 }, forge: { x: -2, y: 0 }
+    };
+    get coords() { return World.COORDS; }
+
     constructor() {
         this.currentLocation = "start"; this.relics = [];
         this.rooms = {
@@ -25,10 +36,34 @@ class World {
             treasury: { north: "marsh", south: null, east: null, west: "ruins" }
         };
         this.relicRooms = { archive: "Руна прилива", shrine: "Руна пламени", catacomb: "Руна праха" }; this.treasureFound = false;
+        this.rooms.start.visited = true;
     }
     getCurrentRoom() { return this.rooms[this.currentLocation]; }
     getCurrentLocation() { return this.getCurrentRoom(); }
-    move(direction) { const next = this.connections[this.currentLocation][direction]; if (!next) return { success: false, message: "🧱 В этом направлении пути нет." }; this.currentLocation = next; return { success: true, room: this.getCurrentRoom() }; }
+    move(direction) { const next = this.connections[this.currentLocation][direction]; if (!next) return { success: false, message: "🧱 В этом направлении пути нет." }; this.currentLocation = next; const room = this.getCurrentRoom(); room.visited = true; return { success: true, room }; }
+
+    // Direction from the current room to `roomId`, or null if they are not
+    // directly connected. Drives click-to-move on the map.
+    directionTo(roomId) { const exits = this.connections[this.currentLocation] || {}; return Object.keys(exits).find(dir => exits[dir] === roomId) || null; }
+
+    // Ids of rooms directly connected to `roomId`.
+    neighborsOf(roomId) { return Object.values(this.connections[roomId] || {}).filter(Boolean); }
+
+    // Fog of war: a room is visible if visited, current, or adjacent to any
+    // visited room (the explorable frontier).
+    isVisible(roomId) {
+        if (roomId === this.currentLocation) return true;
+        const room = this.rooms[roomId]; if (!room) return false;
+        if (room.visited) return true;
+        return this.neighborsOf(roomId).some(id => this.rooms[id] && this.rooms[id].visited);
+    }
+
+    // Move to an adjacent, connected room by id (one step, no teleporting).
+    moveTo(roomId) {
+        const direction = this.directionTo(roomId);
+        if (!direction) return { success: false, message: "🧭 Туда нельзя пройти отсюда — выбери соседнюю комнату." };
+        return this.move(direction);
+    }
     explore() {
         const room = this.getCurrentRoom();
         if (room.id === "treasury") { room.explored = true; if (this.relics.length < 3) { room.event = "bossLocked"; return { type: "locked", message: `🔒 Печать не поддаётся. Нужно рун: ${this.relics.length}/3.` }; } room.event = "boss"; return { type: "boss", message: "👑 Три руны вспыхнули. Страж сокровищницы пробуждается!" }; }

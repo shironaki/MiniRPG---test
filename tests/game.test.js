@@ -243,6 +243,80 @@ describe("World", () => {
         expect(w.collectRelic()).toBe(null);
     });
 
+    it("coordinates match the connection graph exactly", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        const delta = { north: [0, 1], south: [0, -1], east: [1, 0], west: [-1, 0] };
+        for (const [room, exits] of Object.entries(w.connections)) {
+            for (const [dir, dest] of Object.entries(exits)) {
+                if (!dest) continue;
+                const a = w.coords[room];
+                const b = w.coords[dest];
+                expect(b.x - a.x).toBe(delta[dir][0]);
+                expect(b.y - a.y).toBe(delta[dir][1]);
+            }
+        }
+    });
+
+    it("every room has unique coordinates", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        const seen = new Set();
+        for (const id of Object.keys(w.rooms)) {
+            const c = w.coords[id];
+            expect(Boolean(c)).toBe(true);
+            const key = `${c.x},${c.y}`;
+            expect(seen.has(key)).toBe(false);
+            seen.add(key);
+        }
+    });
+
+    it("moveTo only allows adjacent, connected rooms (no teleport to the end)", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        // treasury is far from start: must be rejected
+        expect(w.moveTo("treasury").success).toBe(false);
+        expect(w.currentLocation).toBe("start");
+        // adjacent room is allowed
+        expect(w.moveTo("darkForest").success).toBe(true);
+        expect(w.currentLocation).toBe("darkForest");
+    });
+
+    it("directionTo resolves adjacency and marks rooms visited on entry", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        expect(w.directionTo("ancientHall")).toBe("north");
+        expect(w.directionTo("treasury")).toBe(null);
+        expect(w.rooms.ancientHall.visited).toBe(false);
+        w.move("north");
+        expect(w.rooms.ancientHall.visited).toBe(true);
+    });
+
+    it("fog of war reveals only the frontier around visited rooms", () => {
+        const { exports: g } = loadGame();
+        const w = new g.World();
+        expect(w.isVisible("start")).toBe(true);           // current
+        expect(w.isVisible("darkForest")).toBe(true);      // neighbour of start
+        expect(w.isVisible("treasury")).toBe(false);       // far, hidden
+        w.move("east"); // to darkForest
+        expect(w.isVisible("marsh")).toBe(true);           // now on frontier
+        expect(w.isVisible("treasury")).toBe(false);       // still hidden (2 steps away)
+    });
+
+    it("coords survive a save/resume round-trip via the prototype getter", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.world = new g.World();
+        game.quest = new g.Quest();
+        game.inventory = new g.Inventory(game.player);
+        game.saveSystem.save(game);
+        const game2 = new g.Game();
+        game2.resume();
+        expect(game2.world.coords.treasury.x).toBe(2);
+        expect(game2.world.directionTo("darkForest")).toBe("east");
+    });
+
     it("every room is reachable from start", () => {
         const { exports: g } = loadGame();
         const w = new g.World();

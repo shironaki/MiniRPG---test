@@ -456,42 +456,84 @@ function showWorld() {
 
 function renderWorld() {
 
-    const location =
-        game.world.getCurrentLocation();
+    const world = game.world;
+    const location = world.getCurrentLocation();
+    const coords = world.coords;
+
+    // Bounding box of the spatial layout.
+    const cells = Object.values(coords);
+    const minX = Math.min(...cells.map(c => c.x));
+    const maxX = Math.max(...cells.map(c => c.x));
+    const minY = Math.min(...cells.map(c => c.y));
+    const maxY = Math.max(...cells.map(c => c.y));
 
     const map = document.getElementById("miniMap");
     map.className = "worldMapGrid";
-    map.innerHTML = Object.values(game.world.rooms).map(room => `
-        <div class="mapRoom" data-room="${room.id}" title="${room.name}">
-            <span>${room.name}</span>
-            <small>${room.id === "treasury" ? `Руны ${game.world.relics.length}/3` : room.cleared ? "Исследовано" : room.explored ? "Открыто" : "Неизведано"}</small>
-        </div>
-    `).join("");
+    map.style.gridTemplateColumns = `repeat(${maxX - minX + 1}, 1fr)`;
+    map.style.gridTemplateRows = `repeat(${maxY - minY + 1}, 1fr)`;
 
+    map.innerHTML = Object.keys(world.rooms).map(id => {
+        const c = coords[id];
+        if (!c) return "";
+
+        const col = c.x - minX + 1;      // x → column (west→east)
+        const row = maxY - c.y + 1;      // y → row (north on top)
+        const pos = `grid-column:${col};grid-row:${row}`;
+
+        // Fog of war: undiscovered rooms are hidden behind "?".
+        if (!world.isVisible(id)) {
+            return `<div class="mapCell fog" style="${pos}">❓</div>`;
+        }
+
+        const room = world.rooms[id];
+        const isCurrent = id === world.currentLocation;
+        const reachable = world.directionTo(id) !== null; // adjacent to current
+        const locked = id === "treasury" && world.relics.length < 3;
+
+        const status = id === "treasury"
+            ? `🔒 Руны ${world.relics.length}/3`
+            : room.cleared ? "Исследовано"
+            : room.visited ? "Открыто"
+            : "Неизведано";
+
+        const classes = [
+            "mapCell", "mapRoom",
+            isCurrent ? "current" : "",
+            room.cleared ? "cleared" : "",
+            !room.visited && !isCurrent ? "undiscovered" : "",
+            reachable && !isCurrent ? "reachable" : "",
+            locked ? "locked" : ""
+        ].filter(Boolean).join(" ");
+
+        const clickable = reachable && !isCurrent;
+        const onclick = clickable ? ` onclick="moveToRoom('${id}')"` : "";
+
+        return `<div class="${classes}" data-room="${id}" style="${pos}" title="${room.name}"${onclick}>
+            <span>${room.name}</span>
+            <small>${status}</small>
+        </div>`;
+    }).join("");
 
     document
-        .getElementById(
-            "worldDescription"
-        )
+        .getElementById("worldDescription")
         .innerHTML = `
-
-            <h3>
-                ${location.name}
-            </h3>
-
-            <p>
-                ${location.description}
-            </p>
-
-            <p>✨ Руны для сокровищницы: ${game.world.relics.length}/3</p>
-
+            <h3>${location.name}</h3>
+            <p>${location.description}</p>
+            <p>✨ Руны для сокровищницы: ${world.relics.length}/3</p>
+            <p class="mapHint">👆 Нажми на соседнюю комнату — или используй стрелки / WASD / свайпы.</p>
         `;
+}
 
-    document.querySelectorAll("[data-room]").forEach(mapRoom => {
-        const room = game.world.rooms[mapRoom.dataset.room];
-        mapRoom.classList.toggle("current", mapRoom.dataset.room === game.world.currentLocation);
-        mapRoom.classList.toggle("cleared", Boolean(room.cleared));
-    });
+// Click-to-move on the map: one step to an adjacent, connected room only.
+function moveToRoom(id) {
+    const result = game.world.moveTo(id);
+    if (!result.success) {
+        addLog(result.message);
+        return;
+    }
+    addLog(`🗺️ Ты переместился: ${result.room.name}`);
+    renderLocation();
+    showScreen("locationScreen");
 }
 
 function inventoryUnequip(slot) {
