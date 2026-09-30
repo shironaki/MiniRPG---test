@@ -505,6 +505,183 @@ describe("Quest", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Dialogue (Stage C)
+// ---------------------------------------------------------------------------
+describe("Dialogue", () => {
+    function setup(g) {
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.gold = 100;
+        game.player.karma = 0;
+        game.updateUI = () => {};
+        const d = new g.Dialogue(g.GAME_DATA.dialogues.elder);
+        return { game, d };
+    }
+
+    it("starts at the root node with choices", () => {
+        const { exports: g } = loadGame();
+        const { d } = setup(g);
+        expect(d.current().speaker.includes("Староста")).toBe(true);
+        expect(d.choices().length).toBe(4);
+        expect(d.isEnded()).toBe(false);
+    });
+
+    it("mercy choice raises karma, grants xp, and is one-time", () => {
+        const { exports: g } = loadGame();
+        const { game, d } = setup(g);
+        d.choose(2, game); // -> prisoner
+        d.choose(0, game); // mercy: karma +15
+        expect(game.player.karma).toBe(15);
+        d.choose(0, game); // "Продолжить" -> root
+        d.choose(2, game); // -> prisoner again
+        const labels = d.choices().map(c => c.label);
+        expect(labels.some(l => l.includes("милосердие"))).toBe(false); // spent
+    });
+
+    it("greed choice lowers karma and gives gold", () => {
+        const { exports: g } = loadGame();
+        const { game, d } = setup(g);
+        d.choose(2, game); // -> prisoner
+        const before = game.player.gold;
+        d.choose(1, game); // greed: gold +40, karma -12
+        expect(game.player.gold).toBe(before + 40);
+        expect(game.player.karma).toBe(-12);
+    });
+
+    it("the farewell choice ends the conversation", () => {
+        const { exports: g } = loadGame();
+        const { game, d } = setup(g);
+        d.choose(3, game); // "Мне пора идти" -> end
+        expect(d.isEnded()).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Procedural dungeon (Stage C)
+// ---------------------------------------------------------------------------
+describe("Dungeon", () => {
+    // A deterministic rng cycling through fixed values.
+    function seq(values) { let i = 0; return () => values[(i++) % values.length]; }
+
+    it("generates the requested number of floors, capped by an elite", () => {
+        const { exports: g } = loadGame();
+        const d = g.Dungeon.generate(1, 5, seq([0.1, 0.6, 0.75, 0.9, 0.99]));
+        expect(d.depth).toBe(5);
+        expect(d.floors[d.floors.length - 1].type).toBe("elite");
+        expect(d.active).toBe(true);
+    });
+
+    it("maps rng bands to floor types", () => {
+        const { exports: g } = loadGame();
+        // Non-combat bands only, so no extra rng() is consumed picking an enemy:
+        // 0.6->chest, 0.75->trap, 0.85->rest ; final floor is always elite.
+        const d = g.Dungeon.generate(1, 5, seq([0.6, 0.75, 0.85, 0.6]));
+        expect(d.floors[0].type).toBe("chest");
+        expect(d.floors[1].type).toBe("trap");
+        expect(d.floors[2].type).toBe("rest");
+        expect(d.floors[3].type).toBe("chest");
+        expect(d.floors[4].type).toBe("elite");
+    });
+
+    it("combat floors carry a valid enemy key", () => {
+        const { exports: g } = loadGame();
+        const d = g.Dungeon.generate(1, 5, seq([0.1]));
+        const enemyFloor = d.floors.find(f => f.type === "enemy" || f.type === "elite");
+        expect(typeof g.createEnemy(enemyFloor.enemy, 1).name).toBe("string");
+    });
+
+    it("advance() clears the run after the last floor", () => {
+        const { exports: g } = loadGame();
+        const d = new g.Dungeon([{ n: 1, type: "rest" }, { n: 2, type: "elite", enemy: "goblin" }], 1);
+        d.advance();
+        expect(d.cleared).toBe(false);
+        d.advance();
+        expect(d.cleared).toBe(true);
+        expect(d.active).toBe(false);
+    });
+
+    it("resolves chest, rest and trap floors", () => {
+        const { exports: g } = loadGame();
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.gold = 0;
+        game.player.maxHealth = 100; game.player.health = 50;
+        game.updateUI = () => {};
+        game.dungeon = new g.Dungeon([], 2);
+
+        expect(game.resolveDungeonFloor({ n: 1, type: "chest" }).includes("💰")).toBe(true);
+        expect(game.player.gold > 0).toBe(true);
+
+        const healed = game.player.health;
+        game.resolveDungeonFloor({ n: 2, type: "rest" });
+        expect(game.player.health > healed).toBe(true);
+
+        game.player.health = 100;
+        game.resolveDungeonFloor({ n: 3, type: "trap" });
+        expect(game.player.health < 100).toBe(true);
+    });
+
+});
+
+// ---------------------------------------------------------------------------
+// Elemental combat (Stage B)
+// ---------------------------------------------------------------------------
+describe("Elements", () => {
+    function battleFor(g, type) {
+        const game = new g.Game();
+        game.player = new g.Player("A");
+        game.player.level = 5;
+        game.player.maxEnergy = 100;
+        game.player.energy = 100;
+        game.updateUI = () => {};
+        const enemy = g.createEnemy(type, 1);
+        game.battle = new g.Battle(game, enemy);
+        return { game, enemy, battle: game.battle };
+    }
+
+    it("assigns elements to enemies", () => {
+        const { exports: g } = loadGame();
+        expect(g.createEnemy("wolf", 1).element).toBe("nature");
+        expect(g.createEnemy("flameWarden", 1).element).toBe("fire");
+        expect(g.createEnemy("boss", 1).element).toBe("arcane");
+    });
+
+    it("computes rock-paper-scissors effectiveness", () => {
+        const { exports: g } = loadGame();
+        const { battle } = battleFor(g, "wolf");
+        expect(battle.effectiveness("fire", "nature").mult).toBe(1.5);
+        expect(battle.effectiveness("water", "nature").mult).toBe(0.6);
+        expect(battle.effectiveness("physical", "nature").mult).toBe(1);
+    });
+
+    it("reports weaknesses and none for arcane", () => {
+        const { exports: g } = loadGame();
+        expect(g.Battle.weaknessOf("nature")).toBe("fire");
+        expect(g.Battle.weaknessOf("physical")).toBe("arcane");
+        expect(g.Battle.weaknessOf("arcane") === null).toBe(true);
+    });
+
+    it("super-effective skills hit harder than resisted ones", () => {
+        const { exports: g } = loadGame();
+        // flameSlash (fire) vs a nature wolf should out-damage frostLance (water).
+        const superHit = battleFor(g, "wolf");
+        superHit.enemy.health = 9999; superHit.enemy.maxHealth = 9999;
+        const before1 = superHit.enemy.health;
+        superHit.battle.playerUseSkill("flameSlash");
+        const superDmg = before1 - superHit.enemy.health;
+
+        const weakHit = battleFor(g, "wolf");
+        weakHit.enemy.health = 9999; weakHit.enemy.maxHealth = 9999;
+        weakHit.enemy.statuses = [];
+        const before2 = weakHit.enemy.health;
+        weakHit.battle.playerUseSkill("frostLance");
+        const weakDmg = before2 - weakHit.enemy.health;
+
+        expect(superDmg > weakDmg).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Crafting / rarity
 // ---------------------------------------------------------------------------
 describe("Crafting", () => {

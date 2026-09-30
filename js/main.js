@@ -180,8 +180,65 @@ document
                         game.player,
                         game.quest
                     );
+
+            // Reset any prior branching conversation.
+            game.dialogue = null;
+            const chat = document.getElementById("npcChat");
+            const choicesEl = document.getElementById("npcChoices");
+            if (chat) chat.innerHTML = "";
+            if (choicesEl) choicesEl.innerHTML = "";
         }
     );
+
+
+// =============================================
+// ДИАЛОГ СО СТАРОСТОЙ (ВЕТВЯЩАЯСЯ БЕСЕДА)
+// =============================================
+
+document
+    .getElementById("npcTalkButton")
+    .addEventListener("click", () => {
+        const trees = (typeof GAME_DATA !== "undefined" && GAME_DATA.dialogues) || {};
+        if (!trees.elder) return;
+        game.dialogue = new Dialogue(trees.elder);
+        renderDialogue();
+    });
+
+function renderDialogue() {
+    const d = game.dialogue;
+    const chat = document.getElementById("npcChat");
+    const choicesEl = document.getElementById("npcChoices");
+    if (!chat || !choicesEl) return;
+
+    if (!d || d.isEnded()) {
+        chat.innerHTML = d ? `<p class="dialogueEnd">🧑 Староста кивает и возвращается к делам.</p>` : "";
+        choicesEl.innerHTML = "";
+        game.dialogue = null;
+        return;
+    }
+
+    const node = d.current();
+    chat.innerHTML = `<div class="dialogueNode"><strong>${node.speaker || ""}</strong><p>${node.text || ""}</p></div>`;
+    choicesEl.innerHTML = "";
+    d.choices().forEach((choice) => {
+        // Map the visible choice back to its real index in the node.
+        const realIndex = node.choices.indexOf(choice);
+        const btn = document.createElement("button");
+        btn.className = "dialogueChoice";
+        btn.textContent = choice.label;
+        btn.onclick = () => chooseDialogue(realIndex);
+        choicesEl.appendChild(btn);
+    });
+}
+
+function chooseDialogue(index) {
+    const d = game.dialogue;
+    if (!d) return;
+    const result = d.choose(index, game);
+    (result.messages || []).forEach(m => addLog(m));
+    game.updateUI();
+    renderDialogue();
+}
 
 
 // =============================================
@@ -254,6 +311,78 @@ document
 
 
 // =============================================
+// ВРАТА ИСПЫТАНИЙ (ПРОЦЕДУРНОЕ ПОДЗЕМЕЛЬЕ)
+// =============================================
+
+document
+    .getElementById("dungeonButton")
+    .addEventListener("click", () => game.enterDungeon());
+
+document
+    .getElementById("dungeonActionButton")
+    .addEventListener("click", dungeonAction);
+
+document
+    .getElementById("dungeonLeaveButton")
+    .addEventListener("click", () => {
+        if (game.dungeon) game.dungeon.active = false;
+        game.dungeon = null;
+        addLog("🏃 Ты покинул Врата испытаний.");
+        showScreen("villageScreen");
+        refreshMenus();
+    });
+
+const DUNGEON_ICONS = { enemy: "⚔️", elite: "👑", chest: "📦", trap: "⚠️", rest: "🔥" };
+
+function renderDungeon() {
+    const d = game.dungeon;
+    if (!d) return;
+    const track = document.getElementById("dungeonTrack");
+    if (track) {
+        track.innerHTML = d.floors.map((f, i) => {
+            const state = i < d.index ? "done" : i === d.index ? "current" : "upcoming";
+            const icon = i < d.index ? "✅" : (DUNGEON_ICONS[f.type] || "❔");
+            return `<span class="floorPip ${state}">${icon}</span>`;
+        }).join("");
+    }
+
+    const body = document.getElementById("dungeonBody");
+    const action = document.getElementById("dungeonActionButton");
+    const f = d.current();
+    if (!f) { if (body) body.innerHTML = ""; return; }
+
+    const els = { enemy: "Впереди притаился враг.", elite: "Путь стережёт элитный противник!", chest: "Ты видишь запертый сундук.", trap: "Пол усеян ловушками.", rest: "Тихий уголок для передышки." };
+    if (body) {
+        body.innerHTML = `
+            <div class="dungeonFloor">
+                <p class="dungeonDepth">Этаж ${f.n} из ${d.depth}</p>
+                <p class="dungeonEvent">${DUNGEON_ICONS[f.type] || "❔"} ${els[f.type] || ""}</p>
+            </div>`;
+    }
+    if (action) {
+        action.textContent = (f.type === "enemy" || f.type === "elite") ? "⚔️ Сразиться" : "➡️ Продолжить";
+    }
+}
+
+function dungeonAction() {
+    const d = game.dungeon;
+    if (!d || !d.active) return;
+    const f = d.current();
+    if (!f) return;
+    if (f.type === "enemy" || f.type === "elite") {
+        game.startDungeonBattle(f);
+        return;
+    }
+    addLog(game.resolveDungeonFloor(f));
+    if (game.player.isDead()) return; // gameOver already handled
+    d.advance();
+    game.updateUI();
+    if (d.cleared) game.finishDungeon();
+    else renderDungeon();
+}
+
+
+// =============================================
 // КУЗНИЦА
 // =============================================
 
@@ -285,6 +414,13 @@ function refreshMenus() {
         const p = game && game.player;
         const unlocked = p && typeof Craft !== "undefined" && Craft.essenceCount(p) > 0;
         forgeBtn.style.display = unlocked ? "" : "none";
+    }
+    const dungeonBtn = document.getElementById("dungeonButton");
+    if (dungeonBtn) {
+        const p = game && game.player;
+        // The trial gate opens once the hero is seasoned enough (level 3).
+        const unlocked = p && (p.level || 1) >= 3;
+        dungeonBtn.style.display = unlocked ? "" : "none";
     }
 }
 
@@ -1073,7 +1209,9 @@ function renderBattleSkills() {
         if (p.level < s.level) return; // not yet unlocked
         const btn = document.createElement("button");
         btn.className = "skillButton";
-        btn.innerHTML = `${s.emoji} ${s.name} <small>⚡${s.cost}</small>`;
+        const els = (typeof GAME_DATA !== "undefined" && GAME_DATA.elements) || {};
+        const elChip = s.element && els[s.element] ? `<em class="skillEl" title="${els[s.element].name}">${els[s.element].emoji}</em>` : "";
+        btn.innerHTML = `${s.emoji} ${s.name} ${elChip}<small>⚡${s.cost}</small>`;
         btn.title = s.desc || "";
         btn.disabled = (p.energy || 0) < s.cost;
         btn.onclick = () => useSkill(id);

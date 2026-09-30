@@ -12,6 +12,7 @@ function createEnemy(type, level = 1) {
     const d = table[type] || table.goblin || fallback;
     const enemy = new Enemy(d.name, d.health + scale * 14, d.attack + scale * 3, d.defense + scale, d.experience + scale * 10, d.gold + scale * 8, d.emoji);
     enemy.key = key;
+    enemy.element = d.element || "physical";
     if (d.inflict) { enemy.inflict = d.inflict; enemy.inflictChance = d.inflictChance || 0; }
     return enemy;
 }

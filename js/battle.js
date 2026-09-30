@@ -18,6 +18,25 @@ class Battle {
         if (!this.enemy.statuses) this.enemy.statuses = [];
     }
 
+    // --- Elemental affinities -------------------------------------------
+
+    // Returns { mult, label } for an attacking element vs a defending element.
+    // label is "super" (×1.5), "weak" (×0.6) or "" (neutral).
+    effectiveness(atkEl, defEl) {
+        const chart = (typeof GAME_DATA !== "undefined" && GAME_DATA.elementChart) || {};
+        if (!atkEl || !defEl) return { mult: 1, label: "" };
+        if (chart[atkEl] === defEl) return { mult: 1.5, label: "super" };
+        if (chart[defEl] === atkEl) return { mult: 0.6, label: "weak" };
+        return { mult: 1, label: "" };
+    }
+
+    // The element that is super-effective against a combatant, or null.
+    static weaknessOf(element) {
+        const chart = (typeof GAME_DATA !== "undefined" && GAME_DATA.elementChart) || {};
+        for (const atk of Object.keys(chart)) if (chart[atk] === element) return atk;
+        return null;
+    }
+
     // --- Status-effect engine -------------------------------------------
 
     applyStatus(target, type, turns) {
@@ -30,7 +49,7 @@ class Battle {
     // Apply damage-over-time and count down durations at the start of a
     // combatant's turn. Returns { lines, stunned }.
     tickStatuses(target, meta) {
-        const out = { lines: [], stunned: false };
+        const out = { lines: [], stunned: false, slowed: false };
         if (!target.statuses || !target.statuses.length) return out;
         const defs = (typeof GAME_DATA !== "undefined" && GAME_DATA.statuses) || {};
         const remaining = [];
@@ -42,6 +61,7 @@ class Battle {
                 target.health = Math.max(0, target.health - def.damage);
                 out.lines.push(`${def.emoji || "☠️"} ${meta.name} теряет ${def.damage} HP от «${def.name || s.type}».`);
             }
+            if (def.slow) out.slowed = true;
             s.turns--;
             if (s.turns > 0) remaining.push(s);
         }
@@ -218,9 +238,12 @@ class Battle {
             this.player.health += amount;
             this.log(`${skill.emoji} ${skill.name}: +${amount} HP.`);
         } else {
-            const raw = Math.round(this.player.attack * (skill.mult || 1)) + Math.floor(Math.random() * 6);
+            let raw = Math.round(this.player.attack * (skill.mult || 1)) + Math.floor(Math.random() * 6);
+            const eff = this.effectiveness(skill.element, this.enemy.element);
+            raw = Math.round(raw * eff.mult);
             const dmg = this.enemy.takeDamage(raw);
-            this.log(`${skill.emoji} ${skill.name}: ${dmg} урона.`);
+            const note = eff.label === "super" ? " ✨ Супер-эффективно!" : eff.label === "weak" ? " 🪨 Слабый эффект…" : "";
+            this.log(`${skill.emoji} ${skill.name}: ${dmg} урона.${note}`);
             if (skill.status && (skill.chance === undefined || Math.random() < skill.chance)) {
                 this.applyStatus(this.enemy, skill.status, skill.duration || 2);
                 const def = ((typeof GAME_DATA !== "undefined" && GAME_DATA.statuses) || {})[skill.status] || {};
@@ -275,6 +298,13 @@ class Battle {
 
         if (tick.stunned) {
             this.log(`💫 ${this.enemy.name} оглушён и пропускает ход.`);
+            this.game.updateUI();
+            return;
+        }
+
+        // A chilled foe sometimes moves too slowly to strike.
+        if (tick.slowed && Math.random() < 0.35) {
+            this.log(`❄️ ${this.enemy.name} скован холодом и медлит.`);
             this.game.updateUI();
             return;
         }

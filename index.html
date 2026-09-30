@@ -140,6 +140,10 @@
                     🔨 Кузница
                 </button>
 
+                <button id="dungeonButton">
+                    🚪 Врата испытаний
+                </button>
+
                 <button id="inventoryButton">
                     🎒 Инвентарь
                 </button>
@@ -333,6 +337,13 @@
 
             <div id="npcDialogue"></div>
 
+            <div id="npcChat"></div>
+            <div id="npcChoices"></div>
+
+            <button id="npcTalkButton">
+                💬 Побеседовать
+            </button>
+
             <button id="npcQuestButton">
                 📜 Получить квест
             </button>
@@ -377,6 +388,28 @@
 
             <button id="perkBackButton">
                 🔙 Назад
+            </button>
+
+        </section>
+
+
+        <!-- DUNGEON -->
+
+        <section
+            id="dungeonScreen"
+            class="screen hidden"
+        >
+
+            <h2>🚪 ВРАТА ИСПЫТАНИЙ</h2>
+
+            <div id="dungeonTrack"></div>
+
+            <div id="dungeonBody"></div>
+
+            <button id="dungeonActionButton"></button>
+
+            <button id="dungeonLeaveButton">
+                🏃 Покинуть подземелье
             </button>
 
         </section>
@@ -463,6 +496,8 @@
 <script src="js/data.js"></script>
 <script src="js/item.js"></script>
 <script src="js/craft.js"></script>
+<script src="js/dungeon.js"></script>
+<script src="js/dialogue.js"></script>
 <script src="js/ally.js"></script>
 <script src="js/player.js"></script>
 <script src="js/inventory.js"></script>

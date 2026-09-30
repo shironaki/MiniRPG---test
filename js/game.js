@@ -16,6 +16,8 @@ class Game {
 
         this.battle = null;
 
+        this.dungeon = null;
+
         this.gameEnded = false;
 
         this.saveSystem = new SaveSystem();
@@ -238,6 +240,72 @@ class Game {
     }
 
 
+    // --- Procedural dungeon ("Врата испытаний") -------------------------
+
+    enterDungeon() {
+        if (this.gameEnded) return;
+        this.dungeon = Dungeon.generate(this.player.level);
+        addLog("🚪 Ты входишь во Врата испытаний…");
+        showScreen("dungeonScreen");
+        if (typeof renderDungeon === "function") renderDungeon();
+    }
+
+    // Begin the combat floor: a scaled foe flagged as a dungeon encounter so
+    // enemyDefeated() advances the run instead of returning to the map.
+    startDungeonBattle(floor) {
+        const level = this.player.level + floor.n + (floor.type === "elite" ? 2 : 0);
+        const enemy = createEnemy(floor.enemy, level);
+        enemy.fromDungeon = true;
+        if (floor.type === "elite") { enemy.name = "Элитный " + enemy.name; enemy.isElite = true; }
+        this.startBattle(enemy);
+    }
+
+    // Resolve a non-combat floor immediately; returns a log message. May end
+    // the game if a trap is fatal.
+    resolveDungeonFloor(floor) {
+        const lvl = this.dungeon ? this.dungeon.level : this.player.level;
+        if (floor.type === "chest") {
+            const gold = 20 + lvl * 6;
+            this.player.gold += gold;
+            let msg = `📦 Сундук на этаже ${floor.n}: +${gold} 💰`;
+            if (typeof Craft !== "undefined" && Math.random() < 0.5) {
+                this.player.addItem(Craft.essence());
+                msg += " и 🔩 эссенция ковки";
+            }
+            return msg + ".";
+        }
+        if (floor.type === "trap") {
+            const dmg = 6 + lvl * 2;
+            const taken = this.player.takeDamage(dmg);
+            let msg = `⚠️ Ловушка на этаже ${floor.n}: −${taken} HP.`;
+            if (this.player.isDead()) { this.gameOver(); msg += " Ты пал в подземелье…"; }
+            return msg;
+        }
+        if (floor.type === "rest") {
+            const heal = Math.floor(this.player.maxHealth * 0.25);
+            const before = this.player.health;
+            this.player.health = Math.min(this.player.maxHealth, this.player.health + heal);
+            return `🔥 Привал на этаже ${floor.n}: +${this.player.health - before} HP.`;
+        }
+        return `🌙 Этаж ${floor.n}: тишина.`;
+    }
+
+    // Reward and close a completed run.
+    finishDungeon() {
+        if (!this.dungeon) return;
+        const lvl = this.dungeon.level;
+        const bonusGold = 60 + lvl * 20;
+        this.player.gold += bonusGold;
+        const xpMsgs = this.player.addExperience(40 + lvl * 15);
+        addLog(`🏁 Врата испытаний пройдены! Награда: +${bonusGold} 💰 и опыт.`);
+        if (typeof Craft !== "undefined") { this.player.addItem(Craft.essence()); addLog("🔩 Ты выносишь эссенцию ковки как трофей."); }
+        xpMsgs.forEach(m => addLog(m));
+        this.dungeon.active = false;
+        this.updateUI();
+        showScreen("villageScreen");
+        if (typeof refreshMenus === "function") refreshMenus();
+    }
+
     startBattle(enemy) {
 
         if (this.gameEnded) {
@@ -301,12 +369,23 @@ class Game {
             energyHtml = `<div class="bar energyBar"><div class="energy" style="width:${epct}%"></div></div>
             <p class="fighterEnergy">⚡ ${opts.energy} / ${opts.maxEnergy}</p>`;
         }
+        let elementHtml = "";
+        if (opts.element) {
+            const els = (typeof GAME_DATA !== "undefined" && GAME_DATA.elements) || {};
+            const el = els[opts.element] || {};
+            const weakKey = (typeof Battle !== "undefined") ? Battle.weaknessOf(opts.element) : null;
+            const weak = weakKey && els[weakKey]
+                ? ` <span class="weakTag" title="Уязвим к ${els[weakKey].name}">уязвим: ${els[weakKey].emoji}</span>`
+                : "";
+            elementHtml = `<p class="fighterElement">${el.emoji || ""} ${el.name || ""}${weak}</p>`;
+        }
         return `
             <div class="fighterArt ${opts.side}">${art}${allyBadge}</div>
             <div class="fighterName">${opts.emoji} ${opts.name}</div>
             <div class="bar"><div class="health" style="width:${pct}%"></div></div>
             <p class="fighterHp">❤️ ${opts.health} / ${opts.maxHealth}</p>
             ${energyHtml}
+            ${elementHtml}
             ${this.statusChips(opts.statuses)}`;
     }
 
@@ -342,6 +421,7 @@ class Game {
                 sprite: this.spriteFor("enemy", enemy.key),
                 health: enemy.health,
                 maxHealth: enemy.maxHealth,
+                element: enemy.element,
                 statuses: enemy.statuses
             });
             enemyEl.classList.remove("hitFlash");
@@ -367,6 +447,23 @@ class Game {
             if (e.completed) addLog(`🏆 Задание «${d.title}» выполнено! Забери награду в журнале.`);
             else addLog(`📜 «${d.title}»: ${e.progress}/${d.objective.count}`);
         });
+    }
+
+    /*
+    ========================================
+    ЭТАЖ ПОДЗЕМЕЛЬЯ ПРОЙДЕН (ВРАТА ИСПЫТАНИЙ)
+    ========================================
+    */
+    if (this.dungeon && this.dungeon.active && enemy.fromDungeon) {
+        this.battle = null;
+        this.dungeon.advance();
+        this.updateUI();
+        if (this.dungeon.cleared) {
+            setTimeout(() => this.finishDungeon(), 450);
+        } else {
+            setTimeout(() => { showScreen("dungeonScreen"); if (typeof renderDungeon === "function") renderDungeon(); }, 450);
+        }
+        return;
     }
 
     /*
@@ -486,6 +583,16 @@ class Game {
     escapeBattle() {
         this.battle = null;
         this.updateUI();
+        // Fleeing inside the trial gate abandons the whole run.
+        if (this.dungeon && this.dungeon.active) {
+            this.dungeon.active = false;
+            addLog("🏃 Ты покидаешь Врата испытаний.");
+            setTimeout(() => {
+                showScreen("villageScreen");
+                if (typeof refreshMenus === "function") refreshMenus();
+            }, 450);
+            return;
+        }
         setTimeout(() => {
             showScreen("locationScreen");
             renderLocation();

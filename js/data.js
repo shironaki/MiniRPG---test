@@ -14,13 +14,13 @@ const GAME_DATA = {
     // ---- Enemies (base stats at level 1; scaling applied in createEnemy).
     // `inflict`/`inflictChance` let a foe apply a status effect on a hit. ----
     enemies: {
-        goblin:       { name: "Гоблин",          health: 52,  attack: 11, defense: 3,  experience: 32,  gold: 28,  emoji: "👹" },
-        wolf:         { name: "Волк",            health: 68,  attack: 14, defense: 4,  experience: 44,  gold: 38,  emoji: "🐺", inflict: "poison", inflictChance: 0.30 },
-        skeleton:     { name: "Скелет",          health: 84,  attack: 17, defense: 6,  experience: 60,  gold: 50,  emoji: "💀" },
-        tideWraith:   { name: "Дух прилива",     health: 120, attack: 19, defense: 7,  experience: 110, gold: 80,  emoji: "🌊", inflict: "poison", inflictChance: 0.40 },
-        flameWarden:  { name: "Страж пламени",   health: 130, attack: 21, defense: 8,  experience: 125, gold: 90,  emoji: "🔥", inflict: "burn", inflictChance: 0.45 },
-        boneColossus: { name: "Костяной колосс", health: 145, attack: 22, defense: 9,  experience: 140, gold: 100, emoji: "☠️", inflict: "burn", inflictChance: 0.35 },
-        boss:         { name: "Страж сокровища", health: 190, attack: 24, defense: 10, experience: 220, gold: 250, emoji: "👑", inflict: "burn", inflictChance: 0.30 }
+        goblin:       { name: "Гоблин",          health: 52,  attack: 11, defense: 3,  experience: 32,  gold: 28,  emoji: "👹", element: "physical" },
+        wolf:         { name: "Волк",            health: 68,  attack: 14, defense: 4,  experience: 44,  gold: 38,  emoji: "🐺", element: "nature",   inflict: "poison", inflictChance: 0.30 },
+        skeleton:     { name: "Скелет",          health: 84,  attack: 17, defense: 6,  experience: 60,  gold: 50,  emoji: "💀", element: "physical" },
+        tideWraith:   { name: "Дух прилива",     health: 120, attack: 19, defense: 7,  experience: 110, gold: 80,  emoji: "🌊", element: "water",    inflict: "poison", inflictChance: 0.40 },
+        flameWarden:  { name: "Страж пламени",   health: 130, attack: 21, defense: 8,  experience: 125, gold: 90,  emoji: "🔥", element: "fire",     inflict: "burn", inflictChance: 0.45 },
+        boneColossus: { name: "Костяной колосс", health: 145, attack: 22, defense: 9,  experience: 140, gold: 100, emoji: "☠️", element: "physical", inflict: "burn", inflictChance: 0.35 },
+        boss:         { name: "Страж сокровища", health: 190, attack: 24, defense: 10, experience: 220, gold: 250, emoji: "👑", element: "arcane",   inflict: "burn", inflictChance: 0.30 }
     },
 
     // ---- Status effects. `damage` is per-turn (bypasses defense); stun skips
@@ -28,16 +28,31 @@ const GAME_DATA = {
     statuses: {
         poison: { name: "Яд",         emoji: "🟢", damage: 6 },
         burn:   { name: "Горение",    emoji: "🔥", damage: 9 },
-        stun:   { name: "Оглушение",  emoji: "💫" }
+        stun:   { name: "Оглушение",  emoji: "💫" },
+        chill:  { name: "Холод",      emoji: "❄️", damage: 4, slow: true }
     },
+
+    // ---- Elemental affinities. `elementChart[A] === B` means A is strong
+    // against B (×1.5 damage); the reverse is resisted (×0.6). physical and
+    // arcane sit outside the fire/water/nature triangle. ----
+    elements: {
+        physical: { name: "Физический", emoji: "⚔️" },
+        fire:     { name: "Огонь",      emoji: "🔥" },
+        water:    { name: "Вода",       emoji: "🌊" },
+        nature:   { name: "Природа",    emoji: "🌿" },
+        arcane:   { name: "Магия",      emoji: "🔮" }
+    },
+    elementChart: { fire: "nature", nature: "water", water: "fire", arcane: "physical" },
 
     // ---- Active skills, unlocked by level, costing energy (⚡). ----
     skills: {
-        powerStrike: { name: "Мощный удар",       emoji: "💥", cost: 12, level: 1, type: "attack", mult: 1.8, desc: "Сильный удар (×1.8 урона)." },
+        powerStrike: { name: "Мощный удар",       emoji: "💥", cost: 12, level: 1, type: "attack", element: "physical", mult: 1.8, desc: "Сильный физический удар (×1.8 урона)." },
         secondWind:  { name: "Второе дыхание",    emoji: "💚", cost: 16, level: 2, type: "heal",   heal: 30,  desc: "Восстановить 30 HP." },
-        poisonStab:  { name: "Ядовитый клинок",   emoji: "🗡️", cost: 14, level: 2, type: "attack", mult: 0.8, status: "poison", duration: 3, desc: "Урон + яд на 3 хода." },
-        shieldBash:  { name: "Оглушающий удар",   emoji: "🌀", cost: 15, level: 3, type: "attack", mult: 1.0, status: "stun", duration: 1, chance: 0.6, desc: "Урон + шанс оглушить врага." },
-        flameSlash:  { name: "Огненный разрез",   emoji: "🔥", cost: 18, level: 4, type: "attack", mult: 1.2, status: "burn", duration: 3, desc: "Урон + горение на 3 хода." }
+        poisonStab:  { name: "Ядовитый клинок",   emoji: "🗡️", cost: 14, level: 2, type: "attack", element: "nature",  mult: 0.8, status: "poison", duration: 3, desc: "Урон природой + яд на 3 хода." },
+        shieldBash:  { name: "Оглушающий удар",   emoji: "🌀", cost: 15, level: 3, type: "attack", element: "physical", mult: 1.0, status: "stun", duration: 1, chance: 0.6, desc: "Урон + шанс оглушить врага." },
+        frostLance:  { name: "Ледяное копьё",     emoji: "❄️", cost: 16, level: 3, type: "attack", element: "water",   mult: 1.3, status: "chill", duration: 2, desc: "Урон водой + холод на 2 хода." },
+        flameSlash:  { name: "Огненный разрез",   emoji: "🔥", cost: 18, level: 4, type: "attack", element: "fire",    mult: 1.2, status: "burn", duration: 3, desc: "Урон огнём + горение на 3 хода." },
+        arcaneBolt:  { name: "Чародейский снаряд", emoji: "🔮", cost: 20, level: 5, type: "attack", element: "arcane",  mult: 1.5, desc: "Мощный магический снаряд (×1.5)." }
     },
 
     // ---- Items (shop stock and loot) ----
@@ -114,6 +129,67 @@ const GAME_DATA = {
         { id: "criticalEye",    name: "Меткий глаз",   emoji: "🎯", maxRank: 3, crit: 0.05,    desc: "+5% к шансу крита за ранг." },
         { id: "treasureHunter", name: "Кладоискатель", emoji: "💰", maxRank: 3, gold: 0.15,    desc: "+15% золота с врагов за ранг." }
     ],
+
+    // ---- Branching dialogue trees (see js/dialogue.js). Choices with an
+    // `effect` change karma / gold / xp through the Game. `once` hides a choice
+    // after it is picked so rewards can't be farmed. ----
+    dialogues: {
+        elder: {
+            start: "root",
+            nodes: {
+                root: {
+                    speaker: "🧑 Староста",
+                    text: "Подземелье под нами древнее самой деревни. О чём ты хочешь узнать?",
+                    choices: [
+                        { label: "Расскажи о трёх рунах.", next: "runes" },
+                        { label: "Что было здесь раньше?", next: "history" },
+                        { label: "Как поступить с пленным гоблином?", next: "prisoner" },
+                        { label: "Мне пора идти.", effect: { end: true } }
+                    ]
+                },
+                runes: {
+                    speaker: "🧑 Староста",
+                    text: "Три руны — прилива, пламени и праха — держат печать сокровищницы. Собери их, и Страж пробудится.",
+                    choices: [
+                        { label: "Понял. А ещё?", next: "root" },
+                        { label: "Спасибо, этого достаточно.", effect: { end: true } }
+                    ]
+                },
+                history: {
+                    speaker: "🧑 Староста",
+                    text: "Когда-то тут ковали оружие для целого края. Жадность разбудила то, что спало под кузней… и всё поглотила тьма.",
+                    choices: [
+                        { label: "Возьми монету на храм. (−15 золота)", once: true, effect: { gold: -15, karma: 8 }, next: "grateful" },
+                        { label: "Вернуться к началу.", next: "root" }
+                    ]
+                },
+                grateful: {
+                    speaker: "🧑 Староста",
+                    text: "Ты добр к нам, странник. Деревня этого не забудет.",
+                    choices: [{ label: "Продолжить.", next: "root" }]
+                },
+                prisoner: {
+                    speaker: "🧑 Староста",
+                    text: "Мы поймали одного у ворот. Одни хотят суда, другие — выкупа. Решать тебе.",
+                    choices: [
+                        { label: "Проявить милосердие — отпустить.", once: true, effect: { karma: 15, xp: 20 }, next: "mercy" },
+                        { label: "Забрать его золото и прогнать.", once: true, effect: { karma: -12, gold: 40 }, next: "greed" },
+                        { label: "Я подумаю об этом.", next: "root" }
+                    ]
+                },
+                mercy: {
+                    speaker: "🧑 Староста",
+                    text: "Милосердие — редкая сила. Возможно, однажды он вспомнит о ней.",
+                    choices: [{ label: "Продолжить.", next: "root" }]
+                },
+                greed: {
+                    speaker: "🧑 Староста",
+                    text: "Что ж… золото есть золото. Но взгляды жителей стали холоднее.",
+                    choices: [{ label: "Продолжить.", next: "root" }]
+                }
+            }
+        }
+    },
 
     zones: {
         start:         { accent: "#b5892f", biome: "camp" },

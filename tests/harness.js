@@ -22,6 +22,8 @@ const LOGIC_FILES = [
     "data.js",
     "item.js",
     "craft.js",
+    "dungeon.js",
+    "dialogue.js",
     "ally.js",
     "player.js",
     "inventory.js",
@@ -41,7 +43,7 @@ const LOGIC_FILES = [
 const EXPORTED = [
     "GAME_DATA", "Item", "ITEMS", "RARITY", "Craft", "Ally", "ALLIES", "Player", "Inventory", "Enemy", "createEnemy",
     "Chest", "Trap", "Room", "Shop", "NPC", "Quest", "QuestJournal", "World",
-    "Battle", "SaveSystem", "Game"
+    "Battle", "Dungeon", "Dialogue", "SaveSystem", "Game"
 ];
 
 // ---- Minimal browser shims -------------------------------------------------
@@ -180,7 +182,7 @@ function loadFullGame(opts = {}) {
     sandbox.globalThis = sandbox;
 
     const ordered = [
-        "data.js", "item.js", "craft.js", "ally.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
+        "data.js", "item.js", "craft.js", "dungeon.js", "dialogue.js", "ally.js", "player.js", "inventory.js", "enemy.js", "chest.js", "trap.js",
         "room.js", "shop.js", "npc.js", "quest.js", "world.js", "battle.js",
         "save.js", "audio.js", "game.js", "main.js"
     ];
@@ -189,7 +191,7 @@ function loadFullGame(opts = {}) {
         .map((file) => fs.readFileSync(path.join(JS_DIR, file), "utf8"))
         .join("\n;\n");
 
-    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings, resolveWanderer, recruitHere, declineRecruit, renderBattleSkills, useSkill, acceptQuest, claimQuest, renderQuest, refreshMenus, showScreen, openPerks, renderPerks, buyPerk, openForge, renderForge, upgradeItem, Craft, RARITY, ITEMS, Item };";
+    const uiExports = "\n;globalThis.__ui_exports = { game, renderWorld, moveToRoom, roomBadge, showWorld, renderLocation, sfx, openChest, openSettings, renderSettings, resolveWanderer, recruitHere, declineRecruit, renderBattleSkills, useSkill, acceptQuest, claimQuest, renderQuest, refreshMenus, showScreen, openPerks, renderPerks, buyPerk, openForge, renderForge, upgradeItem, renderDungeon, dungeonAction, renderDialogue, chooseDialogue, Craft, RARITY, ITEMS, Item, Dungeon, Dialogue, GAME_DATA };";
 
     vm.createContext(sandbox);
     vm.runInContext(source + uiExports, sandbox, { filename: "minirpg.full.js" });

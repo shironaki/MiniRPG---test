@@ -209,6 +209,58 @@ describe("Integration: perks UI", () => {
     });
 });
 
+describe("Integration: dialogue UI", () => {
+    it("opens a branching talk and applies a choice's consequence", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        ui.game.player.karma = 0;
+        ui.game.dialogue = new ui.Dialogue(ui.GAME_DATA.dialogues.elder);
+        ui.renderDialogue();
+        expect(sandbox.document.getElementById("npcChat").innerHTML.includes("Староста")).toBe(true);
+        expect(ui.game.dialogue.choices().length).toBe(4);
+
+        ui.chooseDialogue(2); // -> prisoner
+        ui.chooseDialogue(0); // mercy -> karma +15
+        expect(ui.game.player.karma).toBe(15);
+    });
+});
+
+describe("Integration: dungeon UI", () => {
+    it("opens the trial gate, renders the track, and advances a rest floor", () => {
+        const { exports: ui, sandbox } = loadFullGame();
+        ui.game.start();
+        ui.game.player.level = 5;
+        ui.refreshMenus();
+        expect(sandbox.document.getElementById("dungeonButton").style.display).toBe("");
+
+        ui.game.enterDungeon();
+        expect(ui.game.dungeon.active).toBe(true);
+        // Inject a deterministic, non-combat-first layout.
+        ui.game.dungeon.floors = [{ n: 1, type: "rest" }, { n: 2, type: "elite", enemy: "goblin" }];
+        ui.game.dungeon.index = 0;
+        ui.renderDungeon();
+        expect(sandbox.document.getElementById("dungeonTrack").innerHTML.length > 0).toBe(true);
+
+        const hp0 = ui.game.player.health = 10;
+        ui.game.player.maxHealth = 100;
+        ui.dungeonAction(); // resolves rest -> advances to floor 2
+        expect(ui.game.player.health > hp0).toBe(true);
+        expect(ui.game.dungeon.index).toBe(1);
+    });
+
+    it("finishDungeon rewards gold and closes the run", () => {
+        const { exports: ui } = loadFullGame();
+        ui.game.start();
+        ui.game.player.gold = 0;
+        ui.game.dungeon = new ui.Dungeon([{ n: 1, type: "elite", enemy: "goblin" }], 3);
+        ui.game.dungeon.index = 1;
+        ui.game.dungeon.cleared = true;
+        ui.game.finishDungeon();
+        expect(ui.game.player.gold > 0).toBe(true);
+        expect(ui.game.dungeon.active).toBe(false);
+    });
+});
+
 describe("Integration: forge UI", () => {
     it("reveals the forge once essence is held and upgrades an item via UI", () => {
         const { exports: ui, sandbox } = loadFullGame();
