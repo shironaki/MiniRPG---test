@@ -37,11 +37,16 @@ class Player2D {
     // stop instead of teleporting — it feels grounded rather than "floaty".
     update(dt, axis, tilemap) {
         const ax = axis.x, ay = axis.y;
-        const hasInput = (ax !== 0 || ay !== 0);
+        const inputLen = Math.hypot(ax, ay);
+        const hasInput = inputLen > 0.001;
 
-        // Desired velocity (normalised so diagonals aren't faster).
-        let dvx = ax, dvy = ay;
-        if (hasInput) { const len = Math.hypot(dvx, dvy) || 1; dvx /= len; dvy /= len; }
+        // Desired velocity: preserve analog magnitude up to 1.0 (so slight tilt allows walking slowly)
+        let mag = Math.min(1, inputLen);
+        let dvx = 0, dvy = 0;
+        if (hasInput) {
+            dvx = (ax / inputLen) * mag;
+            dvy = (ay / inputLen) * mag;
+        }
 
         const approach = (cur, tgt, step) =>
             cur < tgt ? Math.min(cur + step, tgt) : Math.max(cur - step, tgt);

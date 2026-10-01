@@ -166,12 +166,12 @@
         return g;
     }
 
-    // ---- object tiles (sit on a ground base) --------------------------------
-    function treeTile(baseGrass, trunk, trunkSh, leaf, leafHi, leafSh, big, neighbors) {
+    // ---- tree & forest tiles (sit on a ground base) ------------------------
+    function oakTreeTile(baseGrass, trunk, trunkSh, leaf, leafHi, leafSh, neighbors) {
         const g = grass(baseGrass, "#356b33", "#4a8c42", 0);
 
         if (neighbors && (neighbors.up || neighbors.down || neighbors.left || neighbors.right)) {
-            // Connected forest canopy - seamless, lush woodland
+            // Connected broadleaf forest canopy - seamless, lush woodland
             const foliageDark = "#1c5025", foliageMid = leaf, foliageLight = leafHi, foliageSh = leafSh;
             rect(g, 0, 0, N, N, foliageMid);
             rect(g, 0, 0, N, 3, foliageLight);
@@ -219,31 +219,6 @@
             return g;
         }
 
-        if (big) {
-            // Pine / Spruce tree (tree2)
-            const pineDark = "#0f3016", pineMid = "#1a4d25", pineHi = "#2c7d3e", pineTop = "#3fa055";
-            // Ground shadow
-            rect(g, 4, 14, 8, 2, "#1d3e21");
-            rect(g, 5, 13, 6, 1, "#1d3e21");
-            // Trunk
-            rect(g, 7, 10, 2, 5, trunk);
-            rect(g, 8, 10, 1, 5, trunkSh);
-            // Tier 3 (bottom boughs)
-            rect(g, 2, 10, 12, 3, pineDark);
-            rect(g, 3, 9, 10, 2, pineMid);
-            rect(g, 4, 9, 4, 1, pineHi);
-            // Tier 2 (mid boughs)
-            rect(g, 3, 6, 10, 3, pineDark);
-            rect(g, 4, 5, 8, 2, pineMid);
-            rect(g, 5, 5, 3, 1, pineHi);
-            // Tier 1 (top crown)
-            rect(g, 5, 2, 6, 3, pineDark);
-            rect(g, 6, 1, 4, 2, pineMid);
-            rect(g, 7, 0, 2, 2, pineTop);
-            px(g, 7, 0, "#60c878");
-            return g;
-        }
-
         // Standalone detailed pixel-art oak tree (tree)
         // Soft elliptical ground shadow
         rect(g, 3, 14, 10, 2, "#244d26");
@@ -273,6 +248,92 @@
         rect(g, 7, 8, 6, 3, leafSh);
         rect(g, 11, 5, 3, 4, leafSh);
         px(g, 8, 10, "#163d1e"); px(g, 9, 10, "#163d1e");
+
+        return g;
+    }
+
+    function pineTreeTile(baseGrass, trunk, trunkSh, pineDark, pineMid, pineHi, pineTop, neighbors) {
+        const g = grass(baseGrass, "#26502b", "#387040", 0);
+
+        if (neighbors && (neighbors.up || neighbors.down || neighbors.left || neighbors.right)) {
+            // Connected coniferous pine/spruce forest
+            rect(g, 0, 0, N, N, pineMid);
+            rect(g, 0, 0, N, 3, pineHi);
+            rect(g, 0, N - 3, N, 3, pineDark);
+
+            // Tiered needle cluster texturing
+            for (let y = 1; y < N - 1; y += 3) {
+                for (let x = 1; x < N - 1; x += 3) {
+                    px(g, x + 1, y, pineTop);
+                    px(g, x, y + 1, pineHi);
+                    px(g, x + 2, y + 1, pineDark);
+                    px(g, x + 1, y + 2, pineDark);
+                }
+            }
+
+            if (!neighbors.up) {
+                // Pointed evergreen spire crowns along top edge
+                rect(g, 0, 0, N, 2, baseGrass);
+                // Three little conical needle peaks
+                px(g, 3, 0, pineTop); px(g, 2, 1, pineHi); px(g, 3, 1, pineTop); px(g, 4, 1, pineMid);
+                px(g, 8, 0, pineTop); px(g, 7, 1, pineHi); px(g, 8, 1, pineTop); px(g, 9, 1, pineMid);
+                px(g, 13, 0, pineTop); px(g, 12, 1, pineHi); px(g, 13, 1, pineTop); px(g, 14, 1, pineMid);
+            }
+            if (!neighbors.down) {
+                // Pine trunks, needle shade and undergrowth on ground
+                rect(g, 0, N - 4, N, 4, baseGrass);
+                rect(g, 2, N - 5, 12, 2, pineDark);
+                // Pine trunk with bark texture
+                rect(g, 7, 9, 2, 6, trunk);
+                px(g, 7, 9, "#6b4a28");
+                px(g, 8, 10, trunkSh);
+                px(g, 6, 14, trunk); px(g, 9, 14, trunkSh); // roots
+                // Shadow
+                rect(g, 4, 14, 8, 2, "#18331b");
+            }
+            if (!neighbors.left) {
+                rect(g, 0, 1, 2, N - 2, pineHi);
+                px(g, 0, 0, baseGrass); px(g, 0, N - 1, baseGrass);
+            }
+            if (!neighbors.right) {
+                rect(g, N - 2, 1, 2, N - 2, pineDark);
+                px(g, N - 1, 0, baseGrass); px(g, N - 1, N - 1, baseGrass);
+            }
+            return g;
+        }
+
+        // Standalone detailed pixel-art Spruce / Pine tree (tree2)
+        // Ground shadow
+        rect(g, 3, 14, 10, 2, "#18331b");
+        rect(g, 4, 13, 8, 1, "#18331b");
+
+        // Textured trunk
+        rect(g, 7, 10, 2, 5, trunk);
+        rect(g, 7, 10, 1, 5, "#6b4a28"); // lit side
+        rect(g, 8, 10, 1, 5, trunkSh);   // shadow side
+        px(g, 6, 14, trunk); px(g, 9, 14, trunkSh); // roots
+
+        // Tier 3: Bottom widest drooping boughs
+        rect(g, 3, 10, 10, 2, pineDark);
+        rect(g, 4, 9, 8, 2, pineMid);
+        px(g, 2, 11, pineDark); px(g, 13, 11, pineDark);
+        px(g, 1, 12, pineDark); px(g, 14, 12, pineDark); // serrated needle tips
+        px(g, 4, 9, pineHi); px(g, 5, 9, pineHi); px(g, 6, 10, pineHi);
+
+        // Tier 2: Middle boughs
+        rect(g, 4, 6, 8, 2, pineDark);
+        rect(g, 5, 5, 6, 2, pineMid);
+        px(g, 3, 7, pineDark); px(g, 12, 7, pineDark);
+        px(g, 2, 8, pineDark); px(g, 13, 8, pineDark);
+        px(g, 5, 5, pineHi); px(g, 6, 5, pineHi); px(g, 7, 6, pineHi);
+
+        // Tier 1: Top conical crown & spire
+        rect(g, 5, 2, 6, 2, pineDark);
+        rect(g, 6, 1, 4, 2, pineMid);
+        px(g, 4, 3, pineDark); px(g, 11, 3, pineDark);
+        px(g, 6, 1, pineHi); px(g, 7, 1, pineTop);
+        // Sharp tip
+        px(g, 7, 0, pineTop); px(g, 8, 0, "#60c878");
 
         return g;
     }
@@ -464,8 +525,8 @@
             case "plaza": g = cobbles("#c7ad78", "#a98f5f", "#ddc793", variant); break;
             case "dirt": g = speckled("#5b4a34", "#463825", "#6d5940", variant); break;
             case "water": g = water("#2f6d8f", "#4f96b3", "#265a77", variant, neighbors, now); break;
-            case "tree": g = treeTile("#3d7a3a", "#6b4a2a", "#4e341c", "#2e6b39", "#3f8a4a", "#1f4a28", false, neighbors); break;
-            case "tree2": g = treeTile("#2f5d33", "#523818", "#3c2913", "#1f4a28", "#2e6b39", "#123018", true, neighbors); break;
+            case "tree": g = oakTreeTile("#3d7a3a", "#6b4a2a", "#4e341c", "#2e6b39", "#3f8a4a", "#1f4a28", neighbors); break;
+            case "tree2": g = pineTreeTile("#2f5d33", "#523818", "#3c2913", "#0f3016", "#1a4d25", "#2c7d3e", "#3fa055", neighbors); break;
             case "rock": g = rockTile("#5b4a34", "#5f5750", "#7d746a", "#332e29"); break;
             case "wall": g = cobbles("#6b6152", "#544c40", "#867b69", variant); break;
             case "house": g = houseTile("#c0472b", "#8f3320", "#d8b78a", "#b8946a", "#5c3a20", "#8fd0e0"); break;

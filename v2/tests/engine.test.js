@@ -1053,3 +1053,61 @@ describe("Expanded cooking recipes and artisan goods", () => {
         expect(bag.count("dish_pasta")).toBe(1);
     });
 });
+
+describe("Mobile Controls & Village Life Refinement", () => {
+    it("Player2D scales walking speed with analog joystick magnitude", () => {
+        const { Player2D, Input, TileMap, MAPS } = loadEngine().exports;
+        const pSlow = new Player2D(384, 320);
+        const pFast = new Player2D(384, 320);
+        const map = new TileMap(MAPS.village.rows);
+
+        const inputSlow = new Input();
+        inputSlow.setAnalog(0.3, 0); // Gentle tilt
+        pSlow.update(0.1, inputSlow.axis(), map);
+
+        const inputFast = new Input();
+        inputFast.setAnalog(1.0, 0); // Full tilt
+        pFast.update(0.1, inputFast.axis(), map);
+
+        expect(pSlow.vx).toBeGreaterThan(0);
+        expect(pFast.vx).toBeGreaterThan(pSlow.vx);
+        expect(pFast.x).toBeGreaterThan(pSlow.x);
+    });
+
+    it("detectEncounter ignores friendly fauna (cats, ducks, chickens)", () => {
+        const { Enemy2D, Player2D, detectEncounter } = loadEngine().exports;
+        const player = new Player2D(100, 100);
+        const cat = new Enemy2D(100, 100, { kind: "cat" });
+        const duck = new Enemy2D(100, 100, { kind: "duck" });
+        const goblin = new Enemy2D(100, 100, { kind: "goblin" });
+
+        expect(detectEncounter(player, [cat, duck])).toBe(null);
+        expect(detectEncounter(player, [cat, goblin])).toBe(goblin);
+    });
+
+    it("Starosta Святослав is registered as a full NPC with dialogue, schedule and requests", () => {
+        const { MAPS, Requests, Social } = loadEngine().exports;
+        const starosta = (MAPS.village.npcs || []).find(n => n.id === "elder");
+        expect(Boolean(starosta)).toBe(true);
+        expect(starosta.name).toBe("Староста Святослав");
+        expect(starosta.schedule.length).toBeGreaterThan(1);
+
+        const social = new Social();
+        const reqSys = new Requests();
+        social.talk("elder"); // Chat to establish friendship (points = 20)
+        const req = reqSys.ensure("elder", social.points("elder"), 1);
+        expect(Boolean(req)).toBe(true);
+        expect(req.gold).toBeGreaterThan(0);
+    });
+
+    it("TileArt procedural pine/fir tree generates organic layered bough canopy without crashing", () => {
+        const { TileArt } = loadEngine().exports;
+        const pineSolo = TileArt.compose("tree2", 0, {});
+        expect(Boolean(pineSolo && pineSolo.grid)).toBe(true);
+        expect(pineSolo.grid.length).toBe(16);
+        expect(pineSolo.grid[0].length).toBe(16);
+
+        const pineConnected = TileArt.compose("tree2", 0, { up: true, down: false, left: true, right: false });
+        expect(Boolean(pineConnected && pineConnected.grid)).toBe(true);
+    });
+});

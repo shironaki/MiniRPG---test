@@ -232,25 +232,28 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 /* Virtual joystick */
 #joystick {
     position: relative;
-    width: 116px;
-    height: 116px;
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
-    background: rgba(34,48,73,0.5);
-    border: 1px solid #4a6a9a;
+    background: radial-gradient(circle, rgba(42,60,92,0.65) 0%, rgba(20,28,44,0.75) 100%);
+    border: 2px solid rgba(185,166,255,0.45);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(185,166,255,0.15);
     touch-action: none;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
 }
 #stick {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 48px;
-    height: 48px;
-    margin: -24px 0 0 -24px;
+    width: 56px;
+    height: 56px;
+    margin: -28px 0 0 -28px;
     border-radius: 50%;
-    background: rgba(120,150,200,0.92);
-    border: 1px solid #b9a6ff;
-    transition: transform 0.03s linear;
+    background: radial-gradient(circle at 35% 35%, #9ab9f5 0%, #4a6fa5 70%, #2a416b 100%);
+    border: 2px solid #b9a6ff;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.6);
+    transition: transform 0.02s linear;
+    pointer-events: none;
 }
 
 /* Control-scheme toggle + fullscreen button */
@@ -270,10 +273,10 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 #fsBtn { right: 8px; display: block; }
 #ctrlToggle { right: 56px; display: none; }
 .tbtn {
-    width: 54px;
-    height: 54px;
-    border-radius: 14px;
-    background: rgba(34,48,73,0.82);
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    background: rgba(34,48,73,0.88);
     border: 1px solid #4a6a9a;
     color: #eef2f8;
     font-size: 20px;
@@ -285,15 +288,43 @@ footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-.tbtn:active { background: rgba(74,106,154,0.95); transform: scale(0.94); }
-.tbtn.big { width: 66px; height: 66px; font-size: 24px; border-radius: 50%; }
-#tactions { display: flex; gap: 14px; align-items: center; }
+.tbtn:active { background: rgba(74,106,154,0.95); transform: scale(0.92); }
+.tbtn.big { width: 72px; height: 72px; font-size: 26px; border-radius: 50%; }
+#tactions { display: flex; gap: 16px; align-items: center; }
 
 /* Show touch controls on touch devices */
 @media (pointer: coarse) {
     #touch { display: flex; }
     #ctrlToggle { display: block; }
+}
+
+/* Landscape orientation optimization for mobile screens */
+@media (orientation: landscape) and (max-height: 560px) {
+    #touch {
+        padding: 8px 28px calc(8px + env(safe-area-inset-bottom, 0px));
+    }
+    #joystick {
+        width: 140px;
+        height: 140px;
+    }
+    #stick {
+        width: 60px;
+        height: 60px;
+        margin: -30px 0 0 -30px;
+    }
+    .tbtn.big {
+        width: 70px;
+        height: 70px;
+        font-size: 26px;
+    }
+    body.immersive #hud {
+        bottom: 10px;
+        max-width: 52vw;
+        font-size: 11px;
+        padding: 4px 12px;
+    }
 }
 
 /* Immersive mode (touch devices or fullscreen): fill the whole screen so

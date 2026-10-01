@@ -261,7 +261,7 @@ for f in js/*.js scripts/*.js tests/*.js v2/js/*/*.js v2/js/main.js; do node --c
 ## 10. Контрольный список первого дня нового разработчика
 
 - [ ] Прочитал `AGENTS.md`, этот HANDOVER и `ARCHITECTURE.md`.
-- [ ] `npm test` локально даёт **192 passed**.
+- [ ] `npm test` локально даёт **257 passed** (119 v1 unit + 24 v1 integration + 84 v2 engine + 5 v2 battle + 5 v2 menus + 20 v2 smoke).
 - [ ] `npm run serve`: открываются и `/`, и `/v2/`, в консоли браузера чисто.
 - [ ] В v2 руками проверил: ходьба, разговор с жителем, сбор дерева, цикл
       грядки, наступление ночи (окна светятся), бой в лесу.

@@ -73,14 +73,33 @@ const MAPS = {
             { col: 14, row: 6,  action: "board",   label: "Доска объявлений", emoji: "📜" },
             { col: 11, row: 7,  action: "well",    label: "Деревенский колодец", emoji: "🪣" },
             { col: 5,  row: 8,  action: "fishing", label: "Рыбалка у пруда", emoji: "🎣" },
-            { col: 14, row: 10, action: "cat",     label: "Кот Мурзик", emoji: "🐱" },
-            { col: 7,  row: 6,  action: "npc",     label: "Староста", emoji: "🧑" }
+            { col: 14, row: 10, action: "cat",     label: "Кот Мурзик", emoji: "🐱" }
         ],
-        // The village is a peaceful zone — no enemies here (they roam the wilds).
-        enemies: [],
+        // The village is a peaceful zone — friendly fauna roams here.
+        enemies: [
+            { id: "cat1", kind: "cat", type: "cat", emoji: "🐱", col: 14, row: 10, wanderRadius: 32 }
+        ],
         // Living townsfolk who walk a daily schedule (minutes since midnight).
         // Talk (E) once a day for friendship; gift items/resources they like.
         npcs: [
+            {
+                id: "elder", name: "Староста Святослав", emoji: "👴", role: "Староста деревни",
+                look: { shirt: "#8b3a3a", shirtSh: "#612626", hair: "#d4d4d4", hairSh: "#a0a0a0", beard: "#e6e6e6", beardSh: "#b8b8b8", hat: "#3a2d54", hatSh: "#251c38", pants: "#423d38", pantsSh: "#2a2622" },
+                likes: ["herb", "wood", "dish_tea", "dish_stew", "dish_pie", "fish_carp", "fish_pike", "apple", "cherry"],
+                dialogue: [
+                    "Мир тебе, путник. Деревня наша скромная, но люди здесь трудолюбивые и честные.",
+                    "Помни: добрые дела возвращаются сторицей, а лесной покой беречь надо.",
+                    "Если заглянешь к доске объявлений, всегда найдёшь, кому помочь в нашей округе.",
+                    "Чашка горячего травяного чая на закате — лучшее утешение для старых костей."
+                ],
+                schedule: [
+                    { from: 0,    col: 13, row: 6,  activity: "sleep" },
+                    { from: 480,  col: 11, row: 8,  activity: "plaza" },
+                    { from: 720,  col: 14, row: 8,  activity: "bench" },
+                    { from: 1080, col: 13, row: 9,  activity: "well" },
+                    { from: 1260, col: 13, row: 6,  activity: "home" }
+                ]
+            },
             {
                 id: "marta", name: "Марта", emoji: "👩‍🌾", role: "Фермерша",
                 look: { shirt: "#4b9e57", shirtSh: "#357a41", hair: "#8a5a2b", hairSh: "#5f3d1c", hat: null, pants: "#6b4a2e", pantsSh: "#4a331f" },

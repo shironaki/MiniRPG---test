@@ -50,7 +50,7 @@
         }));
         enemies = (mapData.enemies || []).map(e => new Enemy2D(
             e.col * ts + 6, e.row * ts + 6,
-            { w: 20, h: 20, kind: e.kind, emoji: e.emoji, wanderRadius: e.wanderRadius }
+            { w: 20, h: 20, kind: e.kind || e.type, emoji: e.emoji, wanderRadius: e.wanderRadius }
         ));
         portals = (mapData.portals || []).map(p => ({
             ...p, px: p.col * ts + ts / 2, py: p.row * ts + ts / 2
@@ -228,14 +228,15 @@
         toggle.addEventListener("click", () => apply(mode === "stick" ? "dpad" : "stick"));
         apply(mode);
 
-        // Analog joystick → Input.setAnalog.
-        const R = 34, DEAD = 0.18;
-        let active = false, cx = 0, cy = 0;
+        // Analog joystick → Input.setAnalog with gentle walking curve and dynamic radius
+        let active = false, cx = 0, cy = 0, stickRadius = 46;
+        const DEAD = 0.20; // 20% deadzone to prevent accidental drifting
         function point(e) { return e.touches ? (e.touches[0] || e.changedTouches[0]) : e; }
         function start(e) {
             active = true;
             const r = joystick.getBoundingClientRect();
             cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+            stickRadius = Math.max(36, Math.round(r.width * 0.42));
             move(e); if (e.cancelable) e.preventDefault();
         }
         function move(e) {
@@ -243,13 +244,24 @@
             const p = point(e);
             let dx = p.clientX - cx, dy = p.clientY - cy;
             const d = Math.hypot(dx, dy) || 1;
-            const cl = Math.min(d, R);
-            dx = dx / d * cl; dy = dy / d * cl;
-            stick.style.transform = `translate(${dx}px, ${dy}px)`;
-            let nx = dx / R, ny = dy / R;
-            if (Math.abs(nx) < DEAD) nx = 0;
-            if (Math.abs(ny) < DEAD) ny = 0;
-            input.setAnalog(nx, ny);
+            const cl = Math.min(d, stickRadius);
+            const clampedX = (dx / d) * cl;
+            const clampedY = (dy / d) * cl;
+            stick.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+
+            // Compute normalized analog magnitude with exponential ease-in for gentle walking
+            const rawMag = cl / stickRadius;
+            if (rawMag <= DEAD) {
+                input.setAnalog(0, 0);
+            } else {
+                // Remap DEAD..1.0 to 0.0..1.0, then apply smooth ease-in curve (power of 1.4)
+                let mag = (rawMag - DEAD) / (1 - DEAD);
+                mag = Math.max(0, Math.min(1, mag));
+                mag = Math.pow(mag, 1.4); // slight tilt = slow stroll (30-40%), full tilt = run
+                const nx = (dx / d) * mag;
+                const ny = (dy / d) * mag;
+                input.setAnalog(nx, ny);
+            }
             if (e.cancelable) e.preventDefault();
         }
         function end() {

@@ -65,10 +65,13 @@ class Enemy2D {
     }
 }
 
+const HOSTILE_MOBS = new Set(["goblin", "skeleton", "wolf"]);
+
 // Returns the first enemy whose box overlaps `heroBox`, or null. Pure.
 function detectEncounter(heroBox, enemies) {
     for (const e of enemies) {
         if (e.alive === false) continue;
+        if (!HOSTILE_MOBS.has(e.kind)) continue; // peaceful fauna does not trigger combat
         if (Rect.intersects(heroBox, e.box)) return e;
     }
     return null;
