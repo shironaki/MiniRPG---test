@@ -818,4 +818,22 @@ describe("Town aesthetics and outdoor furniture", () => {
             expect(MobRig.heightScale(kind) > 0).toBe(true);
         }
     });
+    it("TileArt provides organic water autotiling and connected tree canopies", () => {
+        const { TileArt } = loadEngine().exports;
+        // Standalone water and water with sand shore neighbors
+        const wCenter = TileArt.compose("water", 0, { up: true, down: true, left: true, right: true });
+        const wShore = TileArt.compose("water", 0, { up: false, down: true, left: false, right: true });
+        expect(wCenter.w).toBe(16);
+        expect(wCenter.h).toBe(16);
+        expect(wShore.w).toBe(16);
+        expect(wShore.h).toBe(16);
+
+        // Connected forest canopy vs standalone trees
+        const tOak = TileArt.compose("tree", 0);
+        const tPine = TileArt.compose("tree2", 0);
+        const tForest = TileArt.compose("tree", 0, { up: true, down: false, left: true, right: true });
+        expect(tOak.w).toBe(16);
+        expect(tPine.w).toBe(16);
+        expect(tForest.w).toBe(16);
+    });
 });

@@ -33,7 +33,7 @@ class Renderer {
                 // structure is drawn as a whole in drawBuildings().
                 if (typeof TileArt !== "undefined") {
                     const name = info.name === "house" ? "grass" : info.name;
-                    if (TileArt.draw(ctx, name, sx, sy, ts, col, row)) {
+                    if (TileArt.draw(ctx, name, sx, sy, ts, col, row, tilemap, Date.now())) {
                         this._animateTile(ctx, name, sx, sy, ts, col, row);
                         continue;
                     }
@@ -102,9 +102,12 @@ class Renderer {
             ctx.lineTo(bx + sway, by - ts * 0.26);
             ctx.stroke();
         } else if (name === "water") {
-            const glint = ((now / 55 + col * 17 + row * 9) % (ts + 10)) - 5;
-            ctx.fillStyle = "rgba(255,255,255,0.12)";
-            ctx.fillRect(sx + glint, sy + ts * (0.35 + ((row + col) % 3) * 0.16), ts * 0.22, 1);
+            const glint = ((now / 60 + col * 17 + row * 9) % (ts + 12)) - 6;
+            ctx.fillStyle = "rgba(255,255,255,0.18)";
+            ctx.fillRect(sx + glint, sy + ts * (0.32 + ((row + col) % 3) * 0.18), ts * 0.18, 1);
+            const waveOff = Math.sin(now / 450 + col * 1.8 + row * 2.3) * (ts * 0.05);
+            ctx.fillStyle = "rgba(255,255,255,0.10)";
+            ctx.fillRect(sx + ts * 0.28 + waveOff, sy + ts * 0.68, ts * 0.44, 1);
         }
     }
 
@@ -489,37 +492,40 @@ class Renderer {
     drawPortals(list, camera) {
         if (!list) return;
         const ctx = this.ctx;
-        const t = (Date.now() % 1600) / 1600;         // 0..1 pulse
-        const glow = 0.35 + 0.25 * Math.sin(t * Math.PI * 2);
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = "20px serif";
+        const now = Date.now();
         for (const p of list) {
+            // Outdoor portals (path to forest, cave entrance) get an atmospheric ground beacon;
+            // Indoor doorways already have their doorway tiles.
+            if (p.to === "village" && p.label === "На улицу") continue;
+
             const s = camera.worldToScreen(p.px, p.py);
-            ctx.fillStyle = `rgba(201,162,75,${glow})`;
+            const pulse = 0.4 + 0.3 * Math.sin(now / 400 + (p.px + p.py));
+            ctx.save();
+            ctx.fillStyle = `rgba(220,180,90,${pulse * 0.28})`;
             ctx.beginPath();
-            ctx.arc(s.x, s.y, 15, 0, Math.PI * 2);
+            ctx.ellipse(s.x, s.y + 4, 12, 5, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = "rgba(255,225,150,0.9)";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.fillText(p.emoji || "🚪", s.x, s.y + 1);
+            ctx.restore();
         }
     }
 
     drawInteractables(list, camera) {
+        if (!list) return;
         const ctx = this.ctx;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = "22px serif";
+        const now = Date.now();
         for (const it of list) {
-            const s = camera.worldToScreen(it.px, it.py);
-            // marker plate
-            ctx.fillStyle = "rgba(13,16,23,0.55)";
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, 16, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillText(it.emoji || "❔", s.x, s.y + 1);
+            // For doors, shops, beds, stoves, boards, cats, wells, etc., the physical art is already visible.
+            // If it's a standalone wild NPC or dungeon lair without existing architecture, draw a clean subtle floating icon.
+            if (it.action === "npc" || (it.action === "dungeon" && !it.to)) {
+                const s = camera.worldToScreen(it.px, it.py);
+                const bob = Math.sin(now / 350 + (it.px + it.py)) * 2;
+                ctx.save();
+                ctx.font = "20px serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(it.emoji || "✨", s.x, s.y - 10 + bob);
+                ctx.restore();
+            }
         }
     }
 
