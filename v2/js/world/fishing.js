@@ -1,12 +1,9 @@
 /**
  * v2 world — fishing system.
  *
- * Provides fishing logic at water bodies (ponds, streams). Interacting at a
- * fishing spot casts a line. After a short bite window, the catch is resolved.
- * Better fishing rods unlock rarer fish (pike), faster bite times, and bonus
- * treasure (essences / extra catches).
- *
- * Pure logic (rng injectable), unit-testable without DOM.
+ * Provides fishing logic at water bodies (freshwater ponds and ocean beaches).
+ * Interacting at a fishing spot casts a line. After a short bite window, the catch is resolved.
+ * Better fishing rods unlock rarer fish, faster bite times, and bonus treasure.
  */
 const FISH_TABLE = [
     { res: "fish_perch", name: "Окунь",       emoji: "🐟", weight: 40, minRod: 1, xp: 5 },
@@ -15,10 +12,18 @@ const FISH_TABLE = [
     { res: "fish_pike",  name: "Щука",        emoji: "🐡", weight: 10, minRod: 2, xp: 15 }
 ];
 
+const OCEAN_FISH_TABLE = [
+    { res: "fish_flounder", name: "Морская камбала",  emoji: "🐠", weight: 40, minRod: 1, xp: 8 },
+    { res: "fish_tuna",     name: "Лазурный тунец",   emoji: "🐟", weight: 25, minRod: 2, xp: 18 },
+    { res: "lobster",       name: "Королевский омар", emoji: "🦞", weight: 20, minRod: 2, xp: 22 },
+    { res: "pearl",         name: "Жемчужница",       emoji: "🦪", weight: 10, minRod: 3, xp: 35 }
+];
+
 class FishingSystem {
     constructor(opts = {}) {
         this.rng = opts.rng || Math.random;
         this.fishTable = opts.fishTable || FISH_TABLE;
+        this.oceanTable = opts.oceanTable || OCEAN_FISH_TABLE;
         this.active = false;
         this.castTime = 0;
         this.rodLevel = 1;
@@ -46,16 +51,18 @@ class FishingSystem {
      * Resolve a catch after a bite.
      * Evaluates available fish based on rod level and weights.
      */
-    catchFish(rodLevel = 1) {
+    catchFish(rodLevel = 1, isOcean = false) {
         const level = Math.max(1, rodLevel || this.rodLevel || 1);
-        const eligible = this.fishTable.filter(f => f.minRod <= level);
+        const table = isOcean ? this.oceanTable : this.fishTable;
+        const eligible = table.filter(f => f.minRod <= level);
         
         // Weight calculation with rod level bonuses for rare catches
         let totalWeight = 0;
         const weights = eligible.map(f => {
             let w = f.weight;
-            if (f.res === "fish_pike" && level >= 2) w += (level - 1) * 15;
-            if (f.res === "fish_carp" && level >= 2) w += (level - 1) * 10;
+            if ((f.res === "fish_pike" || f.res === "fish_tuna" || f.res === "lobster") && level >= 2) {
+                w += (level - 1) * 15;
+            }
             totalWeight += w;
             return { fish: f, weight: w };
         });
@@ -78,7 +85,9 @@ class FishingSystem {
             if (this.rng() < 0.5) {
                 amount = 2; // double catch
             } else {
-                bonus = { res: "stone", name: "Камень со дна", emoji: "🪨", amount: 1 };
+                bonus = isOcean
+                    ? { res: "seashell", name: "Красивая ракушка", emoji: "🐚", amount: 1 }
+                    : { res: "stone", name: "Камень со дна", emoji: "🪨", amount: 1 };
             }
         }
 
@@ -99,5 +108,5 @@ class FishingSystem {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = { FishingSystem, FISH_TABLE };
+    module.exports = { FishingSystem, FISH_TABLE, OCEAN_FISH_TABLE };
 }

@@ -491,6 +491,53 @@
         return g;
     }
 
+    // Coastal Lighthouse with rotating lamp beam, 2x3.
+    function lighthouse(phase) {
+        const g = grid(N * 2, N * 3);
+        // Stone foundation
+        rect(g, 4, 38, 24, 8, "#54524c");
+        rect(g, 4, 38, 24, 2, "#737068");
+        rect(g, 13, 40, 6, 6, "#3a2618"); // arched heavy door
+        // Striped masonry tower
+        rect(g, 6, 30, 20, 8, "#b83a2a");
+        rect(g, 6, 30, 4, 8, "#d9503f");
+        rect(g, 22, 30, 4, 8, "#8f2618");
+        rect(g, 7, 22, 18, 8, "#e8e5dc");
+        rect(g, 7, 22, 4, 8, "#ffffff");
+        rect(g, 21, 22, 4, 8, "#b3b0a6");
+        rect(g, 8, 14, 16, 8, "#b83a2a");
+        rect(g, 8, 14, 3, 8, "#d9503f");
+        rect(g, 21, 14, 3, 8, "#8f2618");
+        // Lantern room gallery & railing
+        rect(g, 7, 12, 18, 2, "#2b2a28");
+        rect(g, 9, 5, 14, 7, "#ffe599"); // glowing glass lantern
+        rect(g, 11, 6, 10, 5, "#fff8db");
+        // Dome roof
+        rect(g, 9, 2, 14, 3, "#b83a2a");
+        rect(g, 11, 0, 10, 2, "#b83a2a");
+        px(g, 15, 0, "#e8c84a");
+        shadow(g, 4, 46, 24);
+        return g;
+    }
+
+    // Beach umbrella & sun lounger, 2x2.
+    function beachUmbrella() {
+        const g = grid(N * 2, N * 2);
+        // Sun lounger
+        rect(g, 4, 20, 16, 6, "#4a8cb8");
+        rect(g, 4, 20, 16, 1, "#74b3de");
+        rect(g, 4, 16, 6, 5, "#4a8cb8");
+        // Umbrella pole
+        rect(g, 19, 6, 2, 22, "#8a6a42");
+        // Striped umbrella canopy
+        rect(g, 8, 4, 22, 6, "#e84a5f");
+        rect(g, 11, 2, 16, 3, "#f8b195");
+        rect(g, 14, 0, 10, 2, "#e84a5f");
+        px(g, 18, 0, "#ffffff");
+        shadow(g, 16, 29, 8);
+        return g;
+    }
+
     // A soft contact shadow so pieces sit ON the floor instead of floating.
     function shadow(g, x, y, w) {
         rect(g, x + 1, y, w - 2, 1, "#6b4a28");
@@ -523,8 +570,10 @@
         fenceH:    { w: 1, h: 1, make: fenceH },
         fenceV:    { w: 1, h: 1, make: fenceV },
         mailbox:   { w: 1, h: 1, make: mailbox },
-        fountain:  { w: 2, h: 2, make: fountain, animated: true },
-        pier:      { w: 2, h: 1, make: pier, walkable: true }
+        fountain:   { w: 2, h: 2, make: fountain, animated: true },
+        pier:       { w: 2, h: 1, make: pier, walkable: true },
+        lighthouse: { w: 2, h: 3, make: lighthouse, animated: true },
+        umbrella:   { w: 2, h: 2, make: beachUmbrella }
     };
 
     const _cache = new Map();

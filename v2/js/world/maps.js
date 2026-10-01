@@ -14,13 +14,13 @@ const MAPS = {
             "TTTTTTTTTTTTTTTTTTTTTTTTTT",
             "T,.......,.......,.......T",
             "T.,HHHH...,.......,HHHH..T",
-            "T..HHHH.tt.,.....t.HHHH..T",
+            "T..HHHH.....,....t.HHHH..T",
             "T..HHHH.....,......HHHH..T",
             "T....pppppppppppppppppp..T",
             "T.....,.p...PPPPPP,......T",
             "T.t..wwwp..PPPPPPP,...t,.T",
             "T....wwwp..PPppppP......,T",
-            "T,.t.wwwp..PPppppP..,..t.T",
+            "T,.t.wwwp..PPppppP..,..t.p",
             "T.,.....p..PPPPPPP...,...T",
             "T..,.....wwwbbww...HHH...T",
             "T..HHHH..wwwbbww...HHH...T",
@@ -138,6 +138,8 @@ const MAPS = {
         ],
         // Gatherable resource nodes (E to harvest; they regrow over time).
         resources: [
+            { type: "apple_tree",  col: 8,  row: 3  },
+            { type: "cherry_tree", col: 9,  row: 3  },
             { type: "tree", col: 2,  row: 6  },
             { type: "tree", col: 20, row: 7  },
             { type: "tree", col: 3,  row: 10 },
@@ -156,7 +158,61 @@ const MAPS = {
         ],
         // Walk onto a portal tile to travel. { col,row, to, spawn, label, emoji }
         portals: [
-            { col: 12, row: 16, to: "forest", spawn: { col: 11, row: 1 }, label: "Тропа в лес", emoji: "🌲" }
+            { col: 12, row: 16, to: "forest", spawn: { col: 11, row: 1 }, label: "Тропа в лес", emoji: "🌲" },
+            { col: 25, row: 9,  to: "beach",  spawn: { col: 2,  row: 9 }, label: "Тропа к побережью", emoji: "🏖️" }
+        ]
+    },
+
+    beach: {
+        name: "Лазурный берег",
+        tileSize: 32,
+        // 26 x 18. Golden sand dunes, coconut palms, sea shells, ocean waves,
+        // pier and an ancient lighthouse overlooking the sea.
+        rows: [
+            "mmmmmmmmmmmmmmmmmmSSSSSSSS",
+            "mssssssssssssssssmSSSSSSSS",
+            "mssssssssssssssssmSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssbbbbSSSS",
+            "ssssssssssssssssssbbbbSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "msssssssssssssssssSSSSSSSS",
+            "mssssssssssssssssmSSSSSSSS",
+            "mssssssssssssssssmSSSSSSSS",
+            "mmmmmmmmmmmmmmmmmmSSSSSSSS"
+        ],
+        spawn: { col: 2, row: 9 },
+        furniture: [
+            { col: 18, row: 2, kind: "lighthouse" },   // Lighthouse (2x3)
+            { col: 7,  row: 6, kind: "umbrella" },     // Beach umbrella (2x2)
+            { col: 18, row: 8, kind: "pier" },         // Fishing dock pier (2x1)
+            { col: 20, row: 8, kind: "pier" }          // Fishing dock pier (2x1)
+        ],
+        interactables: [
+            { col: 22, row: 8, action: "fishing", isOcean: true, label: "Глубоководная рыбалка", emoji: "🎣" }
+        ],
+        enemies: [
+            { col: 6,  row: 11, kind: "crab",    emoji: "🦀", wanderRadius: 60 },
+            { col: 14, row: 6,  kind: "crab",    emoji: "🦀", wanderRadius: 60 },
+            { col: 10, row: 4,  kind: "seagull", emoji: "🕊️", wanderRadius: 80 }
+        ],
+        resources: [
+            { type: "seashell",  col: 5,  row: 9  },
+            { type: "seashell",  col: 12, row: 12 },
+            { type: "seashell",  col: 7,  row: 14 },
+            { type: "driftwood", col: 10, row: 15 },
+            { type: "driftwood", col: 4,  row: 6  },
+            { type: "seaweed",   col: 16, row: 13 }
+        ],
+        portals: [
+            { col: 0, row: 9, to: "village", spawn: { col: 24, row: 9 }, label: "Назад в деревню", emoji: "🏘️" }
         ]
     },
 

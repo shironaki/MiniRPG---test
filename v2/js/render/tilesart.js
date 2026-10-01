@@ -372,6 +372,43 @@
         return g;
     }
 
+    function sandTile(base, dark, light, variant) {
+        const g = fill(base);
+        const pts = [[2, 3], [7, 6], [12, 2], [4, 10], [9, 13], [14, 8]];
+        scatter(g, pts, dark, variant);
+        scatter(g, pts.map(([x, y]) => [(x + 6) % N, (y + 5) % N]), light, variant + 1);
+        if (variant === 2) {
+            // tiny white seashell
+            px(g, 6, 8, "#ffffff"); px(g, 7, 8, "#f0e6d2"); px(g, 6, 9, "#e0d0b8");
+        }
+        return g;
+    }
+
+    function palmTile(sandBase, trunk, trunkSh, leaf, leafHi, leafSh) {
+        const g = sandTile(sandBase, "#cbb27a", "#ded09b", 0);
+        // Soft ground shadow on sand
+        rect(g, 4, 14, 8, 2, "#967f4c");
+        // Curved palm trunk
+        px(g, 6, 14, trunk); px(g, 7, 14, trunkSh);
+        px(g, 6, 13, trunk); px(g, 7, 13, trunkSh);
+        px(g, 7, 12, trunk); px(g, 8, 12, trunkSh);
+        px(g, 7, 11, trunk); px(g, 8, 11, trunkSh);
+        px(g, 8, 10, trunk); px(g, 9, 10, trunkSh);
+        px(g, 8, 9, trunk);  px(g, 9, 9, trunkSh);
+        px(g, 8, 8, trunk);  px(g, 9, 8, trunkSh);
+        // Coconuts
+        px(g, 7, 7, "#5c3d1e"); px(g, 9, 7, "#5c3d1e");
+        // Spreading lush palm fronds (drooping umbrella canopy)
+        rect(g, 4, 4, 8, 3, leaf);
+        rect(g, 2, 5, 12, 2, leaf);
+        rect(g, 5, 2, 6, 3, leafHi);
+        // Frond tips
+        px(g, 1, 7, leafSh); px(g, 0, 8, leafSh);
+        px(g, 14, 7, leafSh); px(g, 15, 8, leafSh);
+        px(g, 3, 2, leafHi); px(g, 12, 2, leafHi);
+        return g;
+    }
+
     // ---- interiors ----------------------------------------------------------
     // Wooden floorboards: long planks with seams and a little grain.
     function floorBoards(plank, seam, grain, variant) {
@@ -443,6 +480,9 @@
             case "floorStone": g = flagstones("#6d6a63", "#4c4944", "#807c73", variant); break;
             case "wallIn": g = wallInside("#c9b089", "#7a5433", "#5e3f26", "#6b4a2c"); break;
             case "doorway": g = doorwayTile("#7d5a33", "#5c4123", "#ffe9a8"); break;
+            case "sand": g = sandTile("#d8c48a", "#c4ad6e", "#ebdca8", variant); break;
+            case "palm": g = palmTile("#d8c48a", "#8a6239", "#5e3f22", "#2d8a3e", "#4cb55f", "#1b5a26"); break;
+            case "sea": g = water("#1c5d85", "#3a8bb8", "#124060", variant, neighbors, now); break;
             default: g = fill("#101319");
         }
         return { w: N, h: N, grid: g };
@@ -478,11 +518,11 @@
 
     function draw(ctx, name, sx, sy, ts, col, row, tilemap, now) {
         let neighbors = null, nKey = "";
-        if (tilemap && (name === "water" || name === "tree" || name === "tree2")) {
+        if (tilemap && (name === "water" || name === "sea" || name === "tree" || name === "tree2")) {
             const isMatch = (c, r) => {
                 const inf = tilemap.infoAt(c, r);
-                if (name === "water") return inf.name === "water" || inf.name === "bridge";
-                return inf.name === "tree" || inf.name === "tree2";
+                if (name === "water" || name === "sea") return inf.name === "water" || inf.name === "sea" || inf.name === "bridge";
+                return inf.name === "tree" || inf.name === "tree2" || inf.name === "palm";
             };
             const up = isMatch(col, row - 1), down = isMatch(col, row + 1);
             const left = isMatch(col - 1, row), right = isMatch(col + 1, row);

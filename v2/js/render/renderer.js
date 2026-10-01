@@ -128,7 +128,7 @@ class Renderer {
         }
     }
 
-    // Gatherable resource nodes (trees/rocks/bushes/herbs) drawn procedurally.
+    // Gatherable resource nodes (trees/rocks/bushes/herbs/orchard/coastal) drawn procedurally.
     drawResourceNodes(nodes, camera) {
         if (!nodes) return;
         const ctx = this.ctx;
@@ -145,7 +145,7 @@ class Renderer {
             ctx.ellipse(s.x, by + 2, 11, 4, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            if (n.type === "tree") {
+            if (n.type === "tree" || n.type === "apple_tree" || n.type === "cherry_tree") {
                 // trunk
                 ctx.fillStyle = "#5c3a22";
                 ctx.fillRect(cx - 2.5, by - (n.depleted ? 5 : 14), 5, n.depleted ? 6 : 15);
@@ -158,6 +158,22 @@ class Renderer {
                     ctx.arc(cx + 6, by - 22, 7, 0, Math.PI * 2); ctx.fill();
                     ctx.fillStyle = "rgba(255,255,255,0.10)";
                     ctx.beginPath(); ctx.arc(cx - 4, by - 26, 3, 0, Math.PI * 2); ctx.fill();
+
+                    // Orchard fruits
+                    if (n.type === "apple_tree" || n.type === "cherry_tree") {
+                        const isApple = n.type === "apple_tree";
+                        ctx.fillStyle = isApple ? "#e6392b" : "#b31a38";
+                        ctx.beginPath();
+                        ctx.arc(cx - 6, by - 20, 2.8, 0, Math.PI * 2);
+                        ctx.arc(cx + 5, by - 22, 2.8, 0, Math.PI * 2);
+                        ctx.arc(cx, by - 25, 2.8, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = "rgba(255,255,255,0.35)";
+                        ctx.beginPath();
+                        ctx.arc(cx - 7, by - 21, 0.8, 0, Math.PI * 2);
+                        ctx.arc(cx + 4, by - 23, 0.8, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 } else {
                     // stump rings
                     ctx.fillStyle = "#7a5030";
@@ -207,6 +223,24 @@ class Renderer {
                 if (!n.depleted) {
                     ctx.fillStyle = "#e8d24a";
                     ctx.beginPath(); ctx.arc(cx, by - 10, 2, 0, Math.PI * 2); ctx.fill();
+                }
+            } else if (n.type === "seashell") {
+                if (!n.depleted) {
+                    ctx.fillStyle = "#f8f5ee";
+                    ctx.beginPath();
+                    ctx.arc(cx, by - 3, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = "#e0a899";
+                    ctx.beginPath();
+                    ctx.arc(cx, by - 3, 2.5, 0, Math.PI);
+                    ctx.fill();
+                }
+            } else if (n.type === "driftwood") {
+                if (!n.depleted) {
+                    ctx.fillStyle = "#7a6a58";
+                    ctx.fillRect(cx - 8, by - 4, 16, 5);
+                    ctx.fillStyle = "#9c8a74";
+                    ctx.fillRect(cx - 7, by - 4, 14, 2);
                 }
             }
         }
@@ -271,15 +305,42 @@ class Renderer {
                     ctx.beginPath(); ctx.arc(cx + 5, by - 2, 1.6, 0, Math.PI * 2); ctx.fill();
                 }
             } else if (p.state === "ready") {
-                // leafy top + orange root (a little carrot)
-                ctx.fillStyle = "#4caf50";
-                ctx.beginPath();
-                ctx.moveTo(cx, by - 14); ctx.lineTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8);
-                ctx.closePath(); ctx.fill();
-                ctx.fillStyle = "#e8862b";
-                ctx.beginPath();
-                ctx.moveTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8); ctx.lineTo(cx, by);
-                ctx.closePath(); ctx.fill();
+                const key = p.cropKey || "veg";
+                if (key === "strawberry") {
+                    ctx.fillStyle = "#3d8a42";
+                    ctx.beginPath(); ctx.arc(cx - 4, by - 5, 4, 0, Math.PI * 2); ctx.arc(cx + 4, by - 5, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "#e83a4f";
+                    ctx.beginPath(); ctx.arc(cx - 3, by - 4, 3, 0, Math.PI * 2); ctx.arc(cx + 4, by - 5, 3.2, 0, Math.PI * 2); ctx.fill();
+                } else if (key === "tomato") {
+                    ctx.strokeStyle = "#2d7a35"; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(cx, by); ctx.lineTo(cx, by - 12); ctx.stroke();
+                    ctx.fillStyle = "#e6392b";
+                    ctx.beginPath(); ctx.arc(cx - 3, by - 7, 3.5, 0, Math.PI * 2); ctx.arc(cx + 3, by - 5, 3.5, 0, Math.PI * 2); ctx.fill();
+                } else if (key === "pumpkin") {
+                    ctx.fillStyle = "#e6731e";
+                    ctx.beginPath(); ctx.ellipse(cx, by - 6, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "#4a8a38";
+                    ctx.fillRect(cx - 1, by - 12, 2, 3);
+                } else if (key === "corn") {
+                    ctx.strokeStyle = "#4fae53"; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.moveTo(cx, by); ctx.lineTo(cx, by - 15); ctx.stroke();
+                    ctx.fillStyle = "#f5d038";
+                    ctx.fillRect(cx - 2, by - 13, 4, 7);
+                } else if (key === "wheat") {
+                    ctx.strokeStyle = "#e8c85c"; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(cx - 2, by); ctx.lineTo(cx - 4, by - 13);
+                    ctx.moveTo(cx + 2, by); ctx.lineTo(cx + 4, by - 13); ctx.stroke();
+                } else {
+                    // leafy top + orange root (a little carrot)
+                    ctx.fillStyle = "#4caf50";
+                    ctx.beginPath();
+                    ctx.moveTo(cx, by - 14); ctx.lineTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8);
+                    ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = "#e8862b";
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8); ctx.lineTo(cx, by);
+                    ctx.closePath(); ctx.fill();
+                }
             }
         }
     }
@@ -439,31 +500,90 @@ class Renderer {
         }
     }
 
-    // Ambient floating petals / leaves and night fireflies.
-    drawAmbient(camera, zoneName, light) {
+    // Ambient floating petals / leaves, night fireflies, weather rain/storm/snow/fog.
+    drawAmbient(camera, zoneName, light, weather, season) {
         const ctx = this.ctx;
         const now = Date.now();
         const W = camera.viewW, H = camera.viewH;
 
-        if (zoneName === "Деревня" || zoneName === "village") {
-            // Day / evening: drifting petals and autumn leaves
-            const count = 10;
-            for (let i = 0; i < count; i++) {
-                const seed = i * 137.5;
-                const speedX = 0.045 + (i % 3) * 0.015;
-                const speedY = 0.025 + (i % 2) * 0.010;
-                const x = ((now * speedX + seed * 12) % (W + 60)) - 30;
-                const y = ((now * speedY + seed * 23 + Math.sin(now / 400 + i) * 15) % (H + 60)) - 30;
+        const isOutdoor = zoneName !== "home" && zoneName !== "shop_in" && zoneName !== "forge_in" && zoneName !== "cave" && zoneName !== "Твой дом" && zoneName !== "Лавка" && zoneName !== "Кузница" && zoneName !== "Пещера";
 
-                const isPetal = i % 2 === 0;
-                ctx.fillStyle = isPetal ? "rgba(255,182,193,0.65)" : "rgba(220,165,80,0.60)";
-                ctx.beginPath();
-                ctx.ellipse(x, y, isPetal ? 3 : 4, isPetal ? 2 : 2.5, Math.sin(now / 500 + i), 0, Math.PI * 2);
-                ctx.fill();
+        if (isOutdoor) {
+            // 1. Dynamic weather effects
+            if (weather && weather.isRain) {
+                const storm = weather.id === "storm";
+                const count = storm ? 65 : 35;
+                ctx.strokeStyle = "rgba(180, 225, 255, 0.60)";
+                ctx.lineWidth = storm ? 1.5 : 1.1;
+                for (let i = 0; i < count; i++) {
+                    const seed = i * 83.7;
+                    const spX = storm ? 0.35 : 0.15;
+                    const spY = storm ? 0.95 : 0.65;
+                    const x = ((now * spX + seed * 23) % (W + 60)) - 30;
+                    const y = ((now * spY + seed * 47) % (H + 60)) - 30;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x - (storm ? 6 : 2), y + (storm ? 12 : 8));
+                    ctx.stroke();
+                }
+
+                // Lightning flashes during storms
+                if (storm) {
+                    const stormCycle = Math.sin(now / 1500) * Math.sin(now / 390);
+                    if (stormCycle > 0.88) {
+                        const alpha = (stormCycle - 0.88) * 3.8;
+                        ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.55, alpha)})`;
+                        ctx.fillRect(0, 0, W, H);
+                    }
+                }
+            } else if (weather && weather.isSnow) {
+                // Gentle swirling snowflakes
+                const count = 35;
+                ctx.fillStyle = "rgba(240, 248, 255, 0.85)";
+                for (let i = 0; i < count; i++) {
+                    const seed = i * 67.3;
+                    const x = ((now * 0.04 + Math.sin(now / 450 + i) * 18 + seed * 19) % (W + 40)) - 20;
+                    const y = ((now * 0.07 + seed * 31) % (H + 40)) - 20;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (weather && weather.id === "fog") {
+                // Soft horizontal mist
+                ctx.fillStyle = "rgba(220, 230, 240, 0.18)";
+                for (let i = 0; i < 4; i++) {
+                    const seed = i * 110.5;
+                    const y = ((seed * 17) % H);
+                    const wave = Math.sin(now / 800 + i) * 15;
+                    ctx.fillRect(0, y + wave, W, 28);
+                }
             }
 
-            // Dusk / night: glowing fireflies near trees and pond
-            if (light && light.a > 0.25) {
+            // 2. Daytime petals / autumn leaves
+            if (!weather || (!weather.isRain && !weather.isSnow)) {
+                const isAutumn = season && season.id === "autumn";
+                const count = 10;
+                for (let i = 0; i < count; i++) {
+                    const seed = i * 137.5;
+                    const speedX = 0.045 + (i % 3) * 0.015;
+                    const speedY = 0.025 + (i % 2) * 0.010;
+                    const x = ((now * speedX + seed * 12) % (W + 60)) - 30;
+                    const y = ((now * speedY + seed * 23 + Math.sin(now / 400 + i) * 15) % (H + 60)) - 30;
+
+                    const isPetal = i % 2 === 0;
+                    if (isAutumn) {
+                        ctx.fillStyle = isPetal ? "rgba(220, 110, 40, 0.70)" : "rgba(200, 70, 40, 0.65)";
+                    } else {
+                        ctx.fillStyle = isPetal ? "rgba(255,182,193,0.65)" : "rgba(220,165,80,0.60)";
+                    }
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, isPetal ? 3 : 4, isPetal ? 2 : 2.5, Math.sin(now / 500 + i), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // 3. Dusk / night fireflies
+            if (light && light.a > 0.25 && (!weather || !weather.isRain)) {
                 const fireflies = 8;
                 for (let i = 0; i < fireflies; i++) {
                     const seed = i * 97.3;

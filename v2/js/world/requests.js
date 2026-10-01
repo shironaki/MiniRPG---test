@@ -2,12 +2,9 @@
  * v2 world — villager requests (small errands that turn friendship into play).
  *
  * Once you have chatted with a villager at least once, they start asking for
- * things they need: Марта wants produce, Борис wants building materials, Лена
- * wants pretty things. Bring the goods and you are paid in gold and, more
- * importantly, friendship — which in turn unlocks better-paying requests.
- *
- * One open request per villager at a time, so the world never nags. Pure
- * logic: no DOM, no timers, injectable `rng`, fully unit-testable.
+ * things they need: Марта wants produce and berries, Борис wants building materials
+ * and fish, Лена wants pretty flowers, fruits and shells, Томила wants goods to sell,
+ * Кузьма wants forge supplies and hearty meals.
  */
 
 // What each villager may ask for, and the flavour text they ask it with.
@@ -17,36 +14,39 @@ const REQUEST_POOL = {
         { res: "berry",      n: 5, text: "Хочу сварить варенье, да ягод не хватает." },
         { res: "veg",        n: 3, text: "Сготовлю похлёбку на всю улицу, нужны овощи." },
         { res: "herb",       n: 4, text: "Травы для настоя от простуды — выручишь?" },
-        { res: "fish_perch", n: 2, text: "Свежей рыбки бы к ужину с огорода." },
+        { res: "strawberry", n: 3, text: "Сладкой клубники к чаю — вот бы порадовать детей!" },
+        { res: "pumpkin",    n: 1, text: "Большая тыква нужна для праздничного пирога." },
         { res: "dish_pie",   n: 1, text: "Угостишь ягодным пирогом? Сил нет готовить." }
     ],
     boris: [
-        { res: "wood",      n: 6, text: "Пилу наточил, а брёвен нет. Смешно, да?" },
-        { res: "stone",     n: 4, text: "Камень нужен — подлатать фундамент кузницы." },
-        { res: "herb",      n: 3, text: "Спина ноет. Говорят, травяной отвар помогает." },
-        { res: "dish_fish", n: 1, text: "Жареной рыбки с дымком бы к обеду." },
-        { res: "fish_pike", n: 1, text: "Настоящую щуку из пруда принесёшь?" }
+        { res: "wood",       n: 6, text: "Пилу наточил, а брёвен нет. Смешно, да?" },
+        { res: "stone",      n: 4, text: "Камень нужен — подлатать фундамент кузницы." },
+        { res: "herb",       n: 3, text: "Спина ноет. Говорят, травяной отвар помогает." },
+        { res: "dish_fish",  n: 1, text: "Жареной рыбки с дымком бы к обеду." },
+        { res: "fish_pike",  n: 1, text: "Настоящую щуку из пруда принесёшь?" },
+        { res: "dish_cider", n: 1, text: "Кувшин яблочного сидра вернёт силы после валки леса." }
     ],
     tomila: [
-        { res: "herb",      n: 4, text: "Скупаю травы — на них всегда спрос." },
-        { res: "veg",       n: 3, text: "Овощи разлетаются быстрее хлеба." },
-        { res: "wood",      n: 5, text: "Полки для лавки сами себя не сколотят." },
-        { res: "fish_carp", n: 2, text: "Купцы из столицы очень просят свежего карпа." },
-        { res: "dish_tea",  n: 1, text: "Отвара бы травяного, голос совсем сел." }
+        { res: "herb",          n: 4, text: "Скупаю травы — на них всегда спрос." },
+        { res: "veg",           n: 3, text: "Овощи разлетаются быстрее хлеба." },
+        { res: "wood",          n: 5, text: "Полки для лавки сами себя не сколотят." },
+        { res: "fish_tuna",     n: 1, text: "Морской тунец с побережья — редкий деликатес!" },
+        { res: "seashell",      n: 3, text: "Морские ракушки для столичных сувениров." },
+        { res: "dish_jam",      n: 1, text: "Баночку клубничного варенья для витрины." }
     ],
     kuzma: [
-        { res: "stone",     n: 5, text: "Камень нужен — горн переложить." },
-        { res: "wood",      n: 6, text: "Угля нажечь не из чего. Дров бы." },
-        { res: "berry",     n: 3, text: "Ягод бы. У горна весь день во рту сухо." },
-        { res: "dish_soup", n: 1, text: "Горячей ухи бы котелок — силы восстановить." },
-        { res: "crayfish",  n: 3, text: "Речных раков к вечеру — лучше всякого ужина." }
+        { res: "stone",         n: 5, text: "Камень нужен — горн переложить." },
+        { res: "wood",          n: 6, text: "Угля нажечь не из чего. Дров бы." },
+        { res: "apple",         n: 3, text: "Свежих яблок из сада. У горна весь день во рту сухо." },
+        { res: "dish_soup",     n: 1, text: "Горячей ухи бы котелок — силы восстановить." },
+        { res: "lobster",       n: 1, text: "Омара с побережья запечь на углях — пальчики оближешь!" }
     ],
     lena: [
-        { res: "herb",     n: 5, text: "Плету венки на праздник, нужны травы." },
-        { res: "berry",    n: 4, text: "Ягоды для краски — получается чудесный цвет." },
-        { res: "veg",      n: 2, text: "Морковку? Не для еды — для зайца в сарае!" },
-        { res: "seeds",    n: 3, text: "Хочу посадить цветы у калитки." },
-        { res: "dish_pie", n: 1, text: "Ягодный пирог — самый вкусный на свете!" }
+        { res: "herb",          n: 5, text: "Плету венки на праздник, нужны травы." },
+        { res: "berry",         n: 4, text: "Ягоды для краски — получается чудесный цвет." },
+        { res: "cherry",        n: 3, text: "Спелая вишня из сада — самая вкусная ягода!" },
+        { res: "seashell",      n: 2, text: "Красивые ракушки с пляжа для ожерелья." },
+        { res: "dish_pie",      n: 1, text: "Ягодный пирог — самый вкусный на свете!" }
     ]
 };
 

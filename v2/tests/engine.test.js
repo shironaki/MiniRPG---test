@@ -837,3 +837,219 @@ describe("Town aesthetics and outdoor furniture", () => {
         expect(tForest.w).toBe(16);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Dynamic Weather & Four Seasons Calendar
+// ---------------------------------------------------------------------------
+describe("Weather and 4-season calendar system", () => {
+    it("cycles through Spring, Summer, Autumn and Winter across 28 days each", () => {
+        const { WeatherSystem, SEASONS } = loadEngine().exports;
+        const ws = new WeatherSystem();
+        expect(ws.getSeason(1).id).toBe("spring");
+        expect(ws.getSeason(28).id).toBe("spring");
+        expect(ws.getSeason(29).id).toBe("summer");
+        expect(ws.getSeason(56).id).toBe("summer");
+        expect(ws.getSeason(57).id).toBe("autumn");
+        expect(ws.getSeason(84).id).toBe("autumn");
+        expect(ws.getSeason(85).id).toBe("winter");
+        expect(ws.getSeason(112).id).toBe("winter");
+        expect(ws.getSeason(113).id).toBe("spring"); // wraps around to spring in year 2
+    });
+
+    it("generates deterministic weather and provides forecast for tomorrow", () => {
+        const { WeatherSystem } = loadEngine().exports;
+        const ws = new WeatherSystem();
+        const w1 = ws.getWeather(5);
+        const w1Repeat = ws.getWeather(5);
+        expect(w1.id).toBe(w1Repeat.id);
+        expect(typeof w1.name).toBe("string");
+        expect(typeof w1.emoji).toBe("string");
+
+        const forecast = ws.getTomorrowForecast(5);
+        expect(forecast.tomorrowDay).toBe(6);
+        expect(forecast.weather.id).toBe(ws.getWeather(6).id);
+    });
+
+    it("auto-waters growing farm plots on rainy dawn", () => {
+        const { Farm } = loadEngine().exports;
+        const f = new Farm({ rng: () => 0.9 });
+        f.till(1, 1);
+        f.plant(1, 1, 1, 1, "strawberry");
+        expect(f.plot(1, 1).progress).toBe(0);
+
+        // Day 2 dawn with rain (isRaining = true) -> automatically watered & advances progress
+        f.onNewDay(2, true);
+        expect(f.plot(1, 1).progress).toBe(1);
+
+        // Day 3 dawn with rain -> advances progress again
+        f.onNewDay(3, true);
+        expect(f.plot(1, 1).progress).toBe(2);
+
+        // Day 4 dawn with rain -> mature ready for harvest (strawberry growDays = 3)
+        f.onNewDay(4, true);
+        expect(f.plot(1, 1).state).toBe("ready");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-crop Agriculture & Fruit Orchards
+// ---------------------------------------------------------------------------
+describe("Multi-crop agriculture and fruit orchards", () => {
+    it("defines 6 distinct crops with seasonal compatibility and grow times", () => {
+        const { CROPS } = loadEngine().exports;
+        const keys = ["veg", "strawberry", "tomato", "corn", "pumpkin", "wheat"];
+        for (const k of keys) {
+            expect(!!CROPS[k]).toBe(true);
+            expect(CROPS[k].growDays >= 2).toBe(true);
+            expect(typeof CROPS[k].name).toBe("string");
+            expect(typeof CROPS[k].seedRes).toBe("string");
+        }
+    });
+
+    it("supports harvesting distinct crop yields from plots", () => {
+        const { Farm } = loadEngine().exports;
+        const f = new Farm({ rng: () => 0.9 });
+        f.till(5, 5);
+        f.plant(5, 5, 1, 1, "pumpkin");
+        f.water(5, 5, 1);
+        f.onNewDay(2);
+        f.water(5, 5, 2);
+        f.onNewDay(3);
+        f.water(5, 5, 3);
+        f.onNewDay(4);
+        f.water(5, 5, 4);
+        f.onNewDay(5);
+        expect(f.plot(5, 5).state).toBe("ready");
+        const res = f.harvest(5, 5);
+        expect(res.ok).toBe(true);
+        expect(res.crop).toBe("pumpkin");
+        expect(res.emoji).toBe("🎃");
+    });
+
+    it("village orchard features harvestable apple and cherry trees", () => {
+        const { MAPS, ResourceNode } = loadEngine().exports;
+        const v = MAPS.village;
+        const appleNodeDef = v.resources.find(r => r.type === "apple_tree");
+        const cherryNodeDef = v.resources.find(r => r.type === "cherry_tree");
+        expect(!!appleNodeDef).toBe(true);
+        expect(!!cherryNodeDef).toBe(true);
+
+        const appleNode = new ResourceNode(appleNodeDef);
+        const harvest = appleNode.hit();
+        expect(harvest.res).toBe("apple");
+        expect(harvest.amount >= 1).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Coastal Beach Zone & Deep-Sea Fishing
+// ---------------------------------------------------------------------------
+describe("Coastal Beach Zone and marine ecology", () => {
+    it("beach zone is valid, rectangular, has portals, spawns, fauna and resources", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        const b = MAPS.beach;
+        expect(!!b).toBe(true);
+        expect(b.rows.length).toBe(18);
+        const widths = new Set(b.rows.map(r => r.length));
+        expect(widths.size).toBe(1);
+        expect(tileInfo(b.rows[b.spawn.row][b.spawn.col]).solid).toBe(false);
+
+        // Portals link back to village
+        const toVillage = b.portals.find(p => p.to === "village");
+        expect(!!toVillage).toBe(true);
+        expect(tileInfo(b.rows[toVillage.row][toVillage.col]).solid).toBe(false);
+
+        // Beach resources
+        expect(b.resources.some(r => r.type === "seashell")).toBe(true);
+        expect(b.resources.some(r => r.type === "driftwood")).toBe(true);
+        expect(b.resources.some(r => r.type === "seaweed")).toBe(true);
+
+        // Peaceful fauna (crabs & seagulls)
+        expect(b.enemies.some(e => e.kind === "crab")).toBe(true);
+        expect(b.enemies.some(e => e.kind === "seagull")).toBe(true);
+    });
+
+    it("catches saltwater marine fish in ocean waters", () => {
+        const { FishingSystem, OCEAN_FISH_TABLE } = loadEngine().exports;
+        expect(OCEAN_FISH_TABLE.length >= 4).toBe(true);
+        const f = new FishingSystem({ rng: () => 0.05 });
+        const res = f.catchFish(3, true); // tier 3 rod in ocean
+        expect(res.ok).toBe(true);
+        expect(["fish_flounder", "fish_tuna", "lobster", "pearl"].includes(res.res)).toBe(true);
+    });
+
+    it("MobRig supports coastal fauna art (crab, seagull)", () => {
+        const { MobRig } = loadEngine().exports;
+        for (const kind of ["crab", "seagull"]) {
+            const art = MobRig.compose(kind, 0);
+            expect(!!art).toBe(true);
+            expect(art.w > 0).toBe(true);
+            expect(art.h > 0).toBe(true);
+        }
+    });
+
+    it("Furniture supports lighthouse and umbrella pieces", () => {
+        const { Furniture } = loadEngine().exports;
+        for (const kind of ["lighthouse", "umbrella"]) {
+            expect(!!Furniture.KINDS[kind]).toBe(true);
+            const size = Furniture.size(kind);
+            expect(size.w >= 1).toBe(true);
+            expect(size.h >= 1).toBe(true);
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Expanded Cooking Recipes
+// ---------------------------------------------------------------------------
+describe("Expanded cooking recipes and artisan goods", () => {
+    it("cooks apple cider from orchard apples", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("apple", 2);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_cider", bag)).toBe(true);
+        const res = cs.cook("dish_cider", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_cider")).toBe(1);
+    });
+
+    it("cooks strawberry jam from fresh strawberries and berries", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("strawberry", 2);
+        bag.add("berry", 1);
+        expect(cs.canCook("dish_jam", bag)).toBe(true);
+        const res = cs.cook("dish_jam", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_jam")).toBe(1);
+    });
+
+    it("cooks pumpkin soup from autumn pumpkin harvest", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("pumpkin", 1);
+        bag.add("veg", 1);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_pumpkin_soup", bag)).toBe(true);
+        const res = cs.cook("dish_pumpkin_soup", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_pumpkin_soup")).toBe(1);
+    });
+
+    it("cooks seafood pasta from wheat, tomato and lobster", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("wheat", 1);
+        bag.add("tomato", 1);
+        bag.add("lobster", 1);
+        expect(cs.canCook("dish_pasta", bag)).toBe(true);
+        const res = cs.cook("dish_pasta", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_pasta")).toBe(1);
+    });
+});

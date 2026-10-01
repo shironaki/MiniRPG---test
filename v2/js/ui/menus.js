@@ -49,10 +49,14 @@
                 <button class="mBtn" data-buy="${i}">Купить ${s.priceOf(it)}💰</button></div>`).join("");
 
             // Seed packets available at the shop
-            const seedPrice = (RES.seeds && RES.seeds.buyPrice) || 4;
-            const buySeeds = `
-                <div class="row"><span>🌰 ${esc(RES.seeds ? RES.seeds.name : "Семена")} <small>для посева на грядках</small></span>
-                <button class="mBtn" data-buy-seeds="1">Купить ${seedPrice}💰</button></div>`;
+            const seedKeys = ["seeds", "seeds_strawberry", "seeds_tomato", "seeds_corn", "seeds_pumpkin", "seeds_wheat"];
+            const buySeeds = seedKeys.map(k => {
+                const meta = RES[k];
+                if (!meta) return "";
+                const price = meta.buyPrice || 4;
+                return `<div class="row"><span>${meta.emoji || "🌰"} ${esc(meta.name)}</span>
+                <button class="mBtn" data-buy-seed="${k}">Купить ${price}💰</button></div>`;
+            }).join("");
 
             // Sell equipment from hero inventory
             const sellEquip = ctx.hero.inventory.length
@@ -83,12 +87,14 @@
             const b = e.target.closest("button"); if (!b) return;
             if (b.dataset.buy !== undefined) {
                 msg = s.buy(s.items[+b.dataset.buy]).message;
-            } else if (b.dataset.buySeeds !== undefined) {
-                const seedPrice = (RES.seeds && RES.seeds.buyPrice) || 4;
+            } else if (b.dataset.buySeed || b.dataset.buySeeds !== undefined) {
+                const seedKey = b.dataset.buySeed || "seeds";
+                const seedPrice = (RES[seedKey] && RES[seedKey].buyPrice) || 4;
                 if (ctx.hero.gold >= seedPrice) {
                     ctx.hero.gold -= seedPrice;
-                    ctx.resources.add("seeds", 1);
-                    msg = "Куплены семена 🌰!";
+                    ctx.resources.add(seedKey, 1);
+                    const name = RES[seedKey] ? RES[seedKey].name : "Семена";
+                    msg = `Куплены ${name} 🌰!`;
                 } else {
                     msg = "Не хватает золота.";
                 }
@@ -202,14 +208,17 @@
             }
             const list = cs.list(ctx.resources, ctx.storage);
             const cards = list.map(r => {
-                const reqParts = Object.entries(r.activeIngredients).map(([k, needed]) => {
-                    const meta = RES[k] || {};
-                    const have = (ctx.resources ? ctx.resources.count(k) : 0) + (ctx.storage ? ctx.storage.count(k) : 0);
-                    const mark = have >= needed ? "✓" : "✗";
-                    return `<span>${meta.emoji || "📦"} ${meta.name || k}: ${have}/${needed} <small>(${mark})</small></span>`;
+                const reqParts = (r.ingredients || []).map(ing => {
+                    const meta = RES[ing.res] || {};
+                    const have = (ctx.resources ? ctx.resources.count(ing.res) : 0) + (ctx.storage ? ctx.storage.count(ing.res) : 0);
+                    const mark = have >= ing.count ? "✓" : "✗";
+                    return `<span>${meta.emoji || "📦"} ${esc(ing.name || meta.name || ing.res)}: ${have}/${ing.count} <small>(${mark})</small></span>`;
                 }).join(" · ");
 
-                const effect = `❤️ +${r.heal || 0} · ⚡ +${r.energy || 0}`;
+                const resMeta = RES[r.yield ? r.yield.res : r.id] || {};
+                const heal = resMeta.heal || r.heal || 0;
+                const energy = resMeta.energy || r.energy || 0;
+                const effect = `❤️ +${heal} · ⚡ +${energy}`;
                 const btn = r.canCook
                     ? `<button class="mBtn" data-cook="${r.id}">🍲 Приготовить</button>`
                     : `<span class="hint">Нужны припасы</span>`;
@@ -576,12 +585,28 @@
         const RES = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
 
         function render() {
+            // Weather and forecast
+            let weatherForecastHtml = "";
+            if (ctx.weather) {
+                const curSeason = ctx.weather.getSeason(ctx.day || 1);
+                const curW = ctx.weather.getWeather(ctx.day || 1);
+                const tomorrow = ctx.weather.getTomorrowForecast(ctx.day || 1);
+                weatherForecastHtml = `
+                    <div class="row" style="background:rgba(255,255,255,0.05);border-radius:6px;padding:8px 10px;margin-bottom:10px">
+                        <div>
+                            <strong>${curSeason.emoji} ${curSeason.name} (День ${curSeason.dayInSeason}/28)</strong> · <span>Сегодня: ${curW.emoji} ${curW.name}</span><br>
+                            <small class="hint">Завтра ожидается: ${tomorrow.weather.emoji} ${tomorrow.weather.name} ${tomorrow.weather.isRain ? "· 🌧️ Грядки польются дождём!" : ""}</small>
+                        </div>
+                    </div>`;
+            }
+
             // Daily village news & gossip based on day
             const GOSSIP = [
-                "☀️ Сегодня в долине тепло и ясно. Идеальный день для рыбалки на пруду и ухода за грядками!",
+                "☀️ В долине тепло и ясно. Идеальный день для рыбалки на пруду и ухода за грядками!",
                 "🍃 В воздухе пахнет свежей хвоей. В лесу созрели сочные ягоды и целебные травы.",
                 "⚒️ Кузнец Кузьма раздувает меха с самого рассвета — в кузнице ждут новые инструменты!",
                 "🍲 В домах топятся печи и пахнет сытной похлёбкой. Не забудь приготовить горячий обед!",
+                "🏖️ На Лазурном берегу плещутся волны и кричат чайки. Отличное место для глубоководной рыбалки!",
                 "✨ Старейшины говорят, что в глубине тёмного леса открылись древние врата испытаний..."
             ];
             const news = GOSSIP[(ctx.day || 1) % GOSSIP.length];
@@ -617,7 +642,8 @@
 
             paint(`<h2>📜 Доска объявлений деревни</h2>
                 ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
-                <h4 class="mGroup">📰 Вестник деревни</h4>
+                <h4 class="mGroup">🌤️ Погода и вестник</h4>
+                ${weatherForecastHtml}
                 <div class="row"><p style="margin:4px 0;line-height:1.4">${esc(news)}</p></div>
                 <h4 class="mGroup">📋 Заказы жителей</h4>
                 ${errandRows}

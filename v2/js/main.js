@@ -33,6 +33,7 @@
     const tools = (typeof Tools !== "undefined") ? new Tools() : null;
     const cooking = (typeof CookingSystem !== "undefined") ? new CookingSystem() : null;
     const fishing = (typeof FishingSystem !== "undefined") ? new FishingSystem() : null;
+    const weather = (typeof WeatherSystem !== "undefined") ? new WeatherSystem() : null;
     resources.add("seeds", 6);            // a starter pouch of seeds
 
     // Transient on-screen feedback (gathering, gifts, catches) — fades on its own.
@@ -91,7 +92,7 @@
     };
     const menuCtx = {
         hero, journal, host, refresh: refreshStats, social, resources,
-        requests, storage, tools, cooking, fishing,
+        requests, storage, tools, cooking, fishing, weather,
         get day() { return dayCount; }
     };
 
@@ -298,6 +299,11 @@
 
     function gatherVerb(type) {
         return type === "tree" ? "Рубить дерево"
+            : type === "apple_tree" ? "Собрать яблоки"
+            : type === "cherry_tree" ? "Собрать вишню"
+            : type === "seashell" ? "Собрать ракушку"
+            : type === "driftwood" ? "Собрать плавник"
+            : type === "seaweed" ? "Собрать ламинарию"
             : type === "rock" ? "Добыть камень"
             : type === "herb" ? "Собрать травы" : "Собрать ягоды";
     }
@@ -317,8 +323,29 @@
         let r;
         if (act === "till") r = farm.till(cell.col, cell.row);
         else if (act === "plant") {
-            r = farm.plant(cell.col, cell.row, dayCount, resources.count("seeds"));
-            if (r.ok && r.consumeSeed) resources.remove("seeds", 1);
+            let chosenSeed = null;
+            let chosenCrop = "veg";
+            const seedTypes = [
+                { seed: "seeds", crop: "veg" },
+                { seed: "seeds_strawberry", crop: "strawberry" },
+                { seed: "seeds_tomato", crop: "tomato" },
+                { seed: "seeds_corn", crop: "corn" },
+                { seed: "seeds_pumpkin", crop: "pumpkin" },
+                { seed: "seeds_wheat", crop: "wheat" }
+            ];
+            for (const st of seedTypes) {
+                if (resources.count(st.seed) > 0) {
+                    chosenSeed = st.seed;
+                    chosenCrop = st.crop;
+                    break;
+                }
+            }
+            if (chosenSeed) {
+                r = farm.plant(cell.col, cell.row, dayCount, resources.count(chosenSeed), chosenCrop);
+                if (r.ok && r.consumeSeed) resources.remove(chosenSeed, 1);
+            } else {
+                r = farm.plant(cell.col, cell.row, dayCount, 0, "veg");
+            }
         } else if (act === "water") {
             r = farm.water(cell.col, cell.row, dayCount);
         } else {
@@ -340,7 +367,7 @@
     function gatherFrom(node) {
         let toolBonus = 0;
         if (tools) {
-            if (node.type === "tree") toolBonus = tools.level("axe") - 1;
+            if (node.type === "tree" || node.type === "driftwood") toolBonus = tools.level("axe") - 1;
             else if (node.type === "rock") toolBonus = tools.level("pickaxe") - 1;
         }
         const r = node.hit(toolBonus);
@@ -356,11 +383,11 @@
         refreshStats();
     }
 
-    // Fishing at the pond: casts a line and hooks a catch.
-    function fishAtPond() {
+    // Fishing at the pond or ocean beach: casts a line and hooks a catch.
+    function fishAtPond(isOcean = false) {
         const rodLv = tools ? tools.level("rod") : 1;
         const fishSys = fishing || new FishingSystem();
-        const res = fishSys.catchFish(rodLv);
+        const res = fishSys.catchFish(rodLv, isOcean);
         resources.add(res.res, res.amount);
         if (res.bonus) resources.add(res.bonus.res, res.bonus.amount);
         hero.addExperience(res.xp || 5);
@@ -380,7 +407,11 @@
         // Doors are instant: step inside instead of opening a panel.
         if (it.action === "enter" && it.to) { loadZone(it.to, it.spawn); return; }
         if (it.action === "sleep") { sleepUntilMorning(); return; }
-        if (it.action === "fishing") { fishAtPond(); return; }
+        if (it.action === "fishing") {
+            const isOcean = it.spot === "ocean" || mapData.id === "beach";
+            fishAtPond(isOcean);
+            return;
+        }
         paused = true;
         const dispatch = {
             shop: V2Menus.shop,
@@ -401,18 +432,30 @@
         overlay.classList.remove("hidden");
     }
 
+    function onDawn(newDay) {
+        dayCount = newDay;
+        const curWeather = weather ? weather.getWeather(dayCount) : null;
+        const isRain = curWeather && curWeather.isRain;
+        farm.onNewDay(dayCount, isRain);
+        social.setDay(dayCount);
+        if (isRain) {
+            showFlash(`🌧️ Дождь полил все грядки в долине!`, 2.5);
+        }
+    }
+
     /**
      * Sleeping in your own bed ends the day: the clock jumps to next morning,
      * crops advance, and the hero wakes up rested. The one way to skip a night.
      */
     function sleepUntilMorning() {
-        dayCount += 1;
+        const nextDay = dayCount + 1;
         clockMin = 8 * 60;
-        farm.onNewDay(dayCount);
-        social.setDay(dayCount);
+        onDawn(nextDay);
         hero.health = hero.maxHealth;
         if (hero.maxEnergy) hero.energy = hero.maxEnergy;
-        showFlash(`😴 Выспался. Наступил день ${dayCount}.`, 2);
+        const seasonInfo = weather ? weather.getSeason(dayCount) : null;
+        const seasonStr = seasonInfo ? ` · ${seasonInfo.emoji} ${seasonInfo.name}` : "";
+        showFlash(`😴 Выспался. Наступил день ${dayCount}${seasonStr}.`, 2);
         refreshStats();
         input.consumePressed();
     }
@@ -507,7 +550,7 @@
     function update(dt) {
         const prev = clockMin;
         clockMin = (clockMin + dt * MIN_PER_SEC) % 1440;
-        if (clockMin < prev) { dayCount += 1; farm.onNewDay(dayCount); }  // dawn → new day
+        if (clockMin < prev) { onDawn(dayCount + 1); }  // dawn → new day
         social.setDay(dayCount);
         if (flashT > 0) flashT = Math.max(0, flashT - dt);
         if (paused) return;
@@ -562,8 +605,11 @@
             ? (mapData.warm ? { r: 255, g: 176, b: 88, a: 0.12, night: 0 } : { a: 0, night: 0 })
             : lightingFor(clockMin);
 
+        const curSeason = weather ? weather.getSeason(dayCount) : { id: "spring", name: "Весна", emoji: "🌸" };
+        const curW = weather ? weather.getWeather(dayCount) : { id: "sunny", name: "Солнечно", emoji: "☀️" };
+
         renderer.clear(camera.viewW, camera.viewH);
-        renderer.drawMap(tilemap, camera);
+        renderer.drawMap(tilemap, camera, curSeason ? curSeason.id : "spring");
         renderer.drawBuildings(mapData.buildings, camera, mapData.tileSize, light.night);
         renderer.drawFarm(farm, farmPlots, camera, mapData.tileSize);
         renderer.drawFurniture(furniture, camera, mapData.tileSize, Math.floor(performance.now() / 380));
@@ -579,6 +625,9 @@
             buildings: mapData.buildings,
             tileSize: mapData.tileSize
         });
+        if (typeof renderer.drawWeather === "function" && weather && !indoor) {
+            renderer.drawWeather(camera, curW.id, performance.now() / 1000);
+        }
         if (typeof renderer.drawAmbient === "function") {
             renderer.drawAmbient(camera, zoneName, light);
         }
@@ -587,9 +636,11 @@
             hud.textContent = flash;
             hud.classList.add("active");
         } else {
+            const weatherBadge = curW ? ` ${curW.emoji}` : "";
+            const seasonBadge = curSeason ? `${curSeason.emoji} ` : "";
             hud.textContent = nearest
                 ? `Нажми E — ${nearest.emoji} ${nearest.label}`
-                : `📍 ${zoneName} · День ${dayCount} · ${clockLabel(clockMin)} · E — действие · I — рюкзак`;
+                : `📍 ${zoneName} · ${seasonBadge}${curSeason ? curSeason.name : "Сезон"} (День ${dayCount}) ·${weatherBadge} ${clockLabel(clockMin)} · E — действие · I — рюкзак`;
             hud.classList.toggle("active", !!nearest);
         }
     }
@@ -605,7 +656,7 @@
         // as getters so the handle never points at a stale map.
         get tilemap() { return tilemap; },
         get mapData() { return mapData; },
-        social, resources, farm,
+        social, resources, farm, weather,
         get npcs() { return npcs; },
         get nodes() { return resourceNodes; },
         get farmPlots() { return farmPlots; },

@@ -244,6 +244,35 @@ describe("v2 smoke › playing", () => {
         g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
         const html = g.html("overlayBody");
         expect(html.includes("Доска объявлений") || html.includes("Вестник")).toBe(true);
+        expect(html.includes("Погода") || html.includes("День")).toBe(true);
+    });
+
+    it("travels to coastal beach zone, gathers seashells and fishes in the ocean", () => {
+        const g = boot();
+        g.tick(16.7);
+        const beachPortal = g.globals.MAPS.village.portals.find(p => p.to === "beach");
+        expect(!!beachPortal).toBe(true);
+        standOn(g.v2, beachPortal.col, beachPortal.row);
+        g.tick(16.7);
+        expect(g.v2.zone).toBe("Лазурный берег");
+
+        // Gather seashell
+        const shell = g.globals.MAPS.beach.resources.find(r => r.type === "seashell");
+        expect(!!shell).toBe(true);
+        standOn(g.v2, shell.col, shell.row);
+        g.tick(16.7);
+        g.tap("KeyE");
+        g.tick(16.7);
+        expect(g.v2.resources.count("seashell") >= 1).toBe(true);
+
+        // Fish in ocean
+        const oceanSpot = g.globals.MAPS.beach.interactables.find(i => i.action === "fishing");
+        expect(!!oceanSpot).toBe(true);
+        standOn(g.v2, oceanSpot.col, oceanSpot.row);
+        g.tick(16.7);
+        g.tap("KeyE");
+        g.tick(16.7);
+        expect(g.v2.resources.total() >= 2).toBe(true);
     });
 
     it("pets the village cat on the plaza for heartwarming friendship", () => {
