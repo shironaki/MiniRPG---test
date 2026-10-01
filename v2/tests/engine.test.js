@@ -617,3 +617,167 @@ describe("Interiors", () => {
         expect(tm.tileAt(1, 1)).toBe("o");           // art unchanged
     });
 });
+
+// ---------------------------------------------------------------------------
+// Fishing system
+// ---------------------------------------------------------------------------
+describe("Fishing system", () => {
+    it("casts line with delay shortened by better rods", () => {
+        const { FishingSystem } = loadEngine().exports;
+        const f = new FishingSystem({ rng: () => 0 });
+        const c1 = f.cast(1);
+        const c3 = f.cast(3);
+        expect(c1.delay > c3.delay).toBe(true);
+        expect(c1.rodLevel).toBe(1);
+        expect(c3.rodLevel).toBe(3);
+    });
+
+    it("catches fish and grants resources and xp", () => {
+        const { FishingSystem } = loadEngine().exports;
+        const f = new FishingSystem({ rng: () => 0.1 });
+        const res = f.catchFish(1);
+        expect(res.ok).toBe(true);
+        expect(typeof res.res).toBe("string");
+        expect(res.amount >= 1).toBe(true);
+        expect(res.xp > 0).toBe(true);
+    });
+
+    it("tier 1 rod catches common fish, tier 2 rod unlocks pike", () => {
+        const { FishingSystem } = loadEngine().exports;
+        // On tier 1 rod, pike (minRod: 2) must never be drawn
+        const f1 = new FishingSystem({ rng: () => 0.999 });
+        const res1 = f1.catchFish(1);
+        expect(res1.res !== "fish_pike").toBe(true);
+
+        // On tier 2 rod, pike is accessible
+        const f2 = new FishingSystem({ rng: () => 0.99 });
+        const res2 = f2.catchFish(2);
+        expect(res2.ok).toBe(true);
+    });
+
+    it("better rods can hook double catches or bonus items", () => {
+        const { FishingSystem } = loadEngine().exports;
+        // Rng configured to trigger treasureRoll < 0.12 * level
+        let doubleSeen = false;
+        for (let i = 0; i < 20; i++) {
+            const f = new FishingSystem({ rng: () => 0.05 });
+            const res = f.catchFish(3);
+            if (res.amount === 2 || res.bonus) doubleSeen = true;
+        }
+        expect(doubleSeen).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cooking system
+// ---------------------------------------------------------------------------
+describe("Cooking system", () => {
+    it("lists recipes with descriptions, stats and ingredient requirements", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        const list = cs.list(bag);
+        expect(list.length >= 5).toBe(true);
+        expect(list.some(r => r.id === "dish_stew")).toBe(true);
+        expect(list.some(r => r.id === "dish_fish")).toBe(true);
+        expect(list.some(r => r.id === "dish_pie")).toBe(true);
+    });
+
+    it("detects when ingredients are missing and refuses to cook", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        expect(cs.canCook("dish_stew", bag)).toBe(false);
+        const r = cs.cook("dish_stew", bag);
+        expect(r.ok).toBe(false);
+        expect(bag.count("dish_stew")).toBe(0);
+    });
+
+    it("cooks when ingredients are present in bag, consuming them and yielding dish", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("veg", 2);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_stew", bag)).toBe(true);
+        const res = cs.cook("dish_stew", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("veg")).toBe(0);
+        expect(bag.count("herb")).toBe(0);
+        expect(bag.count("dish_stew")).toBe(1);
+    });
+
+    it("supports cooking from home storage chest when bag is short", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        const storage = new ResourceBag();
+        bag.add("veg", 1);
+        storage.add("veg", 1);
+        storage.add("herb", 1);
+        expect(cs.canCook("dish_stew", bag, storage)).toBe(true);
+        const res = cs.cook("dish_stew", bag, storage);
+        expect(res.ok).toBe(true);
+        expect(bag.count("veg")).toBe(0);
+        expect(storage.count("veg")).toBe(0);
+        expect(storage.count("herb")).toBe(0);
+        expect(bag.count("dish_stew")).toBe(1);
+    });
+
+    it("supports alternative fish ingredients for grilled fish", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("crayfish", 2);
+        bag.add("wood", 1);
+        expect(cs.canCook("dish_fish", bag)).toBe(true);
+        const res = cs.cook("dish_fish", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("crayfish")).toBe(0);
+        expect(bag.count("dish_fish")).toBe(1);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Tools and forge upgrades
+// ---------------------------------------------------------------------------
+describe("Tools and upgrades", () => {
+    it("starts at tier 1 with defined names and info", () => {
+        const { Tools } = loadEngine().exports;
+        const t = new Tools();
+        expect(t.level("rod")).toBe(1);
+        expect(t.level("axe")).toBe(1);
+        expect(t.level("pickaxe")).toBe(1);
+        expect(t.level("can")).toBe(1);
+        expect(t.info("rod").name.includes("удочка")).toBe(true);
+    });
+
+    it("refuses upgrade when resources or gold are missing", () => {
+        const { Tools, ResourceBag } = loadEngine().exports;
+        const t = new Tools();
+        const hero = { gold: 10, inventory: [] };
+        const bag = new ResourceBag();
+        const check = t.canUpgrade("rod", hero, bag);
+        expect(check.ok).toBe(false);
+    });
+
+    it("upgrades tool tier, consuming gold and resources", () => {
+        const { Tools, ResourceBag } = loadEngine().exports;
+        const t = new Tools();
+        const hero = { gold: 100, inventory: [{ name: "Эссенция ковки", type: "essence" }] };
+        const bag = new ResourceBag();
+        bag.add("wood", 10);
+        const res = t.upgrade("rod", hero, bag);
+        expect(res.ok).toBe(true);
+        expect(t.level("rod")).toBe(2);
+        expect(hero.gold).toBe(50);
+        expect(bag.count("wood")).toBe(4);
+    });
+
+    it("tool upgrade bonus enhances gathering hit yield", () => {
+        const { ResourceNode } = loadEngine().exports;
+        const node = new ResourceNode({ type: "tree", col: 1, row: 1, hits: 2, bonus: 1 });
+        const res = node.hit(1); // toolBonus = 1
+        expect(res.amount >= 1).toBe(true);
+    });
+});

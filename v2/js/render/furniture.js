@@ -216,6 +216,29 @@
         return g;
     }
 
+    // Kitchen stove with cooking pot, 1x1: cast-iron stove, boiling stew, steam.
+    function stove(phase) {
+        const g = grid(N, N);
+        rect(g, 1, 4, 14, 11, "#383531");
+        rect(g, 1, 4, 14, 1, "#54504a");
+        rect(g, 1, 14, 14, 1, "#201e1c");
+        // Firebox door & glow
+        rect(g, 4, 8, 8, 6, "#241f1c");
+        const f = phase % 2 === 0;
+        rect(g, 5, 10, 6, 3, f ? "#e8622a" : "#f07a2a");
+        px(g, f ? 6 : 8, 11, "#ffe07a");
+        // Cooking pot on stove
+        rect(g, 4, 1, 8, 4, "#5a5a60");
+        rect(g, 3, 2, 10, 1, "#707078");
+        // Stew surface
+        rect(g, 5, 2, 6, 1, "#d9742b");
+        // Steam puffs
+        px(g, f ? 6 : 8, 0, "#e8e0d5");
+        px(g, f ? 8 : 6, 0, "#c9bfb0");
+        shadow(g, 2, 15, 12);
+        return g;
+    }
+
     // A soft contact shadow so pieces sit ON the floor instead of floating.
     function shadow(g, x, y, w) {
         rect(g, x + 1, y, w - 2, 1, "#6b4a28");
@@ -230,6 +253,7 @@
         table:     { w: 2, h: 1, make: table },
         chair:     { w: 1, h: 1, make: chair },
         fireplace: { w: 2, h: 1, make: fireplace, animated: true },
+        stove:     { w: 1, h: 1, make: stove, animated: true },
         counter:   { w: 2, h: 1, make: counter },
         shelf:     { w: 1, h: 1, make: shelf },
         anvil:     { w: 1, h: 1, make: anvil },

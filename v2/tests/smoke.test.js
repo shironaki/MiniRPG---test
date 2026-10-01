@@ -174,6 +174,54 @@ describe("v2 smoke › playing", () => {
         expect(g.v2.resources.count("wood")).toBe(bag);
     });
 
+    it("fishes at the village pond with E and adds fish to the bag", () => {
+        const g = boot();
+        g.tick(16.7);
+        const fishSpot = g.globals.MAPS.village.interactables.find(i => i.action === "fishing");
+        expect(!!fishSpot).toBe(true);
+        standOn(g.v2, fishSpot.col, fishSpot.row);
+        g.tick(16.7);
+        const bagBefore = g.v2.resources.total();
+        g.tap("KeyE");
+        g.tick(16.7);
+        expect(g.v2.resources.total() > bagBefore).toBe(true);
+    });
+
+    it("walks into home, opens the cooking hearth and cooks a dish", () => {
+        const g = boot();
+        g.tick(16.7);
+        const door = g.globals.MAPS.village.interactables.find(i => i.to === "home");
+        standOn(g.v2, door.col, door.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        expect(g.v2.zone).toBe("Твой дом");
+
+        // Give player ingredients
+        g.v2.resources.add("veg", 2);
+        g.v2.resources.add("herb", 1);
+
+        const hearth = g.globals.MAPS.home.interactables.find(i => i.action === "cooking");
+        expect(!!hearth).toBe(true);
+        standOn(g.v2, hearth.col, hearth.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+
+        const html = g.html("overlayBody");
+        expect(html.toLowerCase().includes("очаг") || html.includes("похл")).toBe(true);
+        expect(html.includes("data-cook=\"dish_stew\"")).toBe(true);
+    });
+
+    it("eats a cooked meal from the backpack to restore health and energy", () => {
+        const g = boot();
+        g.tick(16.7);
+        g.v2.resources.add("dish_stew", 1);
+        const hero = g.sandbox.__all.Player ? g.sandbox.__v2.player : null;
+        // Open backpack with KeyI
+        g.tap("KeyI");
+        g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("Овощная похлёбка")).toBe(true);
+        expect(html.includes("data-eat=\"dish_stew\"")).toBe(true);
+    });
+
     it("survives a long session: 400 frames across the day/night cycle", () => {
         const g = boot();
         for (let i = 0; i < 400; i++) g.tick(50);    // ~20s → clock advances

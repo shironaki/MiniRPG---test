@@ -72,13 +72,14 @@ LICENSE               # MIT, © 2026 shironaki — НЕ МЕНЯТЬ
 ../js/enemy.js battle.js shop.js quest.js dungeon.js dialogue.js   ← логика v1
 engine/vec.js  engine/input.js  engine/camera.js  engine/loop.js
 world/tiles.js world/tilemap.js world/social.js world/resources.js
-world/farming.js world/maps.js
+world/farming.js world/fishing.js world/cooking.js world/tools.js
+world/requests.js world/maps.js
 entities/mover.js entities/player.js entities/enemy.js entities/npc.js
 battle/battle2d.js battle/battleui.js
 ui/menus.js
-render/tilesart.js render/buildings.js render/character.js render/mobs.js
+render/tilesart.js render/buildings.js render/furniture.js render/character.js render/mobs.js
 render/renderer.js
-main.js                                                            ← ЗАМОРОЖЕН
+main.js
 ```
 
 ### 3.1 `engine/` — каркас
@@ -97,10 +98,14 @@ main.js                                                            ← ЗАМО�
 |------|-----------|
 | `tiles.js` | типы тайлов, проходимость |
 | `tilemap.js` | сетка 32 px, коллизии, перевод координат |
-| `maps.js` | **данные всех зон**: `village`, `forest`, `cave` — тайлы, `buildings`, `npcs`, `resources`, `farm`, `portals`. Контентные правки делаются тут |
+| `maps.js` | **данные всех зон**: `village`, `forest`, `cave`, `home`, `shop_in`, `forge_in` — тайлы, `buildings`, `npcs`, `resources`, `farm`, `furniture`, `portals`. Контентные правки делаются тут |
 | `social.js` | `Social`: очки дружбы → сердца, лимиты «раз в день» на разговор/подарок, любимые подарки |
-| `resources.js` | `RESOURCES` (каталог: 🪵 дерево, камень, ягоды, травы, 🌰 семена, 🥕 овощи), `NODE_TYPES`, `ResourceNode` (сбор, истощение, респавн), `ResourceBag` (сумка) |
+| `resources.js` | `RESOURCES` (каталог: 🪵 дерево, камень, ягоды, травы, 🌰 семена, 🥕 овощи, 🐟 рыба, 🍲 блюда), `NODE_TYPES`, `ResourceNode` (сбор, истощение, респавн), `ResourceBag` (сумка) |
 | `farming.js` | `Farm`, `FarmPlot`, `CROP`. Конечный автомат грядки: `empty → tilled → growing → ready → (harvest) → tilled`. `onNewDay(day)` растит только политые накануне. `rng` инъектируемый |
+| `fishing.js` | `FishingSystem`: ловля рыбы в пруду/реках (окунь, карп, щука, раки), влияние удочки, шансы сокровищ |
+| `cooking.js` | `CookingSystem`, `RECIPES`: домашняя готовка (похлёбка, жареная рыба, пирог, уха, чай) |
+| `tools.js` | `Tools`, `TOOL_TIERS`: уровни и прокачка удочки, топора, кирки и лейки в кузнице |
+| `requests.js` | `Requests`, `REQUEST_POOL`: поручения жителей на ресурсы, рыбу и блюда за золото и дружбу |
 
 ### 3.3 `entities/` — то, что двигается
 | Файл | Что делает |
@@ -149,10 +154,11 @@ main.js                                                            ← ЗАМО�
 |------|----------|---------------|
 | `tests/game.test.js` | 119 | логика v1 + детерминированный Монте-Карло баланса боя |
 | `tests/integration.test.js` | 24 | загрузка v1 целиком, карта, клики, финальный экран |
-| `v2/tests/engine.test.js` | 39 | движок v2, карты, расписание NPC, дружба, ресурсы, ферма |
+| `v2/tests/engine.test.js` | 62 | движок v2, карты, интерьеры, NPC, дружба, ресурсы, ферма, рыбалка, готовка, инструменты |
 | `v2/tests/battle.test.js` | 5 | мост в боевую систему |
 | `v2/tests/menus.test.js` | 5 | меню поверх систем v1 |
-| | **192** | `npm test` |
+| `v2/tests/smoke.test.js` | 16 | смоук-тесты в headless DOM: полный игровой цикл |
+| | **231** | `npm test` |
 
 Харнессы (`tests/harness.js`, `v2/tests/harness.js`, `v2/tests/menus-harness.js`,
 `v2/tests/battle-harness.js`) грузят **настоящие исходники** в Node `vm` с

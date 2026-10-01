@@ -42,12 +42,13 @@ const MAPS = {
         // Interactable points sit in front of each building's door.
         // `enter` walks the hero into a real interior zone.
         interactables: [
-            { col: 5,  row: 5,  action: "enter", to: "home",     spawn: { col: 5, row: 6 }, label: "Твой дом",  emoji: "🏠" },
-            { col: 21, row: 5,  action: "enter", to: "shop_in",  spawn: { col: 5, row: 7 }, label: "Лавка",     emoji: "🛒" },
-            { col: 5,  row: 15, action: "enter", to: "forge_in", spawn: { col: 5, row: 7 }, label: "Кузница",   emoji: "🔨" },
+            { col: 5,  row: 5,  action: "enter", to: "home",     spawn: { col: 5, row: 6 }, label: "Твой дом",         emoji: "🏠" },
+            { col: 21, row: 5,  action: "enter", to: "shop_in",  spawn: { col: 5, row: 7 }, label: "Лавка",            emoji: "🛒" },
+            { col: 5,  row: 15, action: "enter", to: "forge_in", spawn: { col: 5, row: 7 }, label: "Кузница",          emoji: "🔨" },
             { col: 20, row: 15, action: "dungeon", label: "Врата испытаний", emoji: "🚪" },
             { col: 13, row: 6,  action: "quests",  label: "Доска квестов",   emoji: "📜" },
-            { col: 6,  row: 5,  action: "npc",     label: "Староста",        emoji: "🧑" }
+            { col: 6,  row: 5,  action: "npc",     label: "Староста",        emoji: "🧑" },
+            { col: 5,  row: 8,  action: "fishing", label: "Рыбалка у пруда", emoji: "🎣" }
         ],
         // The village is a peaceful zone — no enemies here (they roam the wilds).
         enemies: [],
@@ -57,11 +58,12 @@ const MAPS = {
             {
                 id: "marta", name: "Марта", emoji: "👩‍🌾", role: "Фермерша",
                 look: { shirt: "#4b9e57", shirtSh: "#357a41", hair: "#8a5a2b", hairSh: "#5f3d1c", hat: null, pants: "#6b4a2e", pantsSh: "#4a331f" },
-                likes: ["berry", "herb", "veg", "Зелье"],
+                likes: ["berry", "herb", "veg", "dish_stew", "dish_pie", "dish_tea", "Зелье"],
                 dialogue: [
                     "Урожай в этом году добрый, если дожди не подведут.",
                     "Свежие ягоды? Обожаю! Не поделишься находкой?",
-                    "Земля кормит того, кто её уважает."
+                    "Земля кормит того, кто её уважает.",
+                    "Горячая похлёбка в промозглый день — лучше любого золота."
                 ],
                 schedule: [
                     { from: 0,    col: 5,  row: 6,  activity: "sleep" },
@@ -74,11 +76,12 @@ const MAPS = {
             {
                 id: "boris", name: "Борис", emoji: "🧔", role: "Дровосек",
                 look: { shirt: "#3a6ea5", shirtSh: "#284f78", hair: "#3b2a1a", hairSh: "#241a10", hat: "#5a3a22", hatSh: "#3f2814", pants: "#41352a" },
-                likes: ["wood", "stone", "Меч", "эссенц"],
+                likes: ["wood", "stone", "dish_fish", "fish_pike", "fish_carp", "Меч", "эссенц"],
                 dialogue: [
                     "Топор остёр, спина крепка — что ещё нужно мужику?",
                     "Хорошее дерево на вес золота. Ценю тех, кто это понимает.",
-                    "В лесу зверьё пошаливает. В деревню, к счастью, не суётся."
+                    "В лесу зверьё пошаливает. В деревню, к счастью, не суётся.",
+                    "Свежевыловленная щука на костре — вот это настоящая еда!"
                 ],
                 schedule: [
                     { from: 0,    col: 21, row: 6,  activity: "sleep" },
@@ -91,11 +94,12 @@ const MAPS = {
             {
                 id: "lena", name: "Лена", emoji: "👧", role: "Цветочница",
                 look: { shirt: "#d46a9f", shirtSh: "#a84c7c", hair: "#e6c34d", hairSh: "#c49a2b", hat: null, pants: "#7a5a86", pantsSh: "#573f61" },
-                likes: ["berry", "herb", "veg", "цвет"],
+                likes: ["berry", "herb", "veg", "dish_pie", "crayfish", "dish_tea", "цвет"],
                 dialogue: [
                     "Смотри, какие цветы у пруда — прелесть!",
                     "Ты принёс мне травы? Ты самый добрый!",
-                    "Староста опять грустит. Отнеси ему хорошие вести!"
+                    "Староста опять грустит. Отнеси ему хорошие вести!",
+                    "А пирог с лесными ягодами ты умеешь печь? Я его так люблю!"
                 ],
                 schedule: [
                     { from: 0,    col: 18, row: 14, activity: "sleep" },
@@ -238,7 +242,8 @@ const MAPS = {
         furniture: [
             { kind: "bed",       col: 1, row: 1 },
             { kind: "chest",     col: 3, row: 1 },
-            { kind: "fireplace", col: 7, row: 1 },
+            { kind: "stove",     col: 6, row: 1 },
+            { kind: "fireplace", col: 8, row: 1 },
             { kind: "table",     col: 6, row: 4 },
             { kind: "chair",     col: 5, row: 4 },
             { kind: "chair",     col: 8, row: 4 },
@@ -246,8 +251,9 @@ const MAPS = {
             { kind: "plant",     col: 9, row: 6 }
         ],
         interactables: [
-            { col: 1, row: 2, action: "sleep", label: "Лечь спать", emoji: "🛏️" },
-            { col: 3, row: 1, action: "storage", label: "Сундук", emoji: "🧰" }
+            { col: 1, row: 2, action: "sleep",   label: "Лечь спать",     emoji: "🛏️" },
+            { col: 3, row: 1, action: "storage", label: "Сундук",         emoji: "🧰" },
+            { col: 6, row: 2, action: "cooking", label: "Очаг (готовка)", emoji: "🍲" }
         ],
         portals: [
             { col: 5, row: 7, to: "village", spawn: { col: 5, row: 6 }, label: "На улицу", emoji: "🚪" }
@@ -291,13 +297,14 @@ const MAPS = {
             {
                 id: "tomila", name: "Томила", emoji: "👩‍🦰", role: "Торговка",
                 look: { shirt: "#8e5aa8", shirtSh: "#6d4184", hair: "#c75b3a", hairSh: "#95412a", hat: null, pants: "#3f4a6b", pantsSh: "#2c3550" },
-                likes: ["herb", "veg", "Эссенция"],
+                likes: ["herb", "veg", "fish_carp", "dish_stew", "dish_tea", "Эссенция"],
                 speed: 20,
                 dialogue: [
                     "Свежий товар! Ну, почти свежий.",
                     "Продашь лишнее — куплю не глядя. Почти.",
                     "Слыхал? В лесу опять волки шалят.",
-                    "Кузнец опять забыл заплатить за гвозди."
+                    "Кузнец опять забыл заплатить за гвозди.",
+                    "Рыбка и овощи в цене — купцы из города с руками отрывают!"
                 ],
                 schedule: [
                     { from: 0,   col: 4, row: 1, activity: "counter" },
@@ -346,13 +353,14 @@ const MAPS = {
             {
                 id: "kuzma", name: "Кузьма", emoji: "🧔‍♂️", role: "Кузнец",
                 look: { shirt: "#7a4a2a", shirtSh: "#5a3319", hair: "#2f2a26", hairSh: "#1c1917", hat: null, pants: "#3a3833", pantsSh: "#282622" },
-                likes: ["stone", "wood", "Эссенция"],
+                likes: ["stone", "wood", "dish_fish", "dish_soup", "fish_perch", "crayfish", "Эссенция"],
                 speed: 26,
                 dialogue: [
                     "Металл любит терпение. И уголь. Много угля.",
                     "Принесёшь камня — сделаю что-нибудь путное.",
                     "Руки в саже, зато совесть чистая.",
-                    "Хороший молот переживёт хозяина."
+                    "Хороший молот переживёт хозяина.",
+                    "Топор затупился или удочка треснула? Приноси, перекую на славу!"
                 ],
                 schedule: [
                     { from: 0,   col: 3, row: 2, activity: "fire" },

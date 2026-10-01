@@ -22,6 +22,9 @@ const FILES = [
     "js/world/social.js",
     "js/world/resources.js",
     "js/world/farming.js",
+    "js/world/fishing.js",
+    "js/world/cooking.js",
+    "js/world/tools.js",
     "js/world/requests.js",
     "js/world/maps.js",
     "js/entities/mover.js",
@@ -38,6 +41,9 @@ const EXPORTED = [
     "moveAndCollide", "Player2D", "Enemy2D", "detectEncounter",
     "NPC2D", "Social", "ResourceNode", "ResourceBag", "RESOURCES", "NODE_TYPES",
     "Farm", "FarmPlot", "CROP",
+    "FishingSystem", "FISH_TABLE",
+    "CookingSystem", "RECIPES",
+    "Tools", "TOOL_TIERS",
     "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP"
 ];
 

@@ -1,8 +1,7 @@
 /**
  * v2 bootstrap — wires the canvas, world, hero, camera, input and loop.
- * Milestone 1: free-roam a tiled village with camera follow, wall collision,
- * and proximity interaction prompts. Interactions currently open an info panel;
- * later milestones bridge them into the existing battle/shop/quest systems.
+ * Free-roam a tiled village with camera follow, wall collision, living NPCs,
+ * farming, gathering, fishing, cooking, tool upgrades, and interiors.
  */
 (function () {
     const canvas = document.getElementById("game");
@@ -31,9 +30,12 @@
     const farm = new Farm();
     const requests = new Requests();      // villager errands
     const storage = new ResourceBag();    // the chest at home
+    const tools = (typeof Tools !== "undefined") ? new Tools() : null;
+    const cooking = (typeof CookingSystem !== "undefined") ? new CookingSystem() : null;
+    const fishing = (typeof FishingSystem !== "undefined") ? new FishingSystem() : null;
     resources.add("seeds", 6);            // a starter pouch of seeds
 
-    // Transient on-screen feedback (gathering, gifts) — fades on its own.
+    // Transient on-screen feedback (gathering, gifts, catches) — fades on its own.
     let flash = "", flashT = 0;
     function showFlash(text, secs) { flash = text; flashT = secs || 1.6; }
 
@@ -61,7 +63,7 @@
         farmPlots = (mapData.farm || []).map(c => ({ col: c.col, row: c.row, px: c.col * ts + ts / 2, py: c.row * ts + ts / 2 }));
         furniture = (mapData.furniture || []).map(f => ({ ...f }));
         // Furniture occupies real space: block its footprint so the hero
-        // walks around the bed instead of through it (rugs stay walkable).
+        // walks around obstacles instead of through them (rugs stay walkable).
         if (typeof Furniture !== "undefined") {
             for (const f of furniture) {
                 const def = Furniture.KINDS[f.kind];
@@ -89,7 +91,7 @@
     };
     const menuCtx = {
         hero, journal, host, refresh: refreshStats, social, resources,
-        requests, storage,
+        requests, storage, tools, cooking, fishing,
         get day() { return dayCount; }
     };
 
@@ -166,8 +168,7 @@
             canvas.style.height = "";
             zoom = Math.max(1, 56 / ts);
         } else {
-            // Desktop windowed: use most of the viewport (much bigger than before),
-            // keeping a pleasant 16:9 and never overflowing width or height.
+            // Desktop windowed: use most of the viewport, keeping 16:9
             const vw = stage.clientWidth || window.innerWidth;
             const vh = window.innerHeight;
             let w = Math.min(vw, 1200);
@@ -318,10 +319,18 @@
         else if (act === "plant") {
             r = farm.plant(cell.col, cell.row, dayCount, resources.count("seeds"));
             if (r.ok && r.consumeSeed) resources.remove("seeds", 1);
-        } else if (act === "water") r = farm.water(cell.col, cell.row, dayCount);
-        else {
+        } else if (act === "water") {
+            r = farm.water(cell.col, cell.row, dayCount);
+        } else {
             r = farm.harvest(cell.col, cell.row);
-            if (r.ok) resources.add(r.crop, r.amount);
+            if (r.ok) {
+                let amount = r.amount;
+                if (tools && tools.level("can") >= 3 && Math.random() < 0.4) {
+                    amount += 1;
+                }
+                resources.add(r.crop, amount);
+                r.amount = amount;
+            }
         }
         if (r && r.msg) showFlash(r.msg, 1.3);
         refreshStats();
@@ -329,7 +338,12 @@
 
     // A quick, non-pausing gather. Adds to the bag and gives feedback.
     function gatherFrom(node) {
-        const r = node.hit();
+        let toolBonus = 0;
+        if (tools) {
+            if (node.type === "tree") toolBonus = tools.level("axe") - 1;
+            else if (node.type === "rock") toolBonus = tools.level("pickaxe") - 1;
+        }
+        const r = node.hit(toolBonus);
         if (!r) return;
         resources.add(r.res, r.amount);
         const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[r.res] : null;
@@ -339,6 +353,20 @@
         if (node.type === "bush" && Math.random() < 0.5) { resources.add("seeds", 1); extra = " 🌰+1"; }
         showFlash((r.felled ? `${em} +${r.amount} — собрано!` : `${em} +${r.amount}`) + extra, 1.2);
         journal.onResourceGathered && journal.onResourceGathered(r.res, r.amount);
+        refreshStats();
+    }
+
+    // Fishing at the pond: casts a line and hooks a catch.
+    function fishAtPond() {
+        const rodLv = tools ? tools.level("rod") : 1;
+        const fishSys = fishing || new FishingSystem();
+        const res = fishSys.catchFish(rodLv);
+        resources.add(res.res, res.amount);
+        if (res.bonus) resources.add(res.bonus.res, res.bonus.amount);
+        hero.addExperience(res.xp || 5);
+        const extra = res.bonus ? ` и со дна: ${res.bonus.emoji} ${res.bonus.name}` : "";
+        showFlash(`🎣 ${res.msg}${extra} (+${res.xp || 5}✨)`, 2);
+        journal.onResourceGathered && journal.onResourceGathered(res.res, res.amount);
         refreshStats();
     }
 
@@ -352,6 +380,7 @@
         // Doors are instant: step inside instead of opening a panel.
         if (it.action === "enter" && it.to) { loadZone(it.to, it.spawn); return; }
         if (it.action === "sleep") { sleepUntilMorning(); return; }
+        if (it.action === "fishing") { fishAtPond(); return; }
         paused = true;
         const dispatch = {
             shop: V2Menus.shop,
@@ -359,7 +388,8 @@
             quests: V2Menus.quests,
             npc: V2Menus.dialogue,
             dungeon: V2Menus.dungeon,
-            storage: V2Menus.storage
+            storage: V2Menus.storage,
+            cooking: V2Menus.cooking
         };
         const open = dispatch[it.action];
         if (open) { open(menuCtx); return; }
@@ -425,12 +455,14 @@
     function describe(action) {
         switch (action) {
             case "npc": return "Староста ждёт вестей о подземелье. Здесь начнутся диалоги и главный квест.";
-            case "shop": return "Лавка торговца — покупка и продажа снаряжения.";
-            case "forge": return "Кузница — улучшение снаряжения эссенциями ковки.";
+            case "shop": return "Лавка торговца — покупка и продажа снаряжения, рыбы и семян.";
+            case "forge": return "Кузница — улучшение снаряжения и рабочих инструментов.";
             case "dungeon": return "Врата испытаний — вход в процедурное подземелье.";
             case "quests": return "Доска квестов — побочные и спутниковые задания.";
             case "storage": return "Домашний сундук — здесь хранятся припасы.";
             case "sleep": return "Кровать — поспать до утра.";
+            case "cooking": return "Очаг — приготовление сытных блюд и целебных отваров.";
+            case "fishing": return "Пруд — ловля рыбы на удочку.";
             default: return "Точка интереса.";
         }
     }
@@ -567,7 +599,8 @@
         get nodes() { return resourceNodes; },
         get farmPlots() { return farmPlots; },
         get furniture() { return furniture; },
-        requests, storage, sleepUntilMorning,
+        requests, storage, tools, cooking, fishing,
+        sleepUntilMorning, fishAtPond,
         get zone() { return zoneName; },
         get clock() { return clockMin; },
         get day() { return dayCount; }
