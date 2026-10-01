@@ -26,6 +26,18 @@
             fur: "#8b909b", furSh: "#5e626d", belly: "#c9ced6",
             eye: "#e6b23a", nose: "#1c1e26", outline: "#191b21",
         },
+        cat: {
+            fur: "#d87a2a", furSh: "#a85018", belly: "#f5eee6",
+            eye: "#38b058", nose: "#f090a0", outline: "#2a1a0e"
+        },
+        chicken: {
+            body: "#f5f2eb", bodySh: "#d4cdbe", comb: "#d83a3a",
+            beak: "#f0a828", outline: "#2d2b28"
+        },
+        duck: {
+            head: "#2e8b57", bill: "#f0c030", neck: "#f0f0f0",
+            body: "#6b5440", bodySh: "#4e3a2a", spec: "#3a68b0", outline: "#1a261c"
+        }
     };
 
     // ---- grid helpers (grids store hex colours directly, null = empty) -------
@@ -148,8 +160,78 @@
         return { w: W, h: H, grid: outline(g, p.outline) };
     }
 
-    const BUILDERS = { goblin: buildGoblin, skeleton: buildSkeleton, wolf: buildWolf };
-    const HEIGHT_SCALE = { goblin: 1.7, skeleton: 1.85, wolf: 1.35 };
+    function buildCat(frame) {
+        const W = 16, H = 14, g = blank(W, H), p = PAL.cat;
+        const step = frame % 2;
+        // Tail (curling up at the back)
+        px(g, 1, 6 - step, p.fur); px(g, 2, 7 - step, p.fur); px(g, 3, 8, p.fur);
+        // Body
+        rect(g, 4, 6, 8, 5, p.fur);
+        rect(g, 5, 6, 2, 3, p.furSh); // stripe
+        rect(g, 8, 6, 2, 3, p.furSh); // stripe
+        rect(g, 6, 9, 5, 2, p.belly); // white belly/chest
+        // Head
+        rect(g, 11, 4, 4, 5, p.fur);
+        px(g, 11, 2, p.fur); px(g, 12, 3, p.fur); // left ear
+        px(g, 14, 2, p.fur); px(g, 13, 3, p.fur); // right ear
+        px(g, 13, 5, p.eye); // green eye
+        px(g, 14, 6, p.nose); // pink nose
+        // Paws
+        rect(g, 4, 11, 2, 2, step ? p.belly : p.fur);
+        rect(g, 7, 11, 2, 2, step ? p.fur : p.belly);
+        rect(g, 10, 11, 2, 2, p.belly);
+        return { w: W, h: H, grid: outline(g, p.outline) };
+    }
+
+    function buildChicken(frame) {
+        const W = 14, H = 14, g = blank(W, H), p = PAL.chicken;
+        const peck = frame % 2;
+        // Body
+        rect(g, 3, 6, 7, 5, p.body);
+        rect(g, 4, 9, 5, 2, p.bodySh);
+        // Tail feathers
+        px(g, 2, 5, p.body); px(g, 1, 4, p.body); px(g, 2, 4, p.bodySh);
+        // Head & neck
+        const hy = peck ? 5 : 3;
+        rect(g, 9, hy, 3, 4, p.body);
+        px(g, 10, hy - 1, p.comb); px(g, 11, hy - 1, p.comb); // red comb
+        px(g, 12, hy + 1, p.beak); px(g, 13, hy + 2, p.beak); // yellow beak
+        px(g, 11, hy + 3, p.comb); // wattle
+        px(g, 10, hy + 1, "#201e1c"); // eye
+        // Legs
+        rect(g, 5, 11, 1, 2, p.beak);
+        rect(g, 8, 11, 1, 2, p.beak);
+        px(g, 6, 13, p.beak); px(g, 9, 13, p.beak);
+        return { w: W, h: H, grid: outline(g, p.outline) };
+    }
+
+    function buildDuck(frame) {
+        const W = 16, H = 12, g = blank(W, H), p = PAL.duck;
+        const bob = frame % 2;
+        // Body
+        rect(g, 3, 4 + bob, 9, 5, p.body);
+        rect(g, 4, 7 + bob, 7, 2, p.bodySh);
+        rect(g, 6, 5 + bob, 3, 2, p.spec); // blue speculum on wing
+        // Tail
+        px(g, 2, 3 + bob, p.body); px(g, 1, 2 + bob, p.bodySh);
+        // Green head & yellow bill
+        rect(g, 11, 2 + bob, 3, 4, p.head);
+        rect(g, 11, 5 + bob, 3, 1, p.neck); // white neck ring
+        rect(g, 13, 3 + bob, 3, 2, p.bill); // yellow bill
+        px(g, 12, 3 + bob, "#101010");      // eye
+        // Water wake ripple
+        px(g, 2, 10, "#a0d8f8"); px(g, 13, 10, "#a0d8f8");
+        return { w: W, h: H, grid: outline(g, p.outline) };
+    }
+
+    const BUILDERS = {
+        goblin: buildGoblin, skeleton: buildSkeleton, wolf: buildWolf,
+        cat: buildCat, chicken: buildChicken, duck: buildDuck
+    };
+    const HEIGHT_SCALE = {
+        goblin: 1.7, skeleton: 1.85, wolf: 1.35,
+        cat: 1.0, chicken: 0.9, duck: 0.85
+    };
 
     function heightScale(kind) { return HEIGHT_SCALE[kind] || 2.0; }
 

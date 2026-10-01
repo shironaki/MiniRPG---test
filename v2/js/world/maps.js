@@ -17,11 +17,11 @@ const MAPS = {
             "T..HHHH.tt.,.....t.HHHH..T",
             "T..HHHH.....,......HHHH..T",
             "T....pppppppppppppppppp..T",
-            "T.....,.....pp,.......,..T",
-            "T.t...www..PppP,......t,.T",
-            "T.....www..PppP.,.......,T",
-            "T,.t..www,.PppP..,.....t.T",
-            "T.,.......,PppP...,......T",
+            "T.....,.p...PPPPPP,......T",
+            "T.t..wwwp..PPPPPPP,...t,.T",
+            "T....wwwp..PPppppP......,T",
+            "T,.t.wwwp..PPppppP..,..t.T",
+            "T.,.....p..PPPPPPP...,...T",
             "T..,.....wwwbbww...HHH...T",
             "T..HHHH..wwwbbww...HHH...T",
             "T.tHHHH.....pp.....HHH.t.T",
@@ -31,7 +31,7 @@ const MAPS = {
             "TTTTTTTTTTTTppTTTTTTTTTTTT"
         ],
         // Player spawn on the central plaza.
-        spawn: { col: 12, row: 8 },
+        spawn: { col: 12, row: 10 },
         // Buildings drawn as whole structures over their solid footprints.
         buildings: [
             { col: 3,  row: 2,  w: 4, h: 3, type: "house" },
@@ -39,16 +39,42 @@ const MAPS = {
             { col: 3,  row: 12, w: 4, h: 3, type: "forge" },
             { col: 19, row: 11, w: 3, h: 4, type: "gate" }
         ],
-        // Interactable points sit in front of each building's door.
+        // Outdoor village furniture & decor
+        furniture: [
+            // Central Town Square & Plaza
+            { col: 11, row: 7,  kind: "well" },      // Town Well (2x2)
+            { col: 14, row: 6,  kind: "board" },     // Notice Board (2x1)
+            { col: 9,  row: 6,  kind: "lamp" },      // Streetlamp NW of plaza (1x2)
+            { col: 16, row: 6,  kind: "lamp" },      // Streetlamp NE of plaza (1x2)
+            { col: 9,  row: 13, kind: "lamp" },      // Streetlamp SW of plaza (1x2)
+            { col: 16, row: 13, kind: "lamp" },      // Streetlamp SE of plaza (1x2)
+            { col: 8,  row: 7,  kind: "bench" },     // Wooden bench by pond (2x1)
+            { col: 14, row: 11, kind: "bench" },     // Wooden bench on town square (2x1)
+            { col: 17, row: 7,  kind: "stall" },     // Market stall on plaza (2x2)
+
+            // Player's Homestead & Shop Surrounding
+            { col: 2,  row: 5,  kind: "flowerbed" }, // Flowerbed by home (2x1)
+            { col: 6,  row: 5,  kind: "mailbox" },   // Mailbox by home (1x1)
+            { col: 18, row: 5,  kind: "flowerbed" }, // Flowerbed by shop (2x1)
+
+            // Lake / Pond Pier
+            { col: 5,  row: 7,  kind: "pier" },      // Wooden fishing pier (2x1)
+
+            // Blacksmith Yard Timber & Barrels
+            { col: 7,  row: 12, kind: "barrel" }     // Barrel near forge (1x1)
+        ],
+        // Interactable points sit in front of each building's door and props.
         // `enter` walks the hero into a real interior zone.
         interactables: [
-            { col: 5,  row: 5,  action: "enter", to: "home",     spawn: { col: 5, row: 6 }, label: "Твой дом",         emoji: "🏠" },
-            { col: 21, row: 5,  action: "enter", to: "shop_in",  spawn: { col: 5, row: 7 }, label: "Лавка",            emoji: "🛒" },
-            { col: 5,  row: 15, action: "enter", to: "forge_in", spawn: { col: 5, row: 7 }, label: "Кузница",          emoji: "🔨" },
+            { col: 5,  row: 5,  action: "enter",   to: "home",     spawn: { col: 5, row: 6 }, label: "Твой дом",         emoji: "🏠" },
+            { col: 21, row: 5,  action: "enter",   to: "shop_in",  spawn: { col: 5, row: 7 }, label: "Лавка",            emoji: "🛒" },
+            { col: 5,  row: 15, action: "enter",   to: "forge_in", spawn: { col: 5, row: 7 }, label: "Кузница",          emoji: "🔨" },
             { col: 20, row: 15, action: "dungeon", label: "Врата испытаний", emoji: "🚪" },
-            { col: 13, row: 6,  action: "quests",  label: "Доска квестов",   emoji: "📜" },
-            { col: 6,  row: 5,  action: "npc",     label: "Староста",        emoji: "🧑" },
-            { col: 5,  row: 8,  action: "fishing", label: "Рыбалка у пруда", emoji: "🎣" }
+            { col: 14, row: 6,  action: "board",   label: "Доска объявлений", emoji: "📜" },
+            { col: 11, row: 7,  action: "well",    label: "Деревенский колодец", emoji: "🪣" },
+            { col: 5,  row: 8,  action: "fishing", label: "Рыбалка у пруда", emoji: "🎣" },
+            { col: 14, row: 10, action: "cat",     label: "Кот Мурзик", emoji: "🐱" },
+            { col: 7,  row: 6,  action: "npc",     label: "Староста", emoji: "🧑" }
         ],
         // The village is a peaceful zone — no enemies here (they roam the wilds).
         enemies: [],
@@ -68,8 +94,8 @@ const MAPS = {
                 schedule: [
                     { from: 0,    col: 5,  row: 6,  activity: "sleep" },
                     { from: 420,  col: 2,  row: 10, activity: "field" },
-                    { from: 720,  col: 13, row: 8,  activity: "market" },
-                    { from: 1080, col: 9,  row: 8,  activity: "well" },
+                    { from: 720,  col: 10, row: 8,  activity: "market" },
+                    { from: 1080, col: 10, row: 9,  activity: "well" },
                     { from: 1260, col: 5,  row: 6,  activity: "home" }
                 ]
             },
@@ -86,7 +112,7 @@ const MAPS = {
                 schedule: [
                     { from: 0,    col: 21, row: 6,  activity: "sleep" },
                     { from: 480,  col: 23, row: 5,  activity: "work" },
-                    { from: 780,  col: 12, row: 9,  activity: "market" },
+                    { from: 780,  col: 13, row: 9,  activity: "market" },
                     { from: 1140, col: 21, row: 5,  activity: "shop" },
                     { from: 1320, col: 21, row: 6,  activity: "home" }
                 ]
@@ -104,8 +130,8 @@ const MAPS = {
                 schedule: [
                     { from: 0,    col: 18, row: 14, activity: "sleep" },
                     { from: 540,  col: 12, row: 10, activity: "plaza" },
-                    { from: 720,  col: 15, row: 9,  activity: "flowers" },
-                    { from: 1020, col: 13, row: 6,  activity: "board" },
+                    { from: 720,  col: 16, row: 9,  activity: "flowers" },
+                    { from: 1020, col: 14, row: 7,  activity: "board" },
                     { from: 1200, col: 18, row: 14, activity: "home" }
                 ]
             }
@@ -120,7 +146,7 @@ const MAPS = {
             { type: "rock", col: 22, row: 8  },
             { type: "bush", col: 6,  row: 6  },
             { type: "bush", col: 17, row: 8  },
-            { type: "herb", col: 16, row: 10 },
+            { type: "herb", col: 22, row: 13 },
             { type: "herb", col: 7,  row: 4  }
         ],
         // Farm plots (till → plant seed → water daily → harvest) near the forge.

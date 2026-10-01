@@ -570,5 +570,154 @@
         render();
     }
 
-    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk, storage, cooking };
+    // ---- Town Notice Board --------------------------------------------------
+    function board(ctx) {
+        let msg = "";
+        const RES = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
+
+        function render() {
+            // Daily village news & gossip based on day
+            const GOSSIP = [
+                "☀️ Сегодня в долине тепло и ясно. Идеальный день для рыбалки на пруду и ухода за грядками!",
+                "🍃 В воздухе пахнет свежей хвоей. В лесу созрели сочные ягоды и целебные травы.",
+                "⚒️ Кузнец Кузьма раздувает меха с самого рассвета — в кузнице ждут новые инструменты!",
+                "🍲 В домах топятся печи и пахнет сытной похлёбкой. Не забудь приготовить горячий обед!",
+                "✨ Старейшины говорят, что в глубине тёмного леса открылись древние врата испытаний..."
+            ];
+            const news = GOSSIP[(ctx.day || 1) % GOSSIP.length];
+
+            // List of active errands
+            const villagers = [
+                { id: "marta", name: "Марта", emoji: "👩‍🌾" },
+                { id: "boris", name: "Борис", emoji: "🧔" },
+                { id: "lena", name: "Лена", emoji: "👧" },
+                { id: "tomila", name: "Томила", emoji: "👩‍🦰" },
+                { id: "kuzma", name: "Кузьма", emoji: "🧔‍♂️" }
+            ];
+
+            let errandRows = "";
+            for (const v of villagers) {
+                const req = ctx.requests ? ctx.requests.current(v.id) : null;
+                if (!req) {
+                    errandRows += `<div class="row"><span>${v.emoji} ${esc(v.name)}</span><small class="hint">Пока нет просьб (поговори с жителем)</small></div>`;
+                } else {
+                    const have = ctx.resources ? ctx.resources.count(req.res) : 0;
+                    const meta = RES[req.res] || {};
+                    const ok = have >= req.n;
+                    const btn = ok
+                        ? `<button class="mBtn" data-deliver="${v.id}">Сдать (${have}/${req.n})</button>`
+                        : `<button class="mBtn ghost" disabled>${have}/${req.n} в наличии</button>`;
+                    errandRows += `
+                        <div class="row">
+                            <span>${v.emoji} <strong>${esc(v.name)}:</strong> ${meta.emoji || "📦"} ${esc(meta.name || req.res)} ×${req.n} <small>(Награда: 💰 ${req.gold})</small></span>
+                            ${btn}
+                        </div>`;
+                }
+            }
+
+            paint(`<h2>📜 Доска объявлений деревни</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <h4 class="mGroup">📰 Вестник деревни</h4>
+                <div class="row"><p style="margin:4px 0;line-height:1.4">${esc(news)}</p></div>
+                <h4 class="mGroup">📋 Заказы жителей</h4>
+                ${errandRows}
+                <div style="margin-top:16px;text-align:center">
+                    <button class="mBtn" data-quests="1">⚔️ Открыть охотничьи контракты</button>
+                </div>`, onClick);
+        }
+
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.deliver) {
+                const id = b.dataset.deliver;
+                const have = ctx.resources ? ctx.resources.count(ctx.requests.current(id).res) : 0;
+                const r = ctx.requests.fulfil(id, have);
+                if (r.ok) {
+                    ctx.resources.remove(r.res, r.take);
+                    ctx.hero.gold += r.gold;
+                    ctx.hero.gainXp(r.xp);
+                    if (ctx.social) ctx.social.award(id, r.friendship);
+                    msg = `🎉 Заказ сдан! Получено 💰 ${r.gold}, ✨ ${r.xp} опыта и ❤ дружба!`;
+                } else {
+                    msg = `Не хватает ещё ${r.short} шт.`;
+                }
+                ctx.refresh(); render();
+            } else if (b.dataset.quests) {
+                quests(ctx);
+            }
+        }
+        render();
+    }
+
+    // ---- Town Well ----------------------------------------------------------
+    function well(ctx) {
+        let msg = "";
+        function render() {
+            paint(`<h2>🪣 Деревенский колодец</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <p class="hint">Глубокий каменный колодец с чистейшей прохладной родниковой водой. Вода приятно освежает и восстанавливает силы.</p>
+                <div class="row">
+                    <span>💧 Напиться студёной воды</span>
+                    <button class="mBtn" data-drink="1">Сделать глоток (+25⚡)</button>
+                </div>
+                <div class="row">
+                    <span>🚰 Наполнить лейку</span>
+                    <button class="mBtn" data-fill="1">Набрать воды</button>
+                </div>`, onClick);
+        }
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.drink) {
+                ctx.hero.energy = Math.min(ctx.hero.maxEnergy, ctx.hero.energy + 25);
+                msg = `💧 Ты сделал глоток чистой колодезной воды. Прохлада наполнила тело энергией (+25⚡)!`;
+            } else if (b.dataset.fill) {
+                msg = `🚰 Лейка наполнена свежей водой до самых краёв!`;
+            }
+            ctx.refresh(); render();
+        }
+        render();
+    }
+
+    // ---- Village Cat (Мурзик) ------------------------------------------------
+    function cat(ctx) {
+        let msg = "";
+        const RES = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
+        function render() {
+            const fishCount = (ctx.resources ? (ctx.resources.count("perch") + ctx.resources.count("carp") + ctx.resources.count("pike")) : 0);
+            paint(`<h2>🐱 Кот Мурзик</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <p class="hint">Рыжий деревенский кот с пушистым хвостом и белыми лапками. Он довольно жмурится на солнышке и мурлычет.</p>
+                <div class="row">
+                    <span>🐾 Погладить за ушком</span>
+                    <button class="mBtn" data-pet="1">Погладить (+15❤️)</button>
+                </div>
+                <div class="row">
+                    <span>🐟 Угостить свежей рыбкой</span>
+                    ${fishCount > 0 ? `<button class="mBtn" data-feed="1">Дать рыбку</button>` : `<button class="mBtn ghost" disabled>Нет рыбы в сумке</button>`}
+                </div>`, onClick);
+        }
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.pet) {
+                ctx.hero.health = Math.min(ctx.hero.maxHealth, ctx.hero.health + 15);
+                msg = `💖 Муррр... Мурзик довольно заурчал и потёрся головой о твою ладонь (+15❤️)!`;
+            } else if (b.dataset.feed) {
+                let fishKey = "perch";
+                if (ctx.resources.count("perch") > 0) fishKey = "perch";
+                else if (ctx.resources.count("carp") > 0) fishKey = "carp";
+                else if (ctx.resources.count("pike") > 0) fishKey = "pike";
+
+                if (ctx.resources && ctx.resources.count(fishKey) > 0) {
+                    ctx.resources.remove(fishKey, 1);
+                    ctx.hero.gold += 10;
+                    ctx.hero.gainXp(25);
+                    msg = `🐟 Мурзик с удовольствием схрумкал рыбку и выкатил лапкой из-под крыльца блестящую монетку (+10💰, +25✨)!`;
+                }
+            }
+            ctx.refresh(); render();
+        }
+        render();
+    }
+
+    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk, storage, cooking, board, well, cat };
 })();

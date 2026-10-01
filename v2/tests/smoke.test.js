@@ -222,6 +222,42 @@ describe("v2 smoke › playing", () => {
         expect(html.includes("data-eat=\"dish_stew\"")).toBe(true);
     });
 
+    it("drinks fresh water from the village town well to restore energy", () => {
+        const g = boot();
+        g.tick(16.7);
+        const wellSpot = g.globals.MAPS.village.interactables.find(i => i.action === "well");
+        expect(!!wellSpot).toBe(true);
+        // Stand adjacent to well
+        standOn(g.v2, wellSpot.col - 1, wellSpot.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("колодец")).toBe(true);
+        expect(html.includes("data-drink=\"1\"")).toBe(true);
+    });
+
+    it("opens the village notice board to check daily gossip and errands", () => {
+        const g = boot();
+        g.tick(16.7);
+        const boardSpot = g.globals.MAPS.village.interactables.find(i => i.action === "board");
+        expect(!!boardSpot).toBe(true);
+        standOn(g.v2, boardSpot.col, boardSpot.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("Доска объявлений") || html.includes("Вестник")).toBe(true);
+    });
+
+    it("pets the village cat on the plaza for heartwarming friendship", () => {
+        const g = boot();
+        g.tick(16.7);
+        const catSpot = g.globals.MAPS.village.interactables.find(i => i.action === "cat");
+        expect(!!catSpot).toBe(true);
+        standOn(g.v2, catSpot.col, catSpot.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("Мурзик")).toBe(true);
+        expect(html.includes("data-pet=\"1\"")).toBe(true);
+    });
+
     it("survives a long session: 400 frames across the day/night cycle", () => {
         const g = boot();
         for (let i = 0; i < 400; i++) g.tick(50);    // ~20s → clock advances

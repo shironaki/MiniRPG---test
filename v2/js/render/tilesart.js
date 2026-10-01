@@ -74,6 +74,15 @@
             const off = (i + variant) % 2 ? 0 : 6;
             for (let x = off; x < N; x += 8) { px(g, x, ry, wave); px(g, x + 1, ry, wave); }
         });
+        if (variant === 2) {
+            // lilypad with pink lotus flower
+            rect(g, 4, 4, 6, 4, "#2d753b");
+            rect(g, 5, 3, 4, 1, "#2d753b");
+            px(g, 7, 5, "#1e5229");
+            px(g, 8, 4, "#ff8da8");
+            px(g, 8, 3, "#ffe0ea");
+            px(g, 7, 4, "#ffb3c6");
+        }
         return g;
     }
 

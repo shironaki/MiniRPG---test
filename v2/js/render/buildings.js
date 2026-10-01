@@ -21,6 +21,26 @@
     }
     function px(g, x, y, c) { x |= 0; y |= 0; if (g[y] && x >= 0 && x < g[0].length) g[y][x] = c; }
 
+    const COLORS = {
+        house: {
+            type: "house", roof: "#c0472b", roofSh: "#8f3320", ridge: "#d9694e",
+            wall: "#d8b78a", wallSh: "#b8946a", door: "#5c3a20", win: "#8fd0e0",
+            chimney: "#6d6a63", chimneyTop: "#4c4944"
+        },
+        shop: {
+            type: "shop", roof: "#2f8f8f", roofSh: "#1f6b6b", ridge: "#46b0b0",
+            wall: "#e6cd9f", wallSh: "#c3a877", door: "#4a3320", win: "#ffe08a",
+            awn1: "#d8452f", awn2: "#f0ede0", sign: "#caa24a",
+            chimney: "#5c554d", chimneyTop: "#3a352f"
+        },
+        forge: {
+            type: "forge", roof: "#3f3833", roofSh: "#2a2521", ridge: "#574d45",
+            wall: "#7a7168", wallSh: "#5c554d", door: "#3a2a18",
+            doorGlow: "#ff8a3a", win: "#ffb24a", winFrame: "#4a4038",
+            chimney: "#5c554d", chimneyTop: "#3a352f",
+        },
+    };
+
     // ---- shared house/shop/forge structure ----------------------------------
     function structure(W, H, c) {
         const g = blank(W, H);
@@ -37,11 +57,21 @@
         for (let x = 2; x < W; x += 3)
             for (let y = Math.round(roofH * 0.32); y < roofH - 1; y++)
                 if ((x + y) % 3 === 0) px(g, x, y, c.roofSh);   // shingles
+
+        // chimneys
+        if (c.chimney) {
+            const cx = c.type === "house" ? Math.round(W * 0.22) : Math.round(W * 0.68);
+            const cw = Math.max(3, Math.round(W * 0.10));
+            rect(g, cx, 0, cw, Math.round(roofH * 0.65), c.chimney);
+            rect(g, cx - 1, 0, cw + 2, 1, c.chimneyTop || "#3a352f");
+        }
+
         // walls
         const wy = roofH, wIn = Math.max(1, Math.round(W * 0.06));
         rect(g, wIn, wy, W - 2 * wIn, H - wy, c.wall);
         rect(g, wIn, H - 2, W - 2 * wIn, 2, c.wallSh);
         for (let y = wy + 3; y < H - 1; y += 4) rect(g, wIn + 1, y, W - 2 * wIn - 2, 1, c.wallSh);
+
         // door
         const dw = Math.max(4, Math.round(W * 0.2)), dh = Math.round((H - wy) * 0.66);
         const dx = Math.round(W / 2 - dw / 2);
@@ -49,12 +79,24 @@
         rect(g, dx, H - dh, dw, 1, c.doorTop || c.wallSh);
         if (c.doorGlow) { rect(g, dx + 1, H - dh + 1, dw - 2, dh - 1, c.doorGlow); px(g, dx + 1, H - Math.round(dh / 2), "#fff2c0"); }
         else px(g, dx + dw - 2, H - Math.round(dh / 2), "#e8c84a"); // knob
-        // windows
+
+        // lantern bracket by the door
+        rect(g, dx - 3, H - dh + 2, 2, 3, "#3a3834");
+        px(g, dx - 2, H - dh + 3, "#ffdf80");
+
+        // windows & flower boxes
         const winY = wy + Math.round((H - wy) * 0.16), ws = Math.max(3, Math.round(W * 0.13));
         function window_(x) {
             rect(g, x, winY, ws, ws, c.winFrame || "#5c3a20");
             rect(g, x + 1, winY + 1, ws - 2, ws - 2, c.win);
             rect(g, x + 1, winY + 1, Math.max(1, (ws - 2) >> 1), 1, "#ffffff");
+            // wooden flower box under the window
+            if (c.type === "house" || c.type === "shop") {
+                rect(g, x - 1, winY + ws, ws + 2, 2, "#6d4b29");
+                rect(g, x, winY + ws - 1, ws, 1, "#3f8c35"); // greenery
+                px(g, x, winY + ws - 1, "#d83a56");           // red blossom
+                px(g, x + ws - 1, winY + ws - 1, "#ffd240"); // yellow blossom
+            }
         }
         window_(Math.round(W * 0.16));
         window_(Math.round(W * 0.84 - ws));
@@ -68,12 +110,6 @@
             // hanging sign with a coin
             rect(g, Math.round(W * 0.62), wy + 2, Math.round(W * 0.16), Math.round(W * 0.12), c.sign);
             px(g, Math.round(W * 0.68), wy + 4, "#fff2c0");
-        } else if (c.type === "forge") {
-            // chimney rising from the roof
-            const cx = Math.round(W * 0.66), cw = Math.max(3, Math.round(W * 0.12));
-            rect(g, cx, 0, cw, Math.round(roofH * 0.6), c.chimney);
-            rect(g, cx, 0, cw, 1, c.chimneyTop);
-            // anvil hint by the door glow already set via doorGlow
         }
         return g;
     }
@@ -102,24 +138,6 @@
         rect(g, pw, top, W - 2 * pw, H - top, dark);
         return g;
     }
-
-    const COLORS = {
-        house: {
-            type: "house", roof: "#c0472b", roofSh: "#8f3320", ridge: "#d9694e",
-            wall: "#d8b78a", wallSh: "#b8946a", door: "#5c3a20", win: "#8fd0e0",
-        },
-        shop: {
-            type: "shop", roof: "#2f8f8f", roofSh: "#1f6b6b", ridge: "#46b0b0",
-            wall: "#e6cd9f", wallSh: "#c3a877", door: "#4a3320", win: "#ffe08a",
-            awn1: "#d8452f", awn2: "#f0ede0", sign: "#caa24a",
-        },
-        forge: {
-            type: "forge", roof: "#3f3833", roofSh: "#2a2521", ridge: "#574d45",
-            wall: "#7a7168", wallSh: "#5c554d", door: "#3a2a18",
-            doorGlow: "#ff8a3a", win: "#ffb24a", winFrame: "#4a4038",
-            chimney: "#5c554d", chimneyTop: "#3a352f",
-        },
-    };
 
     // Build the pixel grid for a building of wTiles×hTiles (art res = ×16).
     function compose(type, wTiles, hTiles) {
@@ -172,14 +190,30 @@
         }
         // ---- animated overlays (drawn live, not cached) ----
         now = now || 0;
-        if (type === "forge") {
-            const cx = sx + dw * 0.72, base = sy + dh * 0.10;
-            for (let i = 0; i < 3; i++) {
-                const t = ((now / 900) + i / 3) % 1;
-                ctx.fillStyle = `rgba(200,200,205,${0.28 * (1 - t)})`;
+        if (type === "forge" || type === "house" || type === "shop") {
+            const cx = sx + (type === "house" ? dw * 0.26 : (type === "shop" ? dw * 0.72 : dw * 0.72));
+            const base = sy + dh * 0.08;
+            const puffs = type === "forge" ? 3 : 2;
+            for (let i = 0; i < puffs; i++) {
+                const speed = type === "forge" ? 900 : 1300;
+                const t = ((now / speed) + i / puffs) % 1;
+                const alpha = (type === "forge" ? 0.32 : 0.22) * (1 - t);
+                ctx.fillStyle = type === "forge" ? `rgba(180,180,190,${alpha})` : `rgba(235,235,245,${alpha})`;
                 ctx.beginPath();
-                ctx.arc(cx + Math.sin(now / 400 + i) * dw * 0.05, base - t * dh * 0.5,
-                    dw * (0.05 + t * 0.06), 0, Math.PI * 2);
+                ctx.arc(cx + Math.sin(now / 500 + i * 2) * dw * 0.04 + (t * dw * 0.08),
+                    base - t * dh * 0.45,
+                    dw * (0.04 + t * 0.05), 0, Math.PI * 2);
+                ctx.fill();
+            }
+            // Door lantern glow at night
+            if (night > 0.1) {
+                const dwVal = Math.max(4, Math.round(W * 0.2));
+                const dxVal = Math.round(W / 2 - dwVal / 2);
+                const lx = sx + (dxVal - 2) * (dw / W);
+                const ly = sy + dh * 0.75;
+                ctx.fillStyle = `rgba(255,220,130,${Math.min(1, night) * 0.5})`;
+                ctx.beginPath();
+                ctx.arc(lx, ly, dw * 0.08, 0, Math.PI * 2);
                 ctx.fill();
             }
         } else if (type === "gate") {

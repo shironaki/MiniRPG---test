@@ -55,13 +55,13 @@ npm run serve          # http://localhost:8080  — сборки не требу
 Тесты:
 
 ```bash
-npm test               # ожидаемо: 119 + 24 + 39 + 5 + 5 = 192 passed
+npm test               # ожидаемо: 119 + 24 + 65 + 5 + 5 + 19 = 237 passed
 ```
 
 Раскладка прогонов: `tests/game.test.js` (119, логика+баланс v1),
 `tests/integration.test.js` (24, UI-обвязка v1), `v2/tests/engine.test.js`
-(39, движок и системы v2), `v2/tests/battle.test.js` (5),
-`v2/tests/menus.test.js` (5).
+(65, движок и системы v2), `v2/tests/battle.test.js` (5),
+`v2/tests/menus.test.js` (5), `v2/tests/smoke.test.js` (19, полный цикл в DOM).
 
 Проверка синтаксиса (её же делает CI):
 

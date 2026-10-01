@@ -239,6 +239,258 @@
         return g;
     }
 
+    // ---- outdoor village props ----------------------------------------------
+
+    // Town Well, 2x2: stone basin, timber pillars, shingle roof, bucket & rope.
+    function well(phase) {
+        const g = grid(N * 2, N * 2);
+        // Roof
+        rect(g, 2, 1, 28, 6, "#a4562f");
+        rect(g, 2, 1, 28, 1, "#c86c38");
+        rect(g, 5, 0, 22, 1, "#d97b44"); // sunlit ridge
+        rect(g, 2, 6, 28, 1, "#7d3e1f"); // eave shadow
+        for (let x = 4; x < 28; x += 4) rect(g, x, 3, 1, 3, "#8a4422");
+        // Timber posts
+        rect(g, 4, 7, 3, 13, "#6d4b29"); rect(g, 4, 7, 1, 13, "#8a6239");
+        rect(g, 25, 7, 3, 13, "#6d4b29"); rect(g, 25, 7, 1, 13, "#8a6239");
+        // Crossbeam & crank axle
+        rect(g, 4, 8, 24, 2, "#7a5433");
+        rect(g, 15, 10, 2, 5, "#caa24a"); // rope
+        // Stone well basin
+        rect(g, 2, 18, 28, 12, "#6d6a63");
+        rect(g, 2, 18, 28, 2, "#8a867c"); // rim highlight
+        rect(g, 2, 29, 28, 1, "#4a4742"); // base shadow
+        for (let y = 20; y < 29; y += 4) {
+            rect(g, 2, y, 28, 1, "#4c4944");
+            const off = ((y / 4) % 2) ? 0 : 7;
+            for (let x = 3 + off; x < 29; x += 7) rect(g, x, y, 1, 4, "#4c4944");
+        }
+        // Water pool inside
+        rect(g, 6, 19, 20, 6, "#2d5c80");
+        const f = phase % 2 === 0;
+        rect(g, 9, 21, 14, 2, f ? "#4688b8" : "#3878a4");
+        px(g, f ? 11 : 18, 21, "#a8e0ff");
+        // Hanging bucket
+        rect(g, 14, 15, 4, 4, "#8a6239");
+        rect(g, 14, 15, 4, 1, "#caa24a"); // metal band
+        shadow(g, 3, 31, 26);
+        return g;
+    }
+
+    // Village Notice / Quest Board, 2x1: wooden board with paper notes & seals.
+    function board() {
+        const g = grid(N * 2, N);
+        // Wooden support posts
+        rect(g, 3, 5, 3, 10, "#5c3a20"); rect(g, 3, 5, 1, 10, "#7a5433");
+        rect(g, 26, 5, 3, 10, "#5c3a20"); rect(g, 26, 5, 1, 10, "#7a5433");
+        // Gabled hood
+        rect(g, 1, 1, 30, 3, "#6b4a2c");
+        rect(g, 1, 1, 30, 1, "#8a6239");
+        rect(g, 1, 3, 30, 1, "#4a2d18");
+        // Board backing
+        rect(g, 2, 4, 28, 9, "#7a5433");
+        rect(g, 3, 5, 26, 7, "#6d4b29");
+        // Pinned parchment notices
+        rect(g, 5, 6, 8, 5, "#f0e6cf"); px(g, 8, 5, "#c0472b"); // left notice + red pin
+        px(g, 6, 7, "#5a452a"); px(g, 8, 7, "#5a452a"); px(g, 10, 7, "#5a452a");
+        px(g, 6, 9, "#5a452a"); px(g, 9, 9, "#5a452a");
+        rect(g, 15, 6, 6, 5, "#e8dcc4"); px(g, 17, 5, "#3a6ea5"); // right notice + blue pin
+        px(g, 16, 7, "#5a452a"); px(g, 18, 7, "#5a452a");
+        px(g, 16, 9, "#5a452a");
+        rect(g, 22, 7, 6, 4, "#f5eedc"); px(g, 24, 6, "#caa24a"); // small notice + gold pin
+        px(g, 23, 8, "#5a452a"); px(g, 25, 8, "#5a452a");
+        shadow(g, 2, 15, 28);
+        return g;
+    }
+
+    // Street Lamp / Lantern post, 1x2: wrought-iron post with glowing lantern.
+    function lamp(phase) {
+        const g = grid(N, N * 2);
+        // Base plate & post
+        rect(g, 5, 30, 6, 2, "#242220");
+        rect(g, 6, 29, 4, 1, "#3e3b37");
+        rect(g, 7, 9, 2, 20, "#242220");
+        rect(g, 7, 9, 1, 20, "#4a4742"); // iron highlight
+        // Cross arm & bracket
+        rect(g, 4, 8, 8, 2, "#242220");
+        px(g, 4, 7, "#3e3b37"); px(g, 11, 7, "#3e3b37");
+        // Lantern housing
+        rect(g, 4, 3, 8, 6, "#242220");
+        rect(g, 5, 4, 6, 4, "#ffdf80"); // lantern glass
+        // Animated flame
+        const f = phase % 2 === 0;
+        rect(g, 6, 5, 4, 3, f ? "#ffb43a" : "#ffa028");
+        px(g, 7, 5, "#ffffff"); // white flame core
+        px(g, f ? 6 : 8, 6, "#ffe07a");
+        // Top cap & finial
+        rect(g, 4, 2, 8, 2, "#3e3b37");
+        rect(g, 6, 0, 4, 2, "#caa24a"); // brass finial
+        shadow(g, 4, 31, 8);
+        return g;
+    }
+
+    // Wooden park / plaza bench, 2x1.
+    function bench() {
+        const g = grid(N * 2, N);
+        // Backrest slats
+        rect(g, 2, 3, 28, 2, "#9c7145"); rect(g, 2, 3, 28, 1, "#b88a58");
+        rect(g, 2, 6, 28, 2, "#9c7145"); rect(g, 2, 6, 28, 1, "#b88a58");
+        // Seat slab
+        rect(g, 1, 9, 30, 3, "#9c7145");
+        rect(g, 1, 9, 30, 1, "#c19a68");
+        rect(g, 1, 11, 30, 1, "#6d4b29");
+        // Cast-iron armrests & legs
+        rect(g, 2, 4, 2, 10, "#2d2b28"); rect(g, 2, 4, 1, 10, "#4a4742");
+        rect(g, 28, 4, 2, 10, "#2d2b28"); rect(g, 28, 4, 1, 10, "#4a4742");
+        rect(g, 15, 9, 2, 5, "#2d2b28");
+        shadow(g, 2, 15, 28);
+        return g;
+    }
+
+    // Market Stall with fruits, veggies & fish, 2x2.
+    function stall() {
+        const g = grid(N * 2, N * 2);
+        // Striped awning canopy
+        const aw = 32, ah = 9;
+        for (let x = 0; x < aw; x++) {
+            const c = (Math.floor(x / 4) % 2 === 0) ? "#d8452f" : "#f0ede0";
+            const cSh = (Math.floor(x / 4) % 2 === 0) ? "#a83020" : "#c9c6bc";
+            rect(g, x, 1, 1, ah - 1, c);
+            px(g, x, 0, c);
+            px(g, x, ah - 1, cSh); // scallop shadow
+        }
+        // Corner timber support posts
+        rect(g, 2, 8, 2, 22, "#6d4b29"); rect(g, 2, 8, 1, 22, "#8a6239");
+        rect(g, 28, 8, 2, 22, "#6d4b29"); rect(g, 28, 8, 1, 22, "#8a6239");
+        // Wooden counter table
+        rect(g, 2, 17, 28, 12, "#7a5433");
+        rect(g, 1, 16, 30, 2, "#a37a4c"); // counter top
+        rect(g, 2, 28, 28, 1, "#4a2d18");
+        for (let x = 4; x < 28; x += 6) rect(g, x, 18, 1, 10, "#5c3a20");
+        // Crates of fresh goods on counter
+        // 1. Red apples crate
+        rect(g, 3, 13, 8, 4, "#5c3a20");
+        rect(g, 4, 12, 6, 3, "#d83a3a");
+        px(g, 5, 11, "#ff6060"); px(g, 8, 11, "#ff6060");
+        // 2. Carrots & greens crate
+        rect(g, 12, 13, 8, 4, "#5c3a20");
+        rect(g, 13, 12, 6, 2, "#e87a2a");
+        rect(g, 14, 11, 4, 2, "#4b9e57"); // carrot tops
+        // 3. Fresh catch basket / tray
+        rect(g, 21, 14, 8, 3, "#4a4742");
+        rect(g, 22, 12, 6, 3, "#6ea8d8");
+        px(g, 23, 11, "#a8d8ff"); px(g, 26, 12, "#3a6890"); // fish tail
+        shadow(g, 2, 31, 28);
+        return g;
+    }
+
+    // Flowerbed with blooming roses, daffodils & lavender, 2x1.
+    function flowerbed() {
+        const g = grid(N * 2, N);
+        // Stone raised border
+        rect(g, 1, 4, 30, 11, "#7a7770");
+        rect(g, 1, 4, 30, 1, "#9c988f");
+        rect(g, 1, 14, 30, 1, "#54524c");
+        rect(g, 3, 6, 26, 7, "#4a331f"); // rich soil
+        // Dense flowers & foliage
+        rect(g, 4, 7, 24, 4, "#3f8c35"); // foliage base
+        // Red roses
+        px(g, 5, 5, "#d83a56"); px(g, 6, 5, "#ff6584"); px(g, 6, 6, "#d83a56");
+        px(g, 17, 5, "#d83a56"); px(g, 18, 5, "#ff6584");
+        // Yellow daffodils
+        px(g, 10, 4, "#ffd240"); px(g, 11, 4, "#fff070"); px(g, 10, 5, "#e0b020");
+        px(g, 24, 5, "#ffd240"); px(g, 25, 4, "#fff070");
+        // Blue cornflowers & purple lavender
+        px(g, 14, 4, "#4a88e8"); px(g, 14, 5, "#80b0ff");
+        px(g, 20, 4, "#9b5de5"); px(g, 21, 5, "#c77dff");
+        px(g, 27, 6, "#4a88e8");
+        shadow(g, 2, 15, 28);
+        return g;
+    }
+
+    // Wooden fence horizontal, 1x1.
+    function fenceH() {
+        const g = grid(N, N);
+        // Posts at ends
+        rect(g, 0, 3, 3, 12, "#6b4a2c"); rect(g, 0, 3, 3, 1, "#8a6239");
+        rect(g, 13, 3, 3, 12, "#6b4a2c"); rect(g, 13, 3, 3, 1, "#8a6239");
+        // Rails
+        rect(g, 0, 5, 16, 2, "#7a5433"); rect(g, 0, 5, 16, 1, "#9c7145");
+        rect(g, 0, 9, 16, 2, "#7a5433"); rect(g, 0, 9, 16, 1, "#9c7145");
+        shadow(g, 0, 15, 16);
+        return g;
+    }
+
+    // Wooden fence vertical, 1x1.
+    function fenceV() {
+        const g = grid(N, N);
+        rect(g, 6, 1, 4, 14, "#6b4a2c");
+        rect(g, 6, 1, 2, 14, "#8a6239");
+        rect(g, 4, 4, 8, 2, "#7a5433");
+        rect(g, 4, 9, 8, 2, "#7a5433");
+        shadow(g, 5, 15, 6);
+        return g;
+    }
+
+    // Mailbox on wooden post, 1x1.
+    function mailbox() {
+        const g = grid(N, N);
+        // Post
+        rect(g, 7, 7, 2, 8, "#6b4a2c"); rect(g, 7, 7, 1, 8, "#8a6239");
+        // Box
+        rect(g, 3, 2, 9, 6, "#5a5a60");
+        rect(g, 3, 2, 9, 1, "#787880"); // roof
+        rect(g, 3, 7, 9, 1, "#3e3e44");
+        rect(g, 4, 3, 2, 4, "#2d2d32"); // opening / slot
+        // Red flag up
+        rect(g, 12, 1, 2, 4, "#d83a3a");
+        px(g, 12, 1, "#ff6060");
+        shadow(g, 5, 15, 6);
+        return g;
+    }
+
+    // Stone town fountain with animated water spray, 2x2.
+    function fountain(phase) {
+        const g = grid(N * 2, N * 2);
+        // Basin
+        rect(g, 2, 14, 28, 15, "#7a7770");
+        rect(g, 2, 14, 28, 2, "#9c988f");
+        rect(g, 2, 28, 28, 1, "#4a4742");
+        // Water pool
+        rect(g, 5, 16, 22, 10, "#3878a8");
+        const f = phase % 2 === 0;
+        rect(g, 7, 18, 18, 6, f ? "#58a0d8" : "#4690c8");
+        px(g, f ? 9 : 19, 19, "#a0e0ff");
+        // Center tier pedestal
+        rect(g, 13, 6, 6, 16, "#6d6a63");
+        rect(g, 13, 6, 2, 16, "#8a867c");
+        // Upper bowl
+        rect(g, 9, 6, 14, 4, "#7a7770");
+        rect(g, 9, 6, 14, 1, "#9c988f");
+        rect(g, 11, 7, 10, 2, "#58a0d8");
+        // Water droplets spray
+        px(g, 15, 1, f ? "#d8f4ff" : "#a8e0ff");
+        px(g, f ? 14 : 16, 2, "#d8f4ff");
+        px(g, f ? 13 : 17, 3, "#a8e0ff");
+        shadow(g, 3, 31, 26);
+        return g;
+    }
+
+    // Wooden fishing dock pier planks extending over water, 2x1.
+    function pier() {
+        const g = grid(N * 2, N);
+        rect(g, 0, 2, 32, 12, "#7a5a3a");
+        rect(g, 0, 2, 32, 1, "#9c764e");
+        rect(g, 0, 13, 32, 1, "#523a22");
+        // Plank seams
+        for (let x = 6; x < 32; x += 6) rect(g, x, 2, 1, 12, "#422e1b");
+        // Mooring bollard & rope
+        rect(g, 3, 1, 3, 4, "#3a3834");
+        px(g, 3, 1, "#5a5852");
+        rect(g, 4, 4, 3, 2, "#caa24a"); // coiled rope
+        return g;
+    }
+
     // A soft contact shadow so pieces sit ON the floor instead of floating.
     function shadow(g, x, y, w) {
         rect(g, x + 1, y, w - 2, 1, "#6b4a28");
@@ -260,7 +512,19 @@
         forgeFire: { w: 1, h: 1, make: forgeFire, animated: true },
         barrel:    { w: 1, h: 1, make: barrel },
         rug:       { w: 2, h: 2, make: rug, walkable: true },
-        plant:     { w: 1, h: 1, make: plant }
+        plant:     { w: 1, h: 1, make: plant },
+        // Village outdoor furniture & props
+        well:      { w: 2, h: 2, make: well, animated: true },
+        board:     { w: 2, h: 1, make: board },
+        lamp:      { w: 1, h: 2, make: lamp, animated: true },
+        bench:     { w: 2, h: 1, make: bench },
+        stall:     { w: 2, h: 2, make: stall },
+        flowerbed: { w: 2, h: 1, make: flowerbed },
+        fenceH:    { w: 1, h: 1, make: fenceH },
+        fenceV:    { w: 1, h: 1, make: fenceV },
+        mailbox:   { w: 1, h: 1, make: mailbox },
+        fountain:  { w: 2, h: 2, make: fountain, animated: true },
+        pier:      { w: 2, h: 1, make: pier, walkable: true }
     };
 
     const _cache = new Map();

@@ -781,3 +781,41 @@ describe("Tools and upgrades", () => {
         expect(res.amount >= 1).toBe(true);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Town aesthetics and outdoor furniture
+// ---------------------------------------------------------------------------
+describe("Town aesthetics and outdoor furniture", () => {
+    it("defines pixel art for outdoor village furniture", () => {
+        const { Furniture } = loadEngine().exports;
+        for (const kind of ["well", "board", "lamp", "bench", "stall", "flowerbed", "mailbox", "pier", "fountain"]) {
+            expect(!!Furniture.KINDS[kind]).toBe(true);
+            const size = Furniture.size(kind);
+            expect(size.w >= 1).toBe(true);
+            expect(size.h >= 1).toBe(true);
+        }
+    });
+
+    it("village map has outdoor furniture and square interactables", () => {
+        const { MAPS } = loadEngine().exports;
+        const v = MAPS.village;
+        expect((v.furniture || []).length >= 5).toBe(true);
+        const well = v.interactables.find(i => i.action === "well");
+        const board = v.interactables.find(i => i.action === "board");
+        const cat = v.interactables.find(i => i.action === "cat");
+        expect(!!well).toBe(true);
+        expect(!!board).toBe(true);
+        expect(!!cat).toBe(true);
+    });
+
+    it("MobRig supports peaceful village fauna (cat, chicken, duck)", () => {
+        const { MobRig } = loadEngine().exports;
+        for (const kind of ["cat", "chicken", "duck"]) {
+            const art = MobRig.compose(kind, 0);
+            expect(!!art).toBe(true);
+            expect(art.w > 0).toBe(true);
+            expect(art.h > 0).toBe(true);
+            expect(MobRig.heightScale(kind) > 0).toBe(true);
+        }
+    });
+});

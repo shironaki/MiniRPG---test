@@ -389,7 +389,10 @@
             npc: V2Menus.dialogue,
             dungeon: V2Menus.dungeon,
             storage: V2Menus.storage,
-            cooking: V2Menus.cooking
+            cooking: V2Menus.cooking,
+            board: V2Menus.board,
+            well: V2Menus.well,
+            cat: V2Menus.cat
         };
         const open = dispatch[it.action];
         if (open) { open(menuCtx); return; }
@@ -570,7 +573,15 @@
         renderer.drawEnemies(enemies, camera);
         renderer.drawNPCs(npcs, camera);
         renderer.drawPlayer(player, camera);
-        renderer.drawNightOverlay(light, camera);
+        renderer.drawNightOverlay(light, camera, {
+            player: { x: player.centerX, y: player.centerY },
+            furniture,
+            buildings: mapData.buildings,
+            tileSize: mapData.tileSize
+        });
+        if (typeof renderer.drawAmbient === "function") {
+            renderer.drawAmbient(camera, zoneName, light);
+        }
 
         if (flashT > 0) {
             hud.textContent = flash;

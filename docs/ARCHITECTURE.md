@@ -154,11 +154,11 @@ main.js
 |------|----------|---------------|
 | `tests/game.test.js` | 119 | логика v1 + детерминированный Монте-Карло баланса боя |
 | `tests/integration.test.js` | 24 | загрузка v1 целиком, карта, клики, финальный экран |
-| `v2/tests/engine.test.js` | 62 | движок v2, карты, интерьеры, NPC, дружба, ресурсы, ферма, рыбалка, готовка, инструменты |
+| `v2/tests/engine.test.js` | 65 | движок v2, карты, интерьеры, NPC, дружба, ресурсы, ферма, рыбалка, готовка, инструменты, уличная мебель и фауна |
 | `v2/tests/battle.test.js` | 5 | мост в боевую систему |
 | `v2/tests/menus.test.js` | 5 | меню поверх систем v1 |
-| `v2/tests/smoke.test.js` | 16 | смоук-тесты в headless DOM: полный игровой цикл |
-| | **231** | `npm test` |
+| `v2/tests/smoke.test.js` | 19 | смоук-тесты в headless DOM: полный игровой цикл (включая колодец, доску и кота) |
+| | **237** | `npm test` |
 
 Харнессы (`tests/harness.js`, `v2/tests/harness.js`, `v2/tests/menus-harness.js`,
 `v2/tests/battle-harness.js`) грузят **настоящие исходники** в Node `vm` с

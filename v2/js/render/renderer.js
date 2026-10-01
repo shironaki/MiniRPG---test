@@ -322,12 +322,168 @@ class Renderer {
         }
     }
 
-    // Full-screen day/night tint drawn over the world (below the DOM HUD).
-    drawNightOverlay(light, camera) {
+    // Full-screen day/night tint with dynamic light sources (lamps, windows, player lantern).
+    drawNightOverlay(light, camera, sources) {
         if (!light || light.a <= 0.002) return;
         const ctx = this.ctx;
-        ctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
-        ctx.fillRect(0, 0, camera.viewW, camera.viewH);
+        const W = camera.viewW, H = camera.viewH;
+
+        // If no light sources or simple context, draw uniform tint.
+        if (!sources || typeof document === "undefined") {
+            ctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
+            ctx.fillRect(0, 0, W, H);
+            return;
+        }
+
+        if (!this._lightCanvas) {
+            this._lightCanvas = document.createElement("canvas");
+        }
+        if (this._lightCanvas.width !== W || this._lightCanvas.height !== H) {
+            this._lightCanvas.width = W;
+            this._lightCanvas.height = H;
+        }
+        const lctx = this._lightCanvas.getContext("2d");
+        if (!lctx) {
+            ctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
+            ctx.fillRect(0, 0, W, H);
+            return;
+        }
+
+        // Fill darkness tint
+        lctx.globalCompositeOperation = "source-over";
+        lctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
+        lctx.fillRect(0, 0, W, H);
+
+        // Carve out light circles with destination-out
+        lctx.globalCompositeOperation = "destination-out";
+
+        const punchLight = (sx, sy, radius, intensity) => {
+            if (sx < -radius || sy < -radius || sx > W + radius || sy > H + radius) return;
+            try {
+                const grd = lctx.createRadialGradient(sx, sy, 0, sx, sy, radius);
+                grd.addColorStop(0, `rgba(0,0,0,${intensity || 1.0})`);
+                grd.addColorStop(0.4, `rgba(0,0,0,${(intensity || 1.0) * 0.7})`);
+                grd.addColorStop(1, "rgba(0,0,0,0)");
+                lctx.fillStyle = grd;
+                lctx.beginPath();
+                lctx.arc(sx, sy, radius, 0, Math.PI * 2);
+                lctx.fill();
+            } catch (e) {
+                // fallback
+                lctx.fillStyle = "rgba(0,0,0,0.6)";
+                lctx.beginPath();
+                lctx.arc(sx, sy, radius * 0.7, 0, Math.PI * 2);
+                lctx.fill();
+            }
+        };
+
+        const ts = sources.tileSize || 32;
+
+        // 1. Street lamps
+        if (sources.furniture) {
+            for (const f of sources.furniture) {
+                if (f.kind === "lamp") {
+                    const sx = Math.round(f.col * ts + ts * 0.5 - camera.x);
+                    const sy = Math.round(f.row * ts + ts * 0.5 - camera.y);
+                    punchLight(sx, sy, 85, 0.95);
+                } else if (f.kind === "fireplace" || f.kind === "stove" || f.kind === "forgeFire") {
+                    const sx = Math.round(f.col * ts + ts * 0.8 - camera.x);
+                    const sy = Math.round(f.row * ts + ts * 0.5 - camera.y);
+                    punchLight(sx, sy, 65, 0.90);
+                }
+            }
+        }
+
+        // 2. Building windows & forge fire
+        if (sources.buildings) {
+            for (const b of sources.buildings) {
+                const sx = Math.round(b.col * ts + b.w * ts * 0.5 - camera.x);
+                const sy = Math.round(b.row * ts + b.h * ts * 0.6 - camera.y);
+                if (b.type === "forge") {
+                    punchLight(sx, sy, 80, 0.92);
+                } else if (b.type === "house" || b.type === "shop") {
+                    punchLight(sx, sy, 70, 0.85);
+                } else if (b.type === "gate") {
+                    punchLight(sx, sy, 60, 0.75);
+                }
+            }
+        }
+
+        // 3. Player lantern (when dark)
+        if (sources.player && light.a > 0.15) {
+            const px = Math.round(sources.player.x - camera.x);
+            const py = Math.round(sources.player.y - camera.y);
+            punchLight(px, py, 60, 0.88);
+        }
+
+        // Blit darkness mask to screen
+        ctx.drawImage(this._lightCanvas, 0, 0);
+
+        // Soft warm glow overlay on lamps and windows
+        if (sources.furniture && light.a > 0.08) {
+            for (const f of sources.furniture) {
+                if (f.kind === "lamp") {
+                    const sx = Math.round(f.col * ts + ts * 0.5 - camera.x);
+                    const sy = Math.round(f.row * ts + ts * 0.5 - camera.y);
+                    if (sx >= -50 && sy >= -50 && sx <= W + 50 && sy <= H + 50) {
+                        ctx.fillStyle = "rgba(255,210,120,0.18)";
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 60, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+    }
+
+    // Ambient floating petals / leaves and night fireflies.
+    drawAmbient(camera, zoneName, light) {
+        const ctx = this.ctx;
+        const now = Date.now();
+        const W = camera.viewW, H = camera.viewH;
+
+        if (zoneName === "Деревня" || zoneName === "village") {
+            // Day / evening: drifting petals and autumn leaves
+            const count = 10;
+            for (let i = 0; i < count; i++) {
+                const seed = i * 137.5;
+                const speedX = 0.045 + (i % 3) * 0.015;
+                const speedY = 0.025 + (i % 2) * 0.010;
+                const x = ((now * speedX + seed * 12) % (W + 60)) - 30;
+                const y = ((now * speedY + seed * 23 + Math.sin(now / 400 + i) * 15) % (H + 60)) - 30;
+
+                const isPetal = i % 2 === 0;
+                ctx.fillStyle = isPetal ? "rgba(255,182,193,0.65)" : "rgba(220,165,80,0.60)";
+                ctx.beginPath();
+                ctx.ellipse(x, y, isPetal ? 3 : 4, isPetal ? 2 : 2.5, Math.sin(now / 500 + i), 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Dusk / night: glowing fireflies near trees and pond
+            if (light && light.a > 0.25) {
+                const fireflies = 8;
+                for (let i = 0; i < fireflies; i++) {
+                    const seed = i * 97.3;
+                    const wx = (seed * 19 + Math.sin(now / 700 + i * 1.5) * 45) % (26 * 32);
+                    const wy = (seed * 29 + Math.cos(now / 600 + i * 1.8) * 35) % (18 * 32);
+                    const sx = Math.round(wx - camera.x);
+                    const sy = Math.round(wy - camera.y);
+                    if (sx < -10 || sy < -10 || sx > W + 10 || sy > H + 10) continue;
+
+                    const pulse = 0.4 + 0.5 * Math.sin(now / 350 + i * 2.1);
+                    if (pulse > 0.15) {
+                        ctx.fillStyle = `rgba(210,255,100,${pulse * 0.85})`;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = `rgba(210,255,100,${pulse * 0.25})`;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
     }
 
     drawPortals(list, camera) {

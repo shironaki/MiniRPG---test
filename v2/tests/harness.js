@@ -30,7 +30,11 @@ const FILES = [
     "js/entities/mover.js",
     "js/entities/player.js",
     "js/entities/enemy.js",
-    "js/entities/npc.js"
+    "js/entities/npc.js",
+    "js/render/furniture.js",
+    "js/render/mobs.js",
+    "js/render/tilesart.js",
+    "js/render/buildings.js"
 ];
 
 const EXPORTED = [
@@ -44,7 +48,8 @@ const EXPORTED = [
     "FishingSystem", "FISH_TABLE",
     "CookingSystem", "RECIPES",
     "Tools", "TOOL_TIERS",
-    "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP"
+    "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP",
+    "Furniture", "MobRig", "TileArt", "BuildingArt"
 ];
 
 function loadEngine() {
