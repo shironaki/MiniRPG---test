@@ -287,6 +287,102 @@ describe("v2 smoke › playing", () => {
         expect(html.includes("data-pet=\"1\"")).toBe(true);
     });
 
+    it("visits the village ranch, pets animals and harvests fresh milk/eggs", () => {
+        const g = boot();
+        g.tick(16.7);
+        const ranchSpot = g.globals.MAPS.village.interactables.find(i => i.action === "ranch");
+        expect(!!ranchSpot).toBe(true);
+        standOn(g.v2, ranchSpot.col, ranchSpot.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("Фермерское подворье")).toBe(true);
+        expect(html.includes("data-pet-all=\"1\"")).toBe(true);
+
+        // Pet and feed animals
+        g.v2.resources.add("hay", 5);
+        const petRes = g.v2.ranch.petAll();
+        expect(petRes.ok).toBe(true);
+        const harvestRes = g.v2.ranch.harvestAll(g.v2.resources);
+        expect(harvestRes.ok).toBe(true);
+        expect(g.v2.resources.count("egg") + g.v2.resources.count("milk") > 0).toBe(true);
+    });
+
+    it("smelts copper ore into copper bars at the village forge furnace", () => {
+        const g = boot();
+        g.tick(16.7);
+        const forgeDoor = g.globals.MAPS.village.interactables.find(i => i.to === "forge_in");
+        expect(!!forgeDoor).toBe(true);
+        standOn(g.v2, forgeDoor.col, forgeDoor.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        expect(g.v2.zone).toBe("Кузница");
+
+        const smeltSpot = g.globals.MAPS.forge_in.interactables.find(i => i.action === "smelt");
+        expect(!!smeltSpot).toBe(true);
+        standOn(g.v2, smeltSpot.col, smeltSpot.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("Плавильный горн")).toBe(true);
+
+        // Add ore & coal and smelt
+        g.v2.resources.add("ore_copper", 3);
+        g.v2.resources.add("coal", 1);
+        const smeltRes = g.v2.smelting.smelt("bar_copper", g.v2.resources);
+        expect(smeltRes.ok).toBe(true);
+        expect(g.v2.resources.count("bar_copper")).toBe(1);
+    });
+
+    it("descends into the deep procedural mines from the cave shaft", () => {
+        const g = boot();
+        g.tick(16.7);
+        const forestPortal = g.globals.MAPS.village.portals.find(p => p.to === "forest");
+        standOn(g.v2, forestPortal.col, forestPortal.row);
+        g.tick(16.7);
+        const cavePortal = g.globals.MAPS.forest.portals.find(p => p.to === "cave");
+        standOn(g.v2, cavePortal.col, cavePortal.row);
+        g.tick(16.7);
+        expect(g.v2.zone).toBe("Пещера");
+
+        const mineSpot = g.globals.MAPS.cave.interactables.find(i => i.action === "mines");
+        expect(!!mineSpot).toBe(true);
+        standOn(g.v2, mineSpot.col, mineSpot.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("Глубокие шахты")).toBe(true);
+
+        // Direct test deep mine floor progression
+        expect(g.v2.mines.floor).toBe(1);
+        const floor2 = g.v2.mines.descend();
+        expect(floor2).toBe(2);
+        const floorData = g.v2.mines.generateFloor(2);
+        expect(floorData.resources.length).toBeGreaterThan(0);
+    });
+
+    it("customizes home interior wallpaper and flooring via decor panel", () => {
+        const g = boot();
+        g.tick(16.7);
+        // Enter home interior
+        const homeDoor = g.globals.MAPS.village.interactables.find(i => i.to === "home");
+        standOn(g.v2, homeDoor.col, homeDoor.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        expect(g.v2.zone).toBe("Твой дом");
+
+        const decorSpot = g.globals.MAPS.home.interactables.find(i => i.action === "decor");
+        expect(!!decorSpot).toBe(true);
+        standOn(g.v2, decorSpot.col, decorSpot.row);
+        g.tick(16.7); g.tap("KeyE"); g.tick(16.7);
+        const html = g.html("overlayBody");
+        expect(html.includes("Обустройство дома")).toBe(true);
+
+        // Change flooring & wallpaper
+        const res1 = g.v2.decor.setFlooring("carpet_red");
+        expect(res1.ok).toBe(true);
+        expect(g.v2.decor.flooring).toBe("carpet_red");
+
+        const res2 = g.v2.decor.setWallpaper("stone_brick");
+        expect(res2.ok).toBe(true);
+        expect(g.v2.decor.wallpaper).toBe("stone_brick");
+    });
+
     it("survives a long session: 400 frames across the day/night cycle", () => {
         const g = boot();
         for (let i = 0; i < 400; i++) g.tick(50);    // ~20s → clock advances

@@ -538,6 +538,107 @@
         return g;
     }
 
+    // Bookshelf, 2x2: rich carved oak library shelves loaded with books.
+    function bookshelf() {
+        const g = grid(N * 2, N * 2);
+        rect(g, 2, 2, 28, 28, "#5c3d20");
+        rect(g, 2, 2, 28, 2, "#7a5433");
+        rect(g, 2, 16, 28, 2, "#7a5433");
+        rect(g, 2, 28, 28, 2, "#422810");
+        // Row 1 books
+        const bCols = ["#b83a2a", "#3a68b0", "#3a8b4a", "#c49a2a", "#8a3a90", "#b83a2a", "#d06828", "#3a68b0"];
+        for (let i = 0; i < 8; i++) {
+            rect(g, 4 + i * 3, 5, 2, 11, bCols[i % bCols.length]);
+            px(g, 4 + i * 3, 8, "#ffd700");
+        }
+        // Row 2 books
+        for (let i = 0; i < 8; i++) {
+            rect(g, 4 + i * 3, 18, 2, 10, bCols[(i + 3) % bCols.length]);
+            px(g, 4 + i * 3, 22, "#e8e5dc");
+        }
+        shadow(g, 2, 31, 28);
+        return g;
+    }
+
+    // Plush Sofa, 2x1.
+    function sofa() {
+        const g = grid(N * 2, N);
+        rect(g, 2, 2, 28, 6, "#8b263e"); // backrest
+        rect(g, 2, 2, 28, 1, "#b33b56");
+        rect(g, 1, 4, 4, 10, "#a8324d"); // left armrest
+        rect(g, 27, 4, 4, 10, "#a8324d"); // right armrest
+        rect(g, 4, 7, 24, 7, "#b83a58"); // cushion
+        rect(g, 4, 7, 24, 1, "#d95775");
+        rect(g, 15, 7, 2, 7, "#731c30"); // cushion split
+        shadow(g, 2, 15, 28);
+        return g;
+    }
+
+    // Grandfather Wall Clock, 1x1.
+    function clock(phase) {
+        const g = grid(N, N);
+        rect(g, 4, 1, 8, 14, "#5a3a1f");
+        rect(g, 4, 1, 8, 1, "#7d522d");
+        rect(g, 5, 3, 6, 5, "#fff8e7"); // clock face
+        px(g, 7, 5, "#201c18"); px(g, 8, 5, "#201c18"); px(g, 7, 4, "#201c18"); // hands
+        // Pendulum
+        const tick = phase % 2 === 0;
+        rect(g, 7, 9, 2, 4, "#2a1c10");
+        px(g, tick ? 6 : 9, 12, "#ffd700"); // brass pendulum bob
+        shadow(g, 4, 15, 8);
+        return g;
+    }
+
+    // Armchair, 1x1.
+    function armchair() {
+        const g = grid(N, N);
+        rect(g, 2, 2, 12, 6, "#8b263e");
+        rect(g, 1, 4, 3, 10, "#a8324d");
+        rect(g, 12, 4, 3, 10, "#a8324d");
+        rect(g, 3, 7, 10, 7, "#b83a58");
+        rect(g, 3, 7, 10, 1, "#d95775");
+        shadow(g, 2, 15, 12);
+        return g;
+    }
+
+    // Animal Feeding Trough with golden hay, 2x1.
+    function feeder() {
+        const g = grid(N * 2, N);
+        rect(g, 2, 4, 28, 10, "#6d4b29");
+        rect(g, 2, 4, 28, 1, "#8a6239");
+        rect(g, 4, 6, 24, 6, "#e8c34a"); // golden hay
+        px(g, 6, 5, "#fbe27d"); px(g, 12, 5, "#fbe27d"); px(g, 20, 5, "#fbe27d");
+        rect(g, 2, 13, 28, 1, "#422810");
+        shadow(g, 2, 15, 28);
+        return g;
+    }
+
+    // Smelting Forge Furnace with glowing molten metal, 1x1.
+    function furnace(phase) {
+        const g = grid(N, N);
+        rect(g, 2, 2, 12, 13, "#54504a");
+        rect(g, 2, 2, 12, 1, "#736e67");
+        rect(g, 4, 6, 8, 8, "#201c1a");
+        const f = phase % 2 === 0;
+        rect(g, 5, 8, 6, 5, f ? "#f06a20" : "#ff8830");
+        rect(g, 6, 9, 4, 3, "#ffe060");
+        px(g, 7, 10, "#ffffff");
+        shadow(g, 2, 15, 12);
+        return g;
+    }
+
+    // Mine Ladder Down, 1x1.
+    function ladderDown() {
+        const g = grid(N, N);
+        rect(g, 3, 1, 10, 14, "#181614");
+        rect(g, 4, 2, 2, 12, "#8a6239");
+        rect(g, 10, 2, 2, 12, "#8a6239");
+        for (let y = 3; y < 13; y += 3) {
+            rect(g, 5, y, 6, 1, "#b38854");
+        }
+        return g;
+    }
+
     // A soft contact shadow so pieces sit ON the floor instead of floating.
     function shadow(g, x, y, w) {
         rect(g, x + 1, y, w - 2, 1, "#6b4a28");
@@ -560,6 +661,14 @@
         barrel:    { w: 1, h: 1, make: barrel },
         rug:       { w: 2, h: 2, make: rug, walkable: true },
         plant:     { w: 1, h: 1, make: plant },
+        // Decorative furniture
+        bookshelf: { w: 2, h: 2, make: bookshelf },
+        sofa:      { w: 2, h: 1, make: sofa },
+        clock:     { w: 1, h: 1, make: clock, animated: true },
+        armchair:  { w: 1, h: 1, make: armchair },
+        feeder:    { w: 2, h: 1, make: feeder },
+        furnace:   { w: 1, h: 1, make: furnace, animated: true },
+        ladderDown:{ w: 1, h: 1, make: ladderDown, walkable: true },
         // Village outdoor furniture & props
         well:      { w: 2, h: 2, make: well, animated: true },
         board:     { w: 2, h: 1, make: board },
@@ -570,10 +679,10 @@
         fenceH:    { w: 1, h: 1, make: fenceH },
         fenceV:    { w: 1, h: 1, make: fenceV },
         mailbox:   { w: 1, h: 1, make: mailbox },
-        fountain:   { w: 2, h: 2, make: fountain, animated: true },
-        pier:       { w: 2, h: 1, make: pier, walkable: true },
-        lighthouse: { w: 2, h: 3, make: lighthouse, animated: true },
-        umbrella:   { w: 2, h: 2, make: beachUmbrella }
+        fountain:  { w: 2, h: 2, make: fountain, animated: true },
+        pier:      { w: 2, h: 1, make: pier, walkable: true },
+        lighthouse:{ w: 2, h: 3, make: lighthouse, animated: true },
+        umbrella:  { w: 2, h: 2, make: beachUmbrella }
     };
 
     const _cache = new Map();

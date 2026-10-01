@@ -34,11 +34,24 @@
     const cooking = (typeof CookingSystem !== "undefined") ? new CookingSystem() : null;
     const fishing = (typeof FishingSystem !== "undefined") ? new FishingSystem() : null;
     const weather = (typeof WeatherSystem !== "undefined") ? new WeatherSystem() : null;
+    const ranch = (typeof RanchSystem !== "undefined") ? new RanchSystem() : null;
+    const smelting = (typeof SmeltingSystem !== "undefined") ? new SmeltingSystem() : null;
+    const decor = (typeof DecorSystem !== "undefined") ? new DecorSystem() : null;
+    const mines = (typeof MinesSystem !== "undefined") ? new MinesSystem() : null;
     resources.add("seeds", 6);            // a starter pouch of seeds
 
     // Transient on-screen feedback (gathering, gifts, catches) — fades on its own.
     let flash = "", flashT = 0;
     function showFlash(text, secs) { flash = text; flashT = secs || 1.6; }
+
+    function getMap(id) {
+        if (typeof id === "object" && id) return id;
+        if (typeof id === "string" && id.startsWith("mine_floor_") && mines) {
+            const flNum = parseInt(id.replace("mine_floor_", ""), 10) || 1;
+            return mines.generateFloor(flNum);
+        }
+        return (typeof MAPS !== "undefined" && MAPS[id]) || (typeof ZONES !== "undefined" && ZONES[id]);
+    }
 
     // Build (or rebuild) the world for a zone and drop the hero at `spawn`.
     function loadZone(id, spawn) {
@@ -62,7 +75,13 @@
         });
         resourceNodes = (mapData.resources || []).map(r => new ResourceNode(r, ts));
         farmPlots = (mapData.farm || []).map(c => ({ col: c.col, row: c.row, px: c.col * ts + ts / 2, py: c.row * ts + ts / 2 }));
-        furniture = (mapData.furniture || []).map(f => ({ ...f }));
+        
+        let furnList = (mapData.furniture || []).map(f => ({ ...f }));
+        if (id === "home" && decor && decor.furniture && decor.furniture.length) {
+            furnList = furnList.concat(decor.furniture.map(df => ({ ...df })));
+        }
+        furniture = furnList;
+
         // Furniture occupies real space: block its footprint so the hero
         // walks around obstacles instead of through them (rugs stay walkable).
         if (typeof Furniture !== "undefined") {
@@ -74,7 +93,7 @@
                     for (let i = 0; i < size.w; i++) tilemap.block(f.col + i, f.row + j);
             }
         }
-        zoneName = mapData.name || id;
+        zoneName = mapData.name || (typeof id === "string" ? id : "Локация");
         const sp = spawn || mapData.spawn;
         player.x = sp.col * ts + 6;
         player.y = sp.row * ts + 6;
@@ -93,6 +112,12 @@
     const menuCtx = {
         hero, journal, host, refresh: refreshStats, social, resources,
         requests, storage, tools, cooking, fishing, weather,
+        ranch, smelting, decor, mines,
+        enterMines: (fl) => {
+            closeInteraction();
+            loadZone(`mine_floor_${fl || 1}`);
+            showFlash(`⛏️ Вы спустились в шахту (Ярус ${fl || 1})!`, 2);
+        },
         get day() { return dayCount; }
     };
 
@@ -317,6 +342,11 @@
             : type === "driftwood" ? "Собрать плавник"
             : type === "seaweed" ? "Собрать ламинарию"
             : type === "rock" ? "Добыть камень"
+            : type === "ore_copper_node" ? "Добыть медную руду"
+            : type === "ore_iron_node" ? "Добыть железную руду"
+            : type === "ore_gold_node" ? "Добыть золотую руду"
+            : type === "coal_node" ? "Добыть уголь"
+            : type === "gem_node" ? "Добыть самоцвет"
             : type === "herb" ? "Собрать травы" : "Собрать ягоды";
     }
 
@@ -380,7 +410,7 @@
         let toolBonus = 0;
         if (tools) {
             if (node.type === "tree" || node.type === "driftwood") toolBonus = tools.level("axe") - 1;
-            else if (node.type === "rock") toolBonus = tools.level("pickaxe") - 1;
+            else if (node.type === "rock" || node.type.startsWith("ore_") || node.type === "coal_node" || node.type === "gem_node") toolBonus = tools.level("pickaxe") - 1;
         }
         const r = node.hit(toolBonus);
         if (!r) return;
@@ -424,6 +454,24 @@
             fishAtPond(isOcean);
             return;
         }
+        if (it.action === "mine_descend") {
+            const nextFl = mines ? mines.descend() : 2;
+            loadZone(`mine_floor_${nextFl}`);
+            showFlash(`🪜 Вы спустились на ярус ${nextFl} глубоких шахт.`, 2);
+            return;
+        }
+        if (it.action === "mine_ascend") {
+            if (mines && mines.floor > 1) {
+                const prevFl = mines.ascend();
+                loadZone(`mine_floor_${prevFl}`);
+                showFlash(`🪜 Вы поднялись на ярус ${prevFl}.`, 1.5);
+            } else {
+                if (mines) mines.reset();
+                loadZone("cave", { col: 9, row: 5 });
+                showFlash(`🌲 Вы вышли из шахты в пещеру.`, 1.5);
+            }
+            return;
+        }
         paused = true;
         const dispatch = {
             shop: V2Menus.shop,
@@ -435,7 +483,11 @@
             cooking: V2Menus.cooking,
             board: V2Menus.board,
             well: V2Menus.well,
-            cat: V2Menus.cat
+            cat: V2Menus.cat,
+            ranch: V2Menus.ranch,
+            smelt: V2Menus.smelt,
+            decor: V2Menus.decor,
+            mines: V2Menus.mines
         };
         const open = dispatch[it.action];
         if (open) { open(menuCtx); return; }
@@ -448,8 +500,10 @@
         dayCount = newDay;
         const curWeather = weather ? weather.getWeather(dayCount) : null;
         const isRain = curWeather && curWeather.isRain;
+        const isWinter = weather ? (weather.getSeason(dayCount).id === "winter") : false;
         farm.onNewDay(dayCount, isRain);
         social.setDay(dayCount);
+        if (ranch) ranch.onNewDay(dayCount, isWinter);
         if (isRain) {
             showFlash(`🌧️ Дождь полил все грядки в долине!`, 2.5);
         }
@@ -674,6 +728,7 @@
         get farmPlots() { return farmPlots; },
         get furniture() { return furniture; },
         requests, storage, tools, cooking, fishing,
+        ranch, smelting, decor, mines,
         sleepUntilMorning, fishAtPond,
         get zone() { return zoneName; },
         get clock() { return clockMin; },

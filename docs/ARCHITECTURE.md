@@ -71,8 +71,9 @@ LICENSE               # MIT, © 2026 shironaki — НЕ МЕНЯТЬ
 ../js/util.js  data.js  item.js  craft.js  ally.js  player.js
 ../js/enemy.js battle.js shop.js quest.js dungeon.js dialogue.js   ← логика v1
 engine/vec.js  engine/input.js  engine/camera.js  engine/loop.js
-world/tiles.js world/tilemap.js world/social.js world/resources.js
+world/tiles.js world/tilemap.js world/weather.js world/social.js world/resources.js
 world/farming.js world/fishing.js world/cooking.js world/tools.js
+world/animals.js world/mines.js world/decor.js
 world/requests.js world/maps.js
 entities/mover.js entities/player.js entities/enemy.js entities/npc.js
 battle/battle2d.js battle/battleui.js
@@ -99,14 +100,17 @@ main.js
 | `tiles.js` | типы тайлов, проходимость (трава, вода, мостовая, песок, море, пальма) |
 | `tilemap.js` | сетка 32 px, коллизии, перевод координат |
 | `weather.js` | `WeatherSystem`, `SEASONS`, `WEATHER_TYPES`: календарь 4 сезонов (28 дней на сезон, 112 дней в году), детерминированная погода (ясно, облачно, дождь, гроза, туман, снегопад), автополив грядок в дождь, прогноз погоды на завтра |
-| `maps.js` | **данные всех зон**: `village`, `beach`, `forest`, `cave`, `home`, `shop_in`, `forge_in` — тайлы, `buildings`, `npcs`, `resources`, `farm`, `furniture`, `portals`. Контентные правки делаются тут |
+| `maps.js` | **данные всех зон**: `village`, `beach`, `forest`, `cave`, `home`, `shop_in`, `forge_in`, `mine_floor_*` — тайлы, `buildings`, `npcs`, `resources`, `farm`, `furniture`, `portals`. Контентные правки делаются тут |
 | `social.js` | `Social`: очки дружбы → сердца, лимиты «раз в день» на разговор/подарок, любимые подарки |
-| `resources.js` | `RESOURCES` (каталог: 🪵 дерево, камень, ягоды, травы, 🌰 семена, 🥕 овощи, 🍓 клубника, 🍅 томаты, 🌽 кукуруза, 🎃 тыква, 🌾 пшеница, 🍎 яблоки, 🍒 вишня, 🐚 ракушки, 🪵 плавник, 🌿 ламинария, 🐟 рыба, 🍲 блюда), `NODE_TYPES`, `ResourceNode` (сбор, истощение, респавн), `ResourceBag` (сумка) |
+| `resources.js` | `RESOURCES` (каталог: 🪵 дерево, камень, руды, слитки, самоцветы, яйца, молоко, шерсть, 🌰 семена, 🥕 овощи, 🍓 клубника, 🍅 томаты, 🌽 кукуруза, 🎃 тыква, 🌾 пшеница, 🍎 яблоки, 🍒 вишня, 🐚 ракушки, 🪵 плавник, 🌿 ламинария, 🐟 рыба, 🍲 блюда), `NODE_TYPES`, `ResourceNode` (сбор, истощение, респавн), `ResourceBag` (сумка) |
 | `farming.js` | `Farm`, `FarmPlot`, `CROPS`, `CROP`. Конечный автомат грядки: `empty → tilled → growing → ready → (harvest) → tilled`. 6 видов культур, `onNewDay(day, isRaining)` с автополивом в дождь. `rng` инъектируемый |
+| `animals.js` | `FarmAnimal`, `RanchSystem`, `ANIMAL_TYPES`: содержание скота (куры, коровы, овцы), ласка, кормление сеном/пшеницей, сбор яиц/молока/шерсти, качество продукции |
+| `mines.js` | `MinesSystem`, `SmeltingSystem`, `SMELTING_RECIPES`: многоярусные процедурные шахты, рудные жилы (медь, железо, золото, уголь, самоцветы), лестницы спуска/подъёма, плавка слитков в печи |
+| `decor.js` | `DecorSystem`, `FLOOR_STYLES`, `WALL_STYLES`, `DECOR_CATALOG`: кастомизация стен и полов, каталог декоративной мебели |
 | `fishing.js` | `FishingSystem`, `FISH_TABLE`, `OCEAN_FISH_TABLE`: ловля пресноводной рыбы в пруду (окунь, карп, щука, раки) и морской рыбы на побережье (камбала, тунец, омар, жемчуг), влияние удочки, шансы сокровищ |
-| `cooking.js` | `CookingSystem`, `RECIPES`: домашняя готовка и консервация (похлёбка, жареная рыба, пирог, уха, чай, сидр, варенье, тыквенный суп, морская паста) |
+| `cooking.js` | `CookingSystem`, `RECIPES`: домашняя готовка и кулинарные деликатесы (омлет, блинчики, сыр, стейк, золотой сидр, похлёбка, уха, пирог, варенье, паста) |
 | `tools.js` | `Tools`, `TOOL_TIERS`: уровни и прокачка удочки, топора, кирки и лейки в кузнице |
-| `requests.js` | `Requests`, `REQUEST_POOL`: поручения жителей на ресурсы, фрукты, рыбу и блюда за золото и дружбу |
+| `requests.js` | `Requests`, `REQUEST_POOL`: поручения жителей на ресурсы, продукты, руды, рыбу и блюда за золото и дружбу |
 
 ### 3.3 `entities/` — то, что двигается
 | Файл | Что делает |

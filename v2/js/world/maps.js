@@ -61,7 +61,10 @@ const MAPS = {
             { col: 5,  row: 7,  kind: "pier" },      // Wooden fishing pier (2x1)
 
             // Blacksmith Yard Timber & Barrels
-            { col: 7,  row: 12, kind: "barrel" }     // Barrel near forge (1x1)
+            { col: 7,  row: 12, kind: "barrel" },    // Barrel near forge (1x1)
+
+            // Farm pasture & animal feeder
+            { col: 10, row: 14, kind: "feeder" }     // Animal Feeding Trough (2x1)
         ],
         // Interactable points sit in front of each building's door and props.
         // `enter` walks the hero into a real interior zone.
@@ -73,11 +76,15 @@ const MAPS = {
             { col: 14, row: 6,  action: "board",   label: "Доска объявлений", emoji: "📜" },
             { col: 11, row: 7,  action: "well",    label: "Деревенский колодец", emoji: "🪣" },
             { col: 5,  row: 8,  action: "fishing", label: "Рыбалка у пруда", emoji: "🎣" },
-            { col: 14, row: 10, action: "cat",     label: "Кот Мурзик", emoji: "🐱" }
+            { col: 14, row: 10, action: "cat",     label: "Кот Мурзик", emoji: "🐱" },
+            { col: 10, row: 14, action: "ranch",   label: "Фермерский загон", emoji: "🐮" }
         ],
         // The village is a peaceful zone — friendly fauna roams here.
         enemies: [
-            { id: "cat1", kind: "cat", type: "cat", emoji: "🐱", col: 14, row: 10, wanderRadius: 32 }
+            { id: "cat1",   kind: "cat",     type: "cat",     emoji: "🐱", col: 14, row: 10, wanderRadius: 32 },
+            { id: "cow1",   kind: "cow",     type: "cow",     emoji: "🐮", col: 11, row: 15, wanderRadius: 16 },
+            { id: "sheep1", kind: "sheep",   type: "sheep",   emoji: "🐑", col: 12, row: 15, wanderRadius: 16 },
+            { id: "hen1",   kind: "chicken", type: "chicken", emoji: "🐔", col: 9,  row: 15, wanderRadius: 16 }
         ],
         // Living townsfolk who walk a daily schedule (minutes since midnight).
         // Talk (E) once a day for friendship; gift items/resources they like.
@@ -307,7 +314,8 @@ const MAPS = {
         ],
         spawn: { col: 2, row: 1 },
         interactables: [
-            { col: 17, row: 11, action: "dungeon", label: "Логово (испытание)", emoji: "🗝️" }
+            { col: 17, row: 11, action: "dungeon", label: "Логово (испытание)", emoji: "🗝️" },
+            { col: 9,  row: 5,  action: "mines",   label: "Спуск в глубокие шахты", emoji: "⛏️" }
         ],
         enemies: [
             { col: 5,  row: 5,  kind: "skeleton", emoji: "💀", wanderRadius: 70 },
@@ -354,7 +362,8 @@ const MAPS = {
         interactables: [
             { col: 1, row: 2, action: "sleep",   label: "Лечь спать",     emoji: "🛏️" },
             { col: 3, row: 1, action: "storage", label: "Сундук",         emoji: "🧰" },
-            { col: 6, row: 2, action: "cooking", label: "Очаг (готовка)", emoji: "🍲" }
+            { col: 6, row: 2, action: "cooking", label: "Очаг (готовка)", emoji: "🍲" },
+            { col: 8, row: 2, action: "decor",   label: "Интерьер дома",  emoji: "🎨" }
         ],
         portals: [
             { col: 5, row: 7, to: "village", spawn: { col: 5, row: 6 }, label: "На улицу", emoji: "🚪" }
@@ -439,6 +448,7 @@ const MAPS = {
         furniture: [
             { kind: "forgeFire", col: 1, row: 1 },
             { kind: "forgeFire", col: 2, row: 1 },
+            { kind: "furnace",   col: 3, row: 1 },
             { kind: "anvil",     col: 5, row: 2 },
             { kind: "barrel",    col: 8, row: 1 },
             { kind: "barrel",    col: 9, row: 3 },
@@ -447,7 +457,8 @@ const MAPS = {
         ],
         interactables: [
             { col: 5, row: 3, action: "forge", label: "Наковальня", emoji: "🔨" },
-            { col: 4, row: 2, action: "forge", label: "Наковальня", emoji: "🔨" }
+            { col: 4, row: 2, action: "forge", label: "Наковальня", emoji: "🔨" },
+            { col: 3, row: 2, action: "smelt", label: "Плавильный горн", emoji: "🔥" }
         ],
         // The smith moves between his fire and his anvil.
         npcs: [

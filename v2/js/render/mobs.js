@@ -45,6 +45,14 @@
         seagull: {
             body: "#f5f5f5", wing: "#a8aeb8", wingSh: "#7a808a",
             beak: "#f0c030", eye: "#101010", outline: "#202022"
+        },
+        cow: {
+            body: "#f5f2eb", bodySh: "#d0c8b8", spot: "#302d2a", spotSh: "#1c1a18",
+            muzzle: "#f2b0be", horn: "#dcd2b0", hoof: "#3c3228", eye: "#1a1a1a", outline: "#201c18"
+        },
+        sheep: {
+            wool: "#f8f6ee", woolSh: "#d8d0be", face: "#423c36", faceSh: "#2c2824",
+            eye: "#121212", hoof: "#302a24", outline: "#201c18"
         }
     };
 
@@ -276,15 +284,70 @@
         return { w: W, h: H, grid: outline(g, p.outline) };
     }
 
+    function buildCow(frame) {
+        const W = 22, H = 18, g = blank(W, H), p = PAL.cow;
+        const step = frame % 2;
+        // Tail
+        px(g, 1, 6 - step, p.body); px(g, 0, 7 - step, p.spot);
+        // Body (torso with cow spots)
+        rect(g, 2, 4, 14, 8, p.body);
+        rect(g, 2, 11, 14, 1, p.bodySh);
+        // Black spots on cow
+        rect(g, 4, 5, 4, 4, p.spot); px(g, 8, 5, p.spotSh);
+        rect(g, 11, 6, 3, 4, p.spot);
+        // Pink udder under belly
+        rect(g, 5, 12, 3, 2, p.muzzle);
+        // Head & Muzzle
+        rect(g, 15, 2, 5, 6, p.body);
+        rect(g, 17, 3, 2, 2, p.spot); // eye spot
+        px(g, 18, 4, p.eye);          // eye
+        rect(g, 18, 5, 4, 3, p.muzzle); // pink snout
+        px(g, 20, 6, "#8a4a58"); px(g, 20, 7, "#8a4a58"); // nostrils
+        // Horns & Ears
+        px(g, 16, 0, p.horn); px(g, 17, 1, p.horn);
+        px(g, 14, 3, p.bodySh); // ear
+        // 4 Legs
+        rect(g, 4, 12 + step, 2, 4, p.body); rect(g, 4, 15 + step, 2, 1, p.hoof);
+        rect(g, 8, 12 - step, 2, 4, p.bodySh); rect(g, 8, 15 - step, 2, 1, p.hoof);
+        rect(g, 12, 12 + step, 2, 4, p.body); rect(g, 12, 15 + step, 2, 1, p.hoof);
+        rect(g, 15, 12 - step, 2, 4, p.bodySh); rect(g, 15, 15 - step, 2, 1, p.hoof);
+        return { w: W, h: H, grid: outline(g, p.outline) };
+    }
+
+    function buildSheep(frame) {
+        const W = 20, H = 16, g = blank(W, H), p = PAL.sheep;
+        const step = frame % 2;
+        // Tail
+        px(g, 1, 6, p.wool);
+        // Fluffy cloud wool body
+        rect(g, 2, 3, 13, 8, p.wool);
+        rect(g, 3, 2, 11, 10, p.wool);
+        rect(g, 4, 10, 10, 2, p.woolSh);
+        // Wool fluff texture puffs
+        px(g, 4, 4, p.woolSh); px(g, 8, 4, p.woolSh); px(g, 12, 5, p.woolSh);
+        px(g, 6, 7, p.woolSh); px(g, 10, 8, p.woolSh);
+        // Dark head & face
+        rect(g, 14, 3, 4, 5, p.face);
+        px(g, 16, 4, p.eye);
+        rect(g, 17, 5, 2, 3, p.faceSh); // snout
+        px(g, 13, 4, p.faceSh);          // drooping ear
+        // 4 Little hooves
+        rect(g, 4, 11 + step, 2, 3, p.face); rect(g, 4, 13 + step, 2, 1, p.hoof);
+        rect(g, 7, 11 - step, 2, 3, p.faceSh); rect(g, 7, 13 - step, 2, 1, p.hoof);
+        rect(g, 11, 11 + step, 2, 3, p.face); rect(g, 11, 13 + step, 2, 1, p.hoof);
+        rect(g, 14, 11 - step, 2, 3, p.faceSh); rect(g, 14, 13 - step, 2, 1, p.hoof);
+        return { w: W, h: H, grid: outline(g, p.outline) };
+    }
+
     const BUILDERS = {
         goblin: buildGoblin, skeleton: buildSkeleton, wolf: buildWolf,
         cat: buildCat, chicken: buildChicken, duck: buildDuck,
-        crab: buildCrab, seagull: buildSeagull
+        crab: buildCrab, seagull: buildSeagull, cow: buildCow, sheep: buildSheep
     };
     const HEIGHT_SCALE = {
         goblin: 1.7, skeleton: 1.85, wolf: 1.35,
         cat: 1.0, chicken: 0.9, duck: 0.85,
-        crab: 0.8, seagull: 0.9
+        crab: 0.8, seagull: 0.9, cow: 1.6, sheep: 1.35
     };
 
     function heightScale(kind) { return HEIGHT_SCALE[kind] || 2.0; }

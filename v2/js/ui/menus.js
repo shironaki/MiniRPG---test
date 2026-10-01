@@ -745,5 +745,212 @@
         render();
     }
 
-    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk, storage, cooking, board, well, cat };
+    // ---- Ranching & Farm Animals (Фермерский загон) -------------------------
+    function ranch(ctx) {
+        let msg = "";
+        const rSystem = ctx.ranch;
+        function render() {
+            if (!rSystem) {
+                paint(`<h2>🐮 Фермерский загон</h2><p>Загон пока пуст.</p>`, () => {});
+                return;
+            }
+            const animals = rSystem.list;
+            const rows = animals.map(a => {
+                const heartsStr = "❤️".repeat(Math.max(1, a.hearts)) + "🤍".repeat(Math.max(0, 10 - a.hearts));
+                const fedIcon = a.fed ? "🌾 Сит(а)" : "🍽️ Голоден";
+                const prodIcon = a.hasProduct ? "🧺 Готова продукция!" : "⏳ Созревает";
+                return `<div class="row" style="flex-direction: column; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <strong>${a.meta.emoji} ${esc(a.name)} (${a.meta.name})</strong>
+                        <span>${fedIcon} · ${prodIcon}</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: #d0c8b8; margin: 4px 0;">Дружба: ${heartsStr} (${a.friendship}/1000)</div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="mBtn" data-pet-one="${esc(a.id)}" ${a.petted ? "disabled" : ""}>Ласка</button>
+                        <button class="mBtn" data-feed-one="${esc(a.id)}" ${a.fed ? "disabled" : ""}>Кормить</button>
+                        ${a.hasProduct ? `<button class="mBtn" data-harvest-one="${esc(a.id)}">${esc(a.meta.harvestVerb)}</button>` : ""}
+                    </div>
+                </div>`;
+            }).join("");
+
+            paint(`<h2>🐮 Фермерское подворье</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <p class="hint">Ухаживайте за домашними животными каждый день: гладьте и кормите их пшеницей или сеном, чтобы получать отборные продукты.</p>
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <button class="mBtn" data-pet-all="1">❤️ Погладить всех</button>
+                    <button class="mBtn" data-feed-all="1">🌾 Покормить всех</button>
+                    <button class="mBtn" data-harvest-all="1">🧺 Собрать всё</button>
+                </div>
+                <div class="list">${rows}</div>
+                <h3 style="margin-top: 14px;">Купить новых животных</h3>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button class="mBtn" data-buy-animal="chicken">Курочка (120💰)</button>
+                    <button class="mBtn" data-buy-animal="cow">Коровка (350💰)</button>
+                    <button class="mBtn" data-buy-animal="sheep">Овечка (260💰)</button>
+                </div>`, onClick);
+        }
+
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.petOne) {
+                const a = rSystem.getById(b.dataset.petOne);
+                if (a) { const r = a.pet(); msg = r.msg; }
+            } else if (b.dataset.feedOne) {
+                const a = rSystem.getById(b.dataset.feedOne);
+                if (a) { const r = a.feed(ctx.resources); msg = r.msg; }
+            } else if (b.dataset.harvestOne) {
+                const a = rSystem.getById(b.dataset.harvestOne);
+                if (a) { const r = a.harvest(ctx.resources); msg = r.msg; }
+            } else if (b.dataset.petAll) {
+                const r = rSystem.petAll(); msg = r.msg;
+            } else if (b.dataset.feedAll) {
+                const r = rSystem.feedAll(ctx.resources); msg = r.msg;
+            } else if (b.dataset.harvestAll) {
+                const r = rSystem.harvestAll(ctx.resources);
+                msg = r.ok ? `Собрано продукции у ${r.count} животных! 🧺` : "Пока нет готовой продукции.";
+            } else if (b.dataset.buyAnimal) {
+                const type = b.dataset.buyAnimal;
+                const r = rSystem.addAnimal(type, null, ctx.resources, (cost) => {
+                    if (ctx.hero.gold >= cost) { ctx.hero.gold -= cost; return true; }
+                    return false;
+                });
+                msg = r.msg;
+            }
+            ctx.refresh(); render();
+        }
+        render();
+    }
+
+    // ---- Forge Smelting Furnace (Плавильный горн) ---------------------------
+    function smelt(ctx) {
+        let msg = "";
+        const sSys = ctx.smelting || new SmeltingSystem();
+        function render() {
+            const recipes = sSys.listRecipes();
+            const listHtml = recipes.map(r => {
+                const can = sSys.canSmelt(r.yield, ctx.resources);
+                const haveOre = ctx.resources.count(r.ore);
+                const haveCoal = ctx.resources.count("coal");
+                return `<div class="row">
+                    <div>
+                        <strong>${r.emoji} ${esc(r.name)}</strong>
+                        <div class="hint">${esc(r.desc)} (Есть: ${haveOre}/${r.oreCount} руды, ${haveCoal}/${r.coalCount} угля)</div>
+                    </div>
+                    <button class="mBtn ${can ? "" : "ghost"}" data-smelt="${esc(r.yield)}" ${can ? "" : "disabled"}>
+                        Выплавить
+                    </button>
+                </div>`;
+            }).join("");
+
+            paint(`<h2>🔥 Плавильный горн</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <p class="hint">В раскаленном горне кузнеца Кузьмы руда и уголь из шахт переплавляются в прочные металлические слитки.</p>
+                <div class="list">${listHtml}</div>`, onClick);
+        }
+
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.smelt) {
+                const res = sSys.smelt(b.dataset.smelt, ctx.resources);
+                msg = res.msg;
+                if (res.ok) {
+                    ctx.hero.gainXp(15);
+                }
+            }
+            ctx.refresh(); render();
+        }
+        render();
+    }
+
+    // ---- Home Decoration & Interior (Интерьер дома) -------------------------
+    function decor(ctx) {
+        let msg = "";
+        const dSys = ctx.decor || new DecorSystem();
+        function render() {
+            const floors = dSys.listFloors();
+            const walls = dSys.listWalls();
+            const catalog = dSys.listCatalog();
+
+            const floorBtns = floors.map(f => `
+                <button class="mBtn ${dSys.flooring === f.id ? "active" : ""}" data-set-floor="${esc(f.id)}">
+                    ${f.emoji} ${esc(f.name)}
+                </button>
+            `).join("");
+
+            const wallBtns = walls.map(w => `
+                <button class="mBtn ${dSys.wallpaper === w.id ? "active" : ""}" data-set-wall="${esc(w.id)}">
+                    ${w.emoji} ${esc(w.name)}
+                </button>
+            `).join("");
+
+            const furnRows = catalog.map(it => {
+                const canAfford = ctx.hero.gold >= it.cost && (!it.wood || ctx.resources.count("wood") >= it.wood) && (!it.wool || ctx.resources.count("wool") >= it.wool);
+                const reqParts = [];
+                if (it.cost) reqParts.push(`${it.cost}💰`);
+                if (it.wood) reqParts.push(`${it.wood}🪵`);
+                if (it.wool) reqParts.push(`${it.wool}🧶`);
+                return `<div class="row">
+                    <div>
+                        <strong>${it.emoji} ${esc(it.name)}</strong>
+                        <div class="hint">${esc(it.desc)} (${reqParts.join(", ")})</div>
+                    </div>
+                    <button class="mBtn ${canAfford ? "" : "ghost"}" data-buy-decor="${esc(it.id)}" ${canAfford ? "" : "disabled"}>Купить</button>
+                </div>`;
+            }).join("");
+
+            paint(`<h2>🎨 Обустройство дома</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <p class="hint">Украсьте своё жилище стильной отделкой и удобной мебелью для тепла и уюта.</p>
+                <h3>Покрытие пола</h3>
+                <div style="display: flex; gap: 6px; margin-bottom: 12px;">${floorBtns}</div>
+                <h3>Стены и обои</h3>
+                <div style="display: flex; gap: 6px; margin-bottom: 12px;">${wallBtns}</div>
+                <h3>Каталог мебели и декора</h3>
+                <div class="list">${furnRows}</div>`, onClick);
+        }
+
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.setFloor) {
+                const r = dSys.setFlooring(b.dataset.setFloor);
+                msg = r.msg;
+            } else if (b.dataset.setWall) {
+                const r = dSys.setWallpaper(b.dataset.setWall);
+                msg = r.msg;
+            } else if (b.dataset.buyDecor) {
+                const r = dSys.buyAndPlace(b.dataset.buyDecor, 4, 3, ctx.resources, (cost) => {
+                    if (ctx.hero.gold >= cost) { ctx.hero.gold -= cost; return true; }
+                    return false;
+                });
+                msg = r.msg;
+            }
+            ctx.refresh(); render();
+        }
+        render();
+    }
+
+    // ---- Deep Mines Entrance (Спуск в шахты) --------------------------------
+    function mines(ctx) {
+        const mSys = ctx.mines || new MinesSystem();
+        paint(`<h2>⛏️ Глубокие шахты</h2>
+            <p class="hint">Перед вами уходит вглубь каменный штрек древней шахты. В глубине залегают жилы меди, железа, золота и драгоценных камней, но берегитесь пещерных тварей!</p>
+            <div class="row">
+                <span>Текущий ярус: <strong>Ярус ${mSys.floor}</strong></span>
+                <span>Рекорд глубины: <strong>Ярус ${mSys.deepestFloor}</strong></span>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+                <button class="mBtn primary" data-enter-mines="1">Спуститься в шахту 🪜</button>
+            </div>`, onClick);
+
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.enterMines) {
+                if (typeof ctx.enterMines === "function") {
+                    ctx.enterMines(mSys.floor);
+                }
+            }
+        }
+    }
+
+    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk, storage, cooking, board, well, cat, ranch, smelt, decor, mines };
 })();

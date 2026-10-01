@@ -1111,3 +1111,214 @@ describe("Mobile Controls & Village Life Refinement", () => {
         expect(Boolean(pineConnected && pineConnected.grid)).toBe(true);
     });
 });
+
+describe("Ranching & Farm Animals System", () => {
+    it("creates animals with correct species attributes and default state", () => {
+        const { FarmAnimal, ANIMAL_TYPES } = loadEngine().exports;
+        const hen = new FarmAnimal({ type: "chicken", name: "Ряба" });
+        expect(hen.type).toBe("chicken");
+        expect(hen.name).toBe("Ряба");
+        expect(hen.hearts).toBe(0);
+        expect(hen.meta.product).toBe("egg");
+
+        const cow = new FarmAnimal({ type: "cow", name: "Зорька", friendship: 350 });
+        expect(cow.type).toBe("cow");
+        expect(cow.hearts).toBe(3);
+        expect(cow.meta.product).toBe("milk");
+    });
+
+    it("pets animal once per day, increasing friendship points", () => {
+        const { FarmAnimal } = loadEngine().exports;
+        const cow = new FarmAnimal({ type: "cow", name: "Бурёнка" });
+        const res1 = cow.pet();
+        expect(res1.ok).toBe(true);
+        expect(cow.friendship).toBe(25);
+        expect(cow.petted).toBe(true);
+
+        const res2 = cow.pet();
+        expect(res2.ok).toBe(false);
+        expect(cow.friendship).toBe(25);
+    });
+
+    it("feeds animal using hay/wheat from bag, increasing friendship", () => {
+        const { FarmAnimal, ResourceBag } = loadEngine().exports;
+        const hen = new FarmAnimal({ type: "chicken", name: "Ряба" });
+        const bag = new ResourceBag();
+
+        const failRes = hen.feed(bag);
+        expect(failRes.ok).toBe(false);
+
+        bag.add("wheat", 2);
+        const okRes = hen.feed(bag);
+        expect(okRes.ok).toBe(true);
+        expect(hen.fed).toBe(true);
+        expect(bag.count("wheat")).toBe(1);
+    });
+
+    it("harvests products and yields quality large eggs/milk at high friendship", () => {
+        const { FarmAnimal, ResourceBag } = loadEngine().exports;
+        const bag = new ResourceBag();
+        const cow = new FarmAnimal({ type: "cow", name: "Бурёнка", friendship: 800, hasProduct: true });
+
+        const res = cow.harvest(bag);
+        expect(res.ok).toBe(true);
+        expect(cow.hasProduct).toBe(false);
+        expect(bag.count("milk") + bag.count("milk_large")).toBe(1);
+    });
+
+    it("RanchSystem manages herds, feeds/pets all and advances days", () => {
+        const { RanchSystem, ResourceBag } = loadEngine().exports;
+        const ranch = new RanchSystem();
+        const bag = new ResourceBag();
+        bag.add("hay", 10);
+
+        expect(ranch.list.length).toBeGreaterThan(2);
+        const petRes = ranch.petAll();
+        expect(petRes.ok).toBe(true);
+        expect(petRes.count).toBe(ranch.list.length);
+
+        const feedRes = ranch.feedAll(bag);
+        expect(feedRes.ok).toBe(true);
+
+        ranch.onNewDay(2, false);
+        for (const a of ranch.list) {
+            expect(a.petted).toBe(false);
+            expect(a.fed).toBe(false);
+            expect(a.hasProduct).toBe(true);
+        }
+    });
+});
+
+describe("Deep Mines & Smelting System", () => {
+    it("MinesSystem descends and ascends through procedural levels", () => {
+        const { MinesSystem } = loadEngine().exports;
+        const mines = new MinesSystem();
+        expect(mines.floor).toBe(1);
+
+        expect(mines.descend()).toBe(2);
+        expect(mines.descend()).toBe(3);
+        expect(mines.deepestFloor).toBe(3);
+
+        expect(mines.ascend()).toBe(2);
+        expect(mines.floor).toBe(2);
+    });
+
+    it("generates procedural mine maps with veins, ladders and enemies based on depth", () => {
+        const { MinesSystem } = loadEngine().exports;
+        const mines = new MinesSystem();
+        const fl1 = mines.generateFloor(1);
+        expect(fl1.indoor).toBe(true);
+        expect(fl1.rows.length).toBe(16);
+        expect(fl1.rows[0].length).toBe(22);
+        expect(fl1.resources.some(r => r.res === "coal" || r.res === "ore_copper")).toBe(true);
+
+        const fl7 = mines.generateFloor(7);
+        expect(fl7.resources.some(r => r.res === "ore_gold" || r.res === "ore_iron")).toBe(true);
+        expect(fl7.enemies.length).toBeGreaterThan(1);
+    });
+
+    it("SmeltingSystem smelts copper, iron and gold bars from ore + coal", () => {
+        const { SmeltingSystem, ResourceBag } = loadEngine().exports;
+        const smelting = new SmeltingSystem();
+        const bag = new ResourceBag();
+
+        expect(smelting.canSmelt("bar_copper", bag)).toBe(false);
+        bag.add("ore_copper", 3);
+        bag.add("coal", 1);
+        expect(smelting.canSmelt("bar_copper", bag)).toBe(true);
+
+        const res = smelting.smelt("bar_copper", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("bar_copper")).toBe(1);
+        expect(bag.count("ore_copper")).toBe(0);
+        expect(bag.count("coal")).toBe(0);
+    });
+});
+
+describe("Home Decoration & Customization System", () => {
+    it("DecorSystem sets wallpaper and flooring styles", () => {
+        const { DecorSystem } = loadEngine().exports;
+        const decor = new DecorSystem();
+        expect(decor.flooring).toBe("floor");
+
+        const r1 = decor.setFlooring("carpet_red");
+        expect(r1.ok).toBe(true);
+        expect(decor.flooring).toBe("carpet_red");
+
+        const r2 = decor.setWallpaper("stone_brick");
+        expect(r2.ok).toBe(true);
+        expect(decor.wallpaper).toBe("stone_brick");
+    });
+
+    it("buys and places furniture pieces consuming materials and gold", () => {
+        const { DecorSystem, ResourceBag } = loadEngine().exports;
+        const decor = new DecorSystem();
+        const bag = new ResourceBag();
+        bag.add("wood", 10);
+        bag.add("wool", 5);
+
+        let gold = 200;
+        const res = decor.buyAndPlace("decor_sofa", 3, 4, bag, (cost) => {
+            if (gold >= cost) { gold -= cost; return true; }
+            return false;
+        });
+
+        expect(res.ok).toBe(true);
+        expect(decor.furniture.length).toBe(1);
+        expect(decor.furniture[0].kind).toBe("sofa");
+        expect(gold).toBe(115);
+        expect(bag.count("wood")).toBe(7);
+        expect(bag.count("wool")).toBe(3);
+    });
+});
+
+describe("Culinary Arts & Gourmet Expansion", () => {
+    it("cooks farm omelette from eggs and herbs", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("egg", 2);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_omelette", bag)).toBe(true);
+        const res = cs.cook("dish_omelette", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_omelette")).toBe(1);
+    });
+
+    it("cooks berry pancakes from eggs, milk, wheat and berries", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("egg", 1);
+        bag.add("milk", 1);
+        bag.add("wheat", 1);
+        bag.add("berry", 2);
+        expect(cs.canCook("dish_pancake", bag)).toBe(true);
+        const res = cs.cook("dish_pancake", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_pancake")).toBe(1);
+    });
+
+    it("cooks artisan cheese from fresh milk", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("milk", 2);
+        expect(cs.canCook("dish_cheese", bag)).toBe(true);
+        const res = cs.cook("dish_cheese", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_cheese")).toBe(1);
+    });
+
+    it("cooks golden elixir cider from apples and gold bar", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("apple", 2);
+        bag.add("bar_gold", 1);
+        expect(cs.canCook("dish_gold_cider", bag)).toBe(true);
+        const res = cs.cook("dish_gold_cider", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_gold_cider")).toBe(1);
+    });
+});

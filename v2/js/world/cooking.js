@@ -107,6 +107,63 @@ const RECIPES = [
             { res: "lobster", count: 1, name: "Морепродукты", alt: ["fish_tuna", "fish_flounder", "crayfish", "fish_perch"] }
         ],
         yield: { res: "dish_pasta", count: 1 }
+    },
+    {
+        id: "dish_omelette",
+        name: "Деревенский омлет",
+        emoji: "🍳",
+        desc: "Пышный горячий омлет из свежих яиц со щепоткой пряных трав.",
+        ingredients: [
+            { res: "egg", count: 2, name: "Яйца", alt: ["egg_large"] },
+            { res: "herb", count: 1, name: "Травы" }
+        ],
+        yield: { res: "dish_omelette", count: 1 }
+    },
+    {
+        id: "dish_pancake",
+        name: "Блинчики с ягодами",
+        emoji: "🥞",
+        desc: "Румяные блинчики на молоке с яйцом, политые лесным ягодным сиропом.",
+        ingredients: [
+            { res: "egg", count: 1, name: "Яйцо", alt: ["egg_large"] },
+            { res: "milk", count: 1, name: "Молоко", alt: ["milk_large"] },
+            { res: "wheat", count: 1, name: "Пшеница", alt: ["seeds_wheat", "seeds"] },
+            { res: "berry", count: 2, name: "Ягоды", alt: ["strawberry", "cherry"] }
+        ],
+        yield: { res: "dish_pancake", count: 1 }
+    },
+    {
+        id: "dish_cheese",
+        name: "Домашний сыр",
+        emoji: "🧀",
+        desc: "Выдержанный фермерский сыр из цельного парного молока.",
+        ingredients: [
+            { res: "milk", count: 2, name: "Молоко", alt: ["milk_large"] }
+        ],
+        yield: { res: "dish_cheese", count: 1 }
+    },
+    {
+        id: "dish_steak",
+        name: "Сытный стейк",
+        emoji: "🥩",
+        desc: "Сытное горячее блюдо из тушёных корнеплодов и трав на костре.",
+        ingredients: [
+            { res: "veg", count: 2, name: "Морковь / Овощи", alt: ["pumpkin", "corn", "tomato"] },
+            { res: "herb", count: 1, name: "Травы" },
+            { res: "wood", count: 1, name: "Дрова" }
+        ],
+        yield: { res: "dish_steak", count: 1 }
+    },
+    {
+        id: "dish_gold_cider",
+        name: "Золотой сидр",
+        emoji: "🍎",
+        desc: "Легендарный напиток из спелых яблок с добавлением частицы чистого золота.",
+        ingredients: [
+            { res: "apple", count: 2, name: "Яблоки" },
+            { res: "bar_gold", count: 1, name: "Золотой слиток", alt: ["ore_gold"] }
+        ],
+        yield: { res: "dish_gold_cider", count: 1 }
     }
 ];
 

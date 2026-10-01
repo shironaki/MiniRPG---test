@@ -26,9 +26,10 @@ const FILES = [
     "js/dungeon.js", "js/dialogue.js",
     "v2/js/engine/vec.js", "v2/js/engine/input.js", "v2/js/engine/camera.js",
     "v2/js/engine/loop.js",
-    "v2/js/world/tiles.js", "v2/js/world/tilemap.js", "v2/js/world/social.js",
-    "v2/js/world/resources.js", "v2/js/world/farming.js",
+    "v2/js/world/tiles.js", "v2/js/world/tilemap.js", "v2/js/world/weather.js",
+    "v2/js/world/social.js", "v2/js/world/resources.js", "v2/js/world/farming.js",
     "v2/js/world/fishing.js", "v2/js/world/cooking.js", "v2/js/world/tools.js",
+    "v2/js/world/animals.js", "v2/js/world/mines.js", "v2/js/world/decor.js",
     "v2/js/world/requests.js", "v2/js/world/maps.js",
     "v2/js/entities/mover.js", "v2/js/entities/player.js", "v2/js/entities/enemy.js",
     "v2/js/entities/npc.js",
@@ -43,7 +44,9 @@ const FILES = [
 const EXPORTED = [
     "MAPS", "getMap", "Player", "QuestJournal", "Social", "ResourceBag",
     "Requests", "Farm", "NPC2D", "ITEMS", "TILES", "tileInfo", "TileMap",
-    "FishingSystem", "CookingSystem", "Tools", "RECIPES", "TOOL_TIERS"
+    "FishingSystem", "CookingSystem", "Tools", "RECIPES", "TOOL_TIERS",
+    "ANIMAL_TYPES", "FarmAnimal", "RanchSystem", "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
+    "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem", "WeatherSystem"
 ];
 
 // Every canvas method becomes a no-op; a few must return usable objects.

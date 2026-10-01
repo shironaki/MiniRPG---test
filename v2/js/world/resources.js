@@ -51,6 +51,26 @@ const RESOURCES = {
     fish_flounder:     { name: "Морская камбала",     emoji: "🐠", sellPrice: 30, heal: 30, energy: 15, category: "marine_fish" },
     lobster:           { name: "Королевский омар",    emoji: "🦞", sellPrice: 55, heal: 50, energy: 25, category: "marine_fish" },
 
+    // Animal & Ranching Products
+    egg:               { name: "Свежее яйцо",         emoji: "🥚", sellPrice: 14, heal: 10, energy: 10, category: "animal" },
+    egg_large:         { name: "Крупное золотое яйцо", emoji: "🥚", sellPrice: 32, heal: 25, energy: 20, category: "animal" },
+    milk:              { name: "Парное молоко",       emoji: "🥛", sellPrice: 18, heal: 15, energy: 15, category: "animal" },
+    milk_large:        { name: "Сливочное молоко",    emoji: "🥛", sellPrice: 42, heal: 35, energy: 30, category: "animal" },
+    wool:              { name: "Мягкая овечья шерсть", emoji: "🧶", sellPrice: 38, category: "material" },
+    hay:               { name: "Ароматное сено",      emoji: "🌾", sellPrice: 3, buyPrice: 6, category: "feed" },
+
+    // Mining, Ores & Smelting
+    coal:              { name: "Каменный уголь",      emoji: "🪨", sellPrice: 8, buyPrice: 15, category: "mineral" },
+    ore_copper:        { name: "Медная руда",         emoji: "🥉", sellPrice: 12, category: "ore" },
+    ore_iron:          { name: "Железная руда",       emoji: "🥈", sellPrice: 20, category: "ore" },
+    ore_gold:          { name: "Золотая руда",        emoji: "🥇", sellPrice: 45, category: "ore" },
+    bar_copper:        { name: "Медный слиток",       emoji: "🟧", sellPrice: 35, category: "bar" },
+    bar_iron:          { name: "Железный слиток",     emoji: "⬜", sellPrice: 60, category: "bar" },
+    bar_gold:          { name: "Золотой слиток",      emoji: "🟨", sellPrice: 130, category: "bar" },
+    gem_amethyst:      { name: "Аметист",             emoji: "💜", sellPrice: 85, category: "gem" },
+    gem_ruby:          { name: "Огненный рубин",      emoji: "🔴", sellPrice: 125, category: "gem" },
+    gem_emerald:       { name: "Изумруд",             emoji: "💚", sellPrice: 165, category: "gem" },
+
     // Cooked dishes (Home stove & hearth)
     dish_stew:         { name: "Овощная похлёбка",    emoji: "🍲", sellPrice: 30, heal: 40, energy: 20, category: "dish" },
     dish_fish:         { name: "Жареная рыба",        emoji: "🐟", sellPrice: 28, heal: 35, energy: 15, category: "dish" },
@@ -60,19 +80,29 @@ const RESOURCES = {
     dish_cider:        { name: "Яблочный сидр",       emoji: "🧃", sellPrice: 35, heal: 20, energy: 40, speedBuff: 1.25, category: "dish" },
     dish_jam:          { name: "Клубничное варенье",  emoji: "🍓", sellPrice: 45, heal: 45, energy: 25, category: "dish" },
     dish_pumpkin_soup: { name: "Тыквенный крем-суп",  emoji: "🎃", sellPrice: 65, heal: 75, energy: 45, category: "dish" },
-    dish_pasta:        { name: "Морская паста",       emoji: "🍝", sellPrice: 85, heal: 95, energy: 50, category: "dish" }
+    dish_pasta:        { name: "Морская паста",       emoji: "🍝", sellPrice: 85, heal: 95, energy: 50, category: "dish" },
+    dish_omelette:     { name: "Деревенский омлет",   emoji: "🍳", sellPrice: 42, heal: 45, energy: 30, category: "dish" },
+    dish_pancake:      { name: "Блинчики с ягодами",  emoji: "🥞", sellPrice: 68, heal: 70, energy: 45, category: "dish" },
+    dish_cheese:       { name: "Домашний сыр",        emoji: "🧀", sellPrice: 58, heal: 50, energy: 35, category: "dish" },
+    dish_steak:        { name: "Сытный стейк",        emoji: "🥩", sellPrice: 95, heal: 110, energy: 60, category: "dish" },
+    dish_gold_cider:   { name: "Золотой сидр",        emoji: "🍎", sellPrice: 190, heal: 150, energy: 100, speedBuff: 1.4, category: "dish" }
 };
 
 // Per node-type defaults: which resource, how many hits to fell, regrow seconds.
 const NODE_TYPES = {
-    tree:        { res: "wood",     hits: 3, regrow: 90,  bonus: 2 },
-    rock:        { res: "stone",    hits: 4, regrow: 110, bonus: 1 },
-    bush:        { res: "berry",    hits: 1, regrow: 45,  bonus: 0 },
-    herb:        { res: "herb",     hits: 1, regrow: 60,  bonus: 0 },
-    apple_tree:  { res: "apple",    hits: 2, regrow: 75,  bonus: 1 },
-    cherry_tree: { res: "cherry",   hits: 2, regrow: 75,  bonus: 1 },
-    seashell:    { res: "seashell", hits: 1, regrow: 40,  bonus: 0 },
-    driftwood:   { res: "wood",     hits: 2, regrow: 60,  bonus: 1 }
+    tree:            { res: "wood",        hits: 3, regrow: 90,  bonus: 2 },
+    rock:            { res: "stone",       hits: 4, regrow: 110, bonus: 1 },
+    bush:            { res: "berry",       hits: 1, regrow: 45,  bonus: 0 },
+    herb:            { res: "herb",        hits: 1, regrow: 60,  bonus: 0 },
+    apple_tree:      { res: "apple",       hits: 2, regrow: 75,  bonus: 1 },
+    cherry_tree:     { res: "cherry",      hits: 2, regrow: 75,  bonus: 1 },
+    seashell:        { res: "seashell",    hits: 1, regrow: 40,  bonus: 0 },
+    driftwood:       { res: "wood",        hits: 2, regrow: 60,  bonus: 1 },
+    ore_copper_node: { res: "ore_copper",  hits: 3, regrow: 120, bonus: 1 },
+    ore_iron_node:   { res: "ore_iron",    hits: 4, regrow: 150, bonus: 1 },
+    ore_gold_node:   { res: "ore_gold",    hits: 5, regrow: 180, bonus: 1 },
+    coal_node:       { res: "coal",        hits: 3, regrow: 100, bonus: 2 },
+    gem_node:        { res: "gem_amethyst", hits: 4, regrow: 200, bonus: 1 }
 };
 
 class ResourceNode {

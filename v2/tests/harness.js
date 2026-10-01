@@ -26,6 +26,9 @@ const FILES = [
     "js/world/fishing.js",
     "js/world/cooking.js",
     "js/world/tools.js",
+    "js/world/animals.js",
+    "js/world/mines.js",
+    "js/world/decor.js",
     "js/world/requests.js",
     "js/world/maps.js",
     "js/entities/mover.js",
@@ -50,6 +53,9 @@ const EXPORTED = [
     "FishingSystem", "FISH_TABLE", "OCEAN_FISH_TABLE",
     "CookingSystem", "RECIPES",
     "Tools", "TOOL_TIERS",
+    "ANIMAL_TYPES", "FarmAnimal", "RanchSystem",
+    "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
+    "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem",
     "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP",
     "Furniture", "MobRig", "TileArt", "BuildingArt"
 ];
