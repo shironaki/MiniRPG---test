@@ -19,15 +19,30 @@ const FILES = [
     "js/engine/camera.js",
     "js/world/tiles.js",
     "js/world/tilemap.js",
+    "js/world/weather.js",
     "js/world/social.js",
     "js/world/resources.js",
     "js/world/farming.js",
+    "js/world/fishing.js",
+    "js/world/cooking.js",
+    "js/world/tools.js",
+    "js/world/animals.js",
+    "js/world/mines.js",
+    "js/world/decor.js",
+    "js/world/skills.js",
+    "js/world/character_creation.js",
+    "js/world/homestead.js",
     "js/world/requests.js",
     "js/world/maps.js",
     "js/entities/mover.js",
     "js/entities/player.js",
     "js/entities/enemy.js",
-    "js/entities/npc.js"
+    "js/entities/npc.js",
+    "js/render/furniture.js",
+    "js/render/mobs.js",
+    "js/render/tilesart.js",
+    "js/render/buildings.js",
+    "js/render/portraits.js"
 ];
 
 const EXPORTED = [
@@ -37,8 +52,19 @@ const EXPORTED = [
     "TileMap", "MAPS", "getMap",
     "moveAndCollide", "Player2D", "Enemy2D", "detectEncounter",
     "NPC2D", "Social", "ResourceNode", "ResourceBag", "RESOURCES", "NODE_TYPES",
-    "Farm", "FarmPlot", "CROP",
-    "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP"
+    "Farm", "FarmPlot", "CROP", "CROPS",
+    "WeatherSystem", "SEASONS", "WEATHER_TYPES",
+    "FishingSystem", "FISH_TABLE", "OCEAN_FISH_TABLE",
+    "CookingSystem", "RECIPES",
+    "Tools", "TOOL_TIERS",
+    "ANIMAL_TYPES", "FarmAnimal", "RanchSystem",
+    "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
+    "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem",
+    "SKILL_DEFS", "SkillsSystem",
+    "DESTINY_CLASSES", "ORIGINS", "CharCreation", "CharacterProfile", "WorldSyncPacket",
+    "HOUSE_TIERS", "COMMUNITY_PROJECTS", "HomesteadSystem",
+    "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP",
+    "Furniture", "MobRig", "TileArt", "BuildingArt", "Portraits"
 ];
 
 function loadEngine() {

@@ -42,12 +42,19 @@
             if ((i + variant) % 3 === 0) { px(g, x, y, dark); px(g, x, y + 1, dark); }
             else if ((i + variant) % 3 === 1) px(g, x, y, light);
         });
-        if (variant === 2) { // a little flower
-            px(g, 6, 6, "#f0e58a"); px(g, 6, 5, "#e8d24a");
-            px(g, 11, 9, "#d76a8a"); px(g, 11, 8, "#efa6bd");
+        if (variant % 4 === 1) { // delicate white & golden wildflowers
+            px(g, 6, 6, "#ffffff"); px(g, 6, 5, "#ffe66d");
+            px(g, 12, 9, "#ffffff"); px(g, 11, 9, "#ffe66d");
+        } else if (variant % 4 === 2) { // soft pink & lilac clover flowers
+            px(g, 4, 10, "#e88eb0"); px(g, 4, 9, "#f7cad9");
+            px(g, 10, 4, "#b988e0"); px(g, 11, 4, "#d8b6f5");
+        } else if (variant % 4 === 3) { // tiny smooth garden pebble
+            px(g, 8, 12, "#7a8a70"); px(g, 9, 12, "#9bb090");
+            px(g, 9, 13, "#5a6850");
         }
         return g;
     }
+
     function speckled(base, dark, light, variant) {
         const g = fill(base);
         const pts = [[3, 4], [8, 2], [12, 6], [5, 11], [10, 13], [14, 9], [2, 8]];
@@ -55,6 +62,7 @@
         scatter(g, pts.map(([x, y]) => [(x + 5) % N, (y + 7) % N]), light, variant + 1);
         return g;
     }
+
     function cobbles(base, line, light, variant) {
         const g = fill(base);
         // stone grid with offset rows
@@ -66,31 +74,273 @@
         px(g, 3, 2, light); px(g, 11, 6, light); px(g, 6, 10, light); px(g, 13, 13, light);
         return g;
     }
-    function water(base, wave, deep, variant) {
-        const g = fill(base);
-        rect(g, 0, 12, N, 4, deep);
-        const rows = [3, 8, 12];
-        rows.forEach((ry, i) => {
-            const off = (i + variant) % 2 ? 0 : 6;
-            for (let x = off; x < N; x += 8) { px(g, x, ry, wave); px(g, x + 1, ry, wave); }
+
+    // Natural water with organic shores, depth gradient and lilypads.
+    function water(base, wave, deep, variant, neighbors, now) {
+        const shallow = "#3b87a8", mid = "#286b8c", deepBlue = "#1e506d";
+        const g = fill(mid);
+        rect(g, 1, 1, N - 2, N - 2, deepBlue);
+
+        // If neighbor info is given, blend organic sandy shores and rounded corners
+        if (neighbors) {
+            const sand = "#cbb27a", sandHi = "#ded09b", sandSh = "#967f4c", foam = "#e8f7fa";
+            const up = !neighbors.up, down = !neighbors.down, left = !neighbors.left, right = !neighbors.right;
+
+            // Shore banks (transitions from grass to sand to shallow water)
+            if (up) {
+                rect(g, 0, 0, N, 2, sand);
+                rect(g, 0, 0, N, 1, sandHi);
+                rect(g, 0, 2, N, 1, sandSh);
+                rect(g, 0, 3, N, 1, shallow);
+                // gentle foam ripples
+                for (let x = 1; x < N - 1; x += 2) px(g, x, 3, foam);
+            }
+            if (down) {
+                rect(g, 0, N - 3, N, 1, shallow);
+                for (let x = 0; x < N; x += 2) px(g, x, N - 3, foam);
+                rect(g, 0, N - 2, N, 1, sandSh);
+                rect(g, 0, N - 1, N, 1, sand);
+            }
+            if (left) {
+                rect(g, 0, 0, 2, N, sand);
+                rect(g, 0, 0, 1, N, sandHi);
+                rect(g, 2, 0, 1, N, sandSh);
+                rect(g, 3, 0, 1, N, shallow);
+                for (let y = 1; y < N - 1; y += 2) px(g, 3, y, foam);
+            }
+            if (right) {
+                rect(g, N - 4, 0, 1, N, shallow);
+                for (let y = 0; y < N; y += 2) px(g, N - 4, y, foam);
+                rect(g, N - 3, 0, 1, N, sandSh);
+                rect(g, N - 2, 0, 2, N, sand);
+            }
+
+            // Outer corners (convex shore rounding with grass base)
+            if (up && left) {
+                px(g, 0, 0, "#3d7a3a"); px(g, 1, 0, sandHi); px(g, 0, 1, sandHi);
+                px(g, 2, 1, sand); px(g, 1, 2, sand); px(g, 2, 2, sandSh);
+            }
+            if (up && right) {
+                px(g, N - 1, 0, "#3d7a3a"); px(g, N - 2, 0, sandHi); px(g, N - 1, 1, sandHi);
+                px(g, N - 3, 1, sand); px(g, N - 2, 2, sand); px(g, N - 3, 2, sandSh);
+            }
+            if (down && left) {
+                px(g, 0, N - 1, "#3d7a3a"); px(g, 1, N - 1, sand); px(g, 0, N - 2, sand);
+                px(g, 2, N - 2, sand); px(g, 1, N - 3, sand); px(g, 2, N - 3, sandSh);
+            }
+            if (down && right) {
+                px(g, N - 1, N - 1, "#3d7a3a"); px(g, N - 2, N - 1, sand); px(g, N - 1, N - 2, sand);
+                px(g, N - 3, N - 2, sand); px(g, N - 2, N - 3, sand); px(g, N - 3, N - 3, sandSh);
+            }
+
+            // Inner corners (concave bays where cardinal neighbors are water but diagonal is land)
+            if (!up && !left && neighbors.ul === false) {
+                px(g, 0, 0, sandSh); px(g, 1, 0, foam); px(g, 0, 1, foam);
+            }
+            if (!up && !right && neighbors.ur === false) {
+                px(g, N - 1, 0, sandSh); px(g, N - 2, 0, foam); px(g, N - 1, 1, foam);
+            }
+            if (!down && !left && neighbors.dl === false) {
+                px(g, 0, N - 1, sandSh); px(g, 1, N - 1, foam); px(g, 0, N - 2, foam);
+            }
+            if (!down && !right && neighbors.dr === false) {
+                px(g, N - 1, N - 1, sandSh); px(g, N - 2, N - 1, foam); px(g, N - 1, N - 2, foam);
+            }
+        }
+
+        // Natural water ripples and sunlight glints
+        const waveC = "#5db4d6", glint = "#b2e7fa";
+        const waveRows = [4, 7, 10, 13];
+        waveRows.forEach((ry, i) => {
+            const off = ((i + (variant || 0)) % 2 === 0) ? 2 : 8;
+            for (let x = off; x < N - 3; x += 8) {
+                px(g, x, ry, waveC);
+                px(g, x + 1, ry, waveC);
+                px(g, x + 2, ry, glint);
+            }
         });
+        // Lilypad with pink lotus flower (variant 2)
+        if (variant === 2 && (!neighbors || (neighbors.up && neighbors.down && neighbors.left && neighbors.right))) {
+            rect(g, 5, 6, 6, 4, "#2d753b");
+            rect(g, 6, 5, 4, 1, "#2d753b");
+            px(g, 8, 7, "#1e5229"); // slit
+            px(g, 9, 6, "#ff8da8");
+            px(g, 9, 5, "#ffe0ea");
+            px(g, 8, 6, "#ffb3c6");
+            px(g, 10, 6, "#ff6b8e");
+        }
         return g;
     }
 
-    // ---- object tiles (sit on a ground base) --------------------------------
-    function treeTile(baseGrass, trunk, trunkSh, leaf, leafHi, leafSh, big) {
+    // ---- tree & forest tiles (sit on a ground base) ------------------------
+    function oakTreeTile(baseGrass, trunk, trunkSh, leaf, leafHi, leafSh, neighbors) {
         const g = grass(baseGrass, "#356b33", "#4a8c42", 0);
-        // trunk
-        rect(g, 7, 10, 2, 5, trunk); px(g, 8, 10, trunkSh); px(g, 8, 14, trunkSh);
-        // canopy blob
-        const top = big ? 0 : 1;
-        rect(g, 4, top + 2, 8, 7, leaf);
-        rect(g, 3, top + 4, 10, 4, leaf);
-        rect(g, 5, top + 1, 6, 1, leaf);
-        rect(g, 6, top + 0, 4, 1, leaf);
-        rect(g, 4, top + 2, 4, 2, leafHi);      // top-left highlight
-        rect(g, 4, top + 8, 8, 1, leafSh);      // bottom shade
-        px(g, 11, top + 4, leafSh);
+
+        if (neighbors && (neighbors.up || neighbors.down || neighbors.left || neighbors.right)) {
+            // Connected broadleaf forest canopy - seamless, lush woodland
+            const foliageDark = "#1c5025", foliageMid = leaf, foliageLight = leafHi, foliageSh = leafSh;
+            rect(g, 0, 0, N, N, foliageMid);
+            rect(g, 0, 0, N, 3, foliageLight);
+            rect(g, 0, N - 3, N, 3, foliageSh);
+
+            // Organic canopy cluster texturing
+            for (let y = 1; y < N - 1; y += 3) {
+                for (let x = 1; x < N - 1; x += 3) {
+                    px(g, x, y, foliageLight);
+                    px(g, x + 1, y, foliageLight);
+                    px(g, x + 1, y + 1, foliageDark);
+                    px(g, x, y + 2, foliageSh);
+                }
+            }
+
+            // Outer edges of connected forest
+            if (!neighbors.up) {
+                // Rounded canopy dome overflowing skyward
+                px(g, 0, 0, baseGrass); px(g, N - 1, 0, baseGrass);
+                rect(g, 1, 0, N - 2, 2, foliageLight);
+                px(g, 1, 0, "#6cd675"); px(g, 4, 0, "#6cd675"); px(g, 9, 0, "#6cd675");
+            }
+            if (!neighbors.down) {
+                // Bottom of forest canopy with oak trunks, root flares and ground shadows
+                rect(g, 0, N - 4, N, 4, baseGrass);
+                rect(g, 2, N - 5, 12, 2, foliageDark);
+                // Oak trunk
+                rect(g, 6, 8, 4, 7, trunk);
+                rect(g, 6, 8, 1, 7, "#7a5433"); // lit bark side
+                rect(g, 9, 8, 1, 7, trunkSh);   // shadow bark side
+                px(g, 5, 14, trunk);            // left root flare
+                px(g, 10, 14, trunkSh);         // right root flare
+                // Ground undergrowth shadow
+                rect(g, 3, 14, 10, 2, "#1f4222");
+                rect(g, 4, 13, 8, 1, "#1f4222");
+            }
+            if (!neighbors.left) {
+                rect(g, 0, 1, 2, N - 2, foliageLight);
+                px(g, 0, 0, baseGrass); px(g, 0, N - 1, baseGrass);
+            }
+            if (!neighbors.right) {
+                rect(g, N - 2, 1, 2, N - 2, foliageSh);
+                px(g, N - 1, 0, baseGrass); px(g, N - 1, N - 1, baseGrass);
+            }
+            return g;
+        }
+
+        // Standalone detailed pixel-art oak tree (tree)
+        // Soft elliptical ground shadow
+        rect(g, 3, 14, 10, 2, "#244d26");
+        rect(g, 4, 13, 8, 1, "#244d26");
+
+        // Trunk with bark texture & root flare
+        rect(g, 6, 8, 4, 7, trunk);
+        rect(g, 6, 8, 1, 7, "#7a5433"); // lit bark
+        rect(g, 9, 8, 1, 7, trunkSh);   // shadow bark
+        px(g, 5, 14, trunk);            // left root flare
+        px(g, 10, 14, trunkSh);         // right root flare
+
+        // Voluminous lush spherical foliage
+        rect(g, 2, 4, 12, 7, leaf);
+        rect(g, 3, 2, 10, 9, leaf);
+        rect(g, 5, 1, 6, 2, leaf);
+
+        // Sunlight highlights (top & left lobes)
+        rect(g, 3, 2, 5, 3, leafHi);
+        rect(g, 4, 1, 4, 2, leafHi);
+        rect(g, 2, 5, 3, 3, leafHi);
+        px(g, 4, 1, "#6ad472"); px(g, 5, 1, "#6ad472");
+        px(g, 9, 3, leafHi); px(g, 4, 6, leafHi);
+
+        // Deep shade clusters (bottom & right lobes)
+        rect(g, 4, 10, 8, 1, leafSh);
+        rect(g, 7, 8, 6, 3, leafSh);
+        rect(g, 11, 5, 3, 4, leafSh);
+        px(g, 8, 10, "#163d1e"); px(g, 9, 10, "#163d1e");
+
+        return g;
+    }
+
+    function pineTreeTile(baseGrass, trunk, trunkSh, pineDark, pineMid, pineHi, pineTop, neighbors) {
+        const g = grass(baseGrass, "#26502b", "#387040", 0);
+
+        if (neighbors && (neighbors.up || neighbors.down || neighbors.left || neighbors.right)) {
+            // Connected coniferous pine/spruce forest
+            rect(g, 0, 0, N, N, pineMid);
+            rect(g, 0, 0, N, 3, pineHi);
+            rect(g, 0, N - 3, N, 3, pineDark);
+
+            // Tiered needle cluster texturing
+            for (let y = 1; y < N - 1; y += 3) {
+                for (let x = 1; x < N - 1; x += 3) {
+                    px(g, x + 1, y, pineTop);
+                    px(g, x, y + 1, pineHi);
+                    px(g, x + 2, y + 1, pineDark);
+                    px(g, x + 1, y + 2, pineDark);
+                }
+            }
+
+            if (!neighbors.up) {
+                // Pointed evergreen spire crowns along top edge
+                rect(g, 0, 0, N, 2, baseGrass);
+                // Three little conical needle peaks
+                px(g, 3, 0, pineTop); px(g, 2, 1, pineHi); px(g, 3, 1, pineTop); px(g, 4, 1, pineMid);
+                px(g, 8, 0, pineTop); px(g, 7, 1, pineHi); px(g, 8, 1, pineTop); px(g, 9, 1, pineMid);
+                px(g, 13, 0, pineTop); px(g, 12, 1, pineHi); px(g, 13, 1, pineTop); px(g, 14, 1, pineMid);
+            }
+            if (!neighbors.down) {
+                // Pine trunks, needle shade and undergrowth on ground
+                rect(g, 0, N - 4, N, 4, baseGrass);
+                rect(g, 2, N - 5, 12, 2, pineDark);
+                // Pine trunk with bark texture
+                rect(g, 7, 9, 2, 6, trunk);
+                px(g, 7, 9, "#6b4a28");
+                px(g, 8, 10, trunkSh);
+                px(g, 6, 14, trunk); px(g, 9, 14, trunkSh); // roots
+                // Shadow
+                rect(g, 4, 14, 8, 2, "#18331b");
+            }
+            if (!neighbors.left) {
+                rect(g, 0, 1, 2, N - 2, pineHi);
+                px(g, 0, 0, baseGrass); px(g, 0, N - 1, baseGrass);
+            }
+            if (!neighbors.right) {
+                rect(g, N - 2, 1, 2, N - 2, pineDark);
+                px(g, N - 1, 0, baseGrass); px(g, N - 1, N - 1, baseGrass);
+            }
+            return g;
+        }
+
+        // Standalone detailed pixel-art Spruce / Pine tree (tree2)
+        // Ground shadow
+        rect(g, 3, 14, 10, 2, "#18331b");
+        rect(g, 4, 13, 8, 1, "#18331b");
+
+        // Textured trunk
+        rect(g, 7, 10, 2, 5, trunk);
+        rect(g, 7, 10, 1, 5, "#6b4a28"); // lit side
+        rect(g, 8, 10, 1, 5, trunkSh);   // shadow side
+        px(g, 6, 14, trunk); px(g, 9, 14, trunkSh); // roots
+
+        // Tier 3: Bottom widest drooping boughs
+        rect(g, 3, 10, 10, 2, pineDark);
+        rect(g, 4, 9, 8, 2, pineMid);
+        px(g, 2, 11, pineDark); px(g, 13, 11, pineDark);
+        px(g, 1, 12, pineDark); px(g, 14, 12, pineDark); // serrated needle tips
+        px(g, 4, 9, pineHi); px(g, 5, 9, pineHi); px(g, 6, 10, pineHi);
+
+        // Tier 2: Middle boughs
+        rect(g, 4, 6, 8, 2, pineDark);
+        rect(g, 5, 5, 6, 2, pineMid);
+        px(g, 3, 7, pineDark); px(g, 12, 7, pineDark);
+        px(g, 2, 8, pineDark); px(g, 13, 8, pineDark);
+        px(g, 5, 5, pineHi); px(g, 6, 5, pineHi); px(g, 7, 6, pineHi);
+
+        // Tier 1: Top conical crown & spire
+        rect(g, 5, 2, 6, 2, pineDark);
+        rect(g, 6, 1, 4, 2, pineMid);
+        px(g, 4, 3, pineDark); px(g, 11, 3, pineDark);
+        px(g, 6, 1, pineHi); px(g, 7, 1, pineTop);
+        // Sharp tip
+        px(g, 7, 0, pineTop); px(g, 8, 0, "#60c878");
+
         return g;
     }
     function rockTile(baseGround, stone, hi, sh) {
@@ -189,6 +439,43 @@
         return g;
     }
 
+    function sandTile(base, dark, light, variant) {
+        const g = fill(base);
+        const pts = [[2, 3], [7, 6], [12, 2], [4, 10], [9, 13], [14, 8]];
+        scatter(g, pts, dark, variant);
+        scatter(g, pts.map(([x, y]) => [(x + 6) % N, (y + 5) % N]), light, variant + 1);
+        if (variant === 2) {
+            // tiny white seashell
+            px(g, 6, 8, "#ffffff"); px(g, 7, 8, "#f0e6d2"); px(g, 6, 9, "#e0d0b8");
+        }
+        return g;
+    }
+
+    function palmTile(sandBase, trunk, trunkSh, leaf, leafHi, leafSh) {
+        const g = sandTile(sandBase, "#cbb27a", "#ded09b", 0);
+        // Soft ground shadow on sand
+        rect(g, 4, 14, 8, 2, "#967f4c");
+        // Curved palm trunk
+        px(g, 6, 14, trunk); px(g, 7, 14, trunkSh);
+        px(g, 6, 13, trunk); px(g, 7, 13, trunkSh);
+        px(g, 7, 12, trunk); px(g, 8, 12, trunkSh);
+        px(g, 7, 11, trunk); px(g, 8, 11, trunkSh);
+        px(g, 8, 10, trunk); px(g, 9, 10, trunkSh);
+        px(g, 8, 9, trunk);  px(g, 9, 9, trunkSh);
+        px(g, 8, 8, trunk);  px(g, 9, 8, trunkSh);
+        // Coconuts
+        px(g, 7, 7, "#5c3d1e"); px(g, 9, 7, "#5c3d1e");
+        // Spreading lush palm fronds (drooping umbrella canopy)
+        rect(g, 4, 4, 8, 3, leaf);
+        rect(g, 2, 5, 12, 2, leaf);
+        rect(g, 5, 2, 6, 3, leafHi);
+        // Frond tips
+        px(g, 1, 7, leafSh); px(g, 0, 8, leafSh);
+        px(g, 14, 7, leafSh); px(g, 15, 8, leafSh);
+        px(g, 3, 2, leafHi); px(g, 12, 2, leafHi);
+        return g;
+    }
+
     // ---- interiors ----------------------------------------------------------
     // Wooden floorboards: long planks with seams and a little grain.
     function floorBoards(plank, seam, grain, variant) {
@@ -233,7 +520,7 @@
     }
 
     // ---- registry -----------------------------------------------------------
-    function compose(name, variant) {
+    function compose(name, variant, neighbors, now) {
         variant = variant | 0;
         let g;
         switch (name) {
@@ -243,9 +530,9 @@
             case "path": g = speckled("#b79a63", "#9c8150", "#c9b078", variant); break;
             case "plaza": g = cobbles("#c7ad78", "#a98f5f", "#ddc793", variant); break;
             case "dirt": g = speckled("#5b4a34", "#463825", "#6d5940", variant); break;
-            case "water": g = water("#2f6d8f", "#4f96b3", "#265a77", variant); break;
-            case "tree": g = treeTile("#3d7a3a", "#6b4a2a", "#4e341c", "#2e6b39", "#3f8a4a", "#1f4a28", false); break;
-            case "tree2": g = treeTile("#2f5d33", "#523818", "#3c2913", "#1f4a28", "#2e6b39", "#123018", true); break;
+            case "water": g = water("#2f6d8f", "#4f96b3", "#265a77", variant, neighbors, now); break;
+            case "tree": g = oakTreeTile("#3d7a3a", "#6b4a2a", "#4e341c", "#2e6b39", "#3f8a4a", "#1f4a28", neighbors); break;
+            case "tree2": g = pineTreeTile("#2f5d33", "#523818", "#3c2913", "#0f3016", "#1a4d25", "#2c7d3e", "#3fa055", neighbors); break;
             case "rock": g = rockTile("#5b4a34", "#5f5750", "#7d746a", "#332e29"); break;
             case "wall": g = cobbles("#6b6152", "#544c40", "#867b69", variant); break;
             case "house": g = houseTile("#c0472b", "#8f3320", "#d8b78a", "#b8946a", "#5c3a20", "#8fd0e0"); break;
@@ -260,6 +547,9 @@
             case "floorStone": g = flagstones("#6d6a63", "#4c4944", "#807c73", variant); break;
             case "wallIn": g = wallInside("#c9b089", "#7a5433", "#5e3f26", "#6b4a2c"); break;
             case "doorway": g = doorwayTile("#7d5a33", "#5c4123", "#ffe9a8"); break;
+            case "sand": g = sandTile("#d8c48a", "#c4ad6e", "#ebdca8", variant); break;
+            case "palm": g = palmTile("#d8c48a", "#8a6239", "#5e3f22", "#2d8a3e", "#4cb55f", "#1b5a26"); break;
+            case "sea": g = water("#1c5d85", "#3a8bb8", "#124060", variant, neighbors, now); break;
             default: g = fill("#101319");
         }
         return { w: N, h: N, grid: g };
@@ -267,11 +557,11 @@
 
     // ---- draw with offscreen cache -----------------------------------------
     const _cache = new Map();
-    function offscreen(name, variant) {
-        const key = name + "|" + variant;
+    function offscreen(name, variant, nKey, neighbors) {
+        const key = name + "|" + variant + "|" + (nKey || "");
         const hit = _cache.get(key);
         if (hit !== undefined) return hit;
-        const { grid } = compose(name, variant);
+        const { grid } = compose(name, variant, neighbors);
         let cv = null;
         if (typeof document !== "undefined") {
             cv = document.createElement("canvas");
@@ -293,8 +583,24 @@
         return h < 2 ? 0 : h < 4 ? 1 : 2;
     }
 
-    function draw(ctx, name, sx, sy, ts, col, row) {
-        const cv = offscreen(name, variantFor(name, col, row));
+    function draw(ctx, name, sx, sy, ts, col, row, tilemap, now) {
+        let neighbors = null, nKey = "";
+        if (tilemap && (name === "water" || name === "sea" || name === "tree" || name === "tree2")) {
+            const isMatch = (c, r) => {
+                const inf = tilemap.infoAt(c, r);
+                if (name === "water" || name === "sea") return inf.name === "water" || inf.name === "sea" || inf.name === "bridge";
+                return inf.name === "tree" || inf.name === "tree2" || inf.name === "palm";
+            };
+            const up = isMatch(col, row - 1), down = isMatch(col, row + 1);
+            const left = isMatch(col - 1, row), right = isMatch(col + 1, row);
+            const ul = isMatch(col - 1, row - 1), ur = isMatch(col + 1, row - 1);
+            const dl = isMatch(col - 1, row + 1), dr = isMatch(col + 1, row + 1);
+            neighbors = { up, down, left, right, ul, ur, dl, dr };
+            nKey = (up ? "1" : "0") + (down ? "1" : "0") + (left ? "1" : "0") + (right ? "1" : "0") +
+                   (ul ? "1" : "0") + (ur ? "1" : "0") + (dl ? "1" : "0") + (dr ? "1" : "0");
+        }
+
+        const cv = offscreen(name, variantFor(name, col, row), nKey, neighbors);
         if (!cv) return false;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(cv, sx, sy, ts, ts);

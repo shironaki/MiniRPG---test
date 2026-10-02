@@ -33,7 +33,7 @@ class Renderer {
                 // structure is drawn as a whole in drawBuildings().
                 if (typeof TileArt !== "undefined") {
                     const name = info.name === "house" ? "grass" : info.name;
-                    if (TileArt.draw(ctx, name, sx, sy, ts, col, row)) {
+                    if (TileArt.draw(ctx, name, sx, sy, ts, col, row, tilemap, Date.now())) {
                         this._animateTile(ctx, name, sx, sy, ts, col, row);
                         continue;
                     }
@@ -102,9 +102,12 @@ class Renderer {
             ctx.lineTo(bx + sway, by - ts * 0.26);
             ctx.stroke();
         } else if (name === "water") {
-            const glint = ((now / 55 + col * 17 + row * 9) % (ts + 10)) - 5;
-            ctx.fillStyle = "rgba(255,255,255,0.12)";
-            ctx.fillRect(sx + glint, sy + ts * (0.35 + ((row + col) % 3) * 0.16), ts * 0.22, 1);
+            const glint = ((now / 60 + col * 17 + row * 9) % (ts + 12)) - 6;
+            ctx.fillStyle = "rgba(255,255,255,0.18)";
+            ctx.fillRect(sx + glint, sy + ts * (0.32 + ((row + col) % 3) * 0.18), ts * 0.18, 1);
+            const waveOff = Math.sin(now / 450 + col * 1.8 + row * 2.3) * (ts * 0.05);
+            ctx.fillStyle = "rgba(255,255,255,0.10)";
+            ctx.fillRect(sx + ts * 0.28 + waveOff, sy + ts * 0.68, ts * 0.44, 1);
         }
     }
 
@@ -122,10 +125,28 @@ class Renderer {
             ctx.fillStyle = "rgba(0,0,0,0.16)";
             ctx.fillRect(sx + 2, sy + hpx - 2, wpx - 4, 3);
             BuildingArt.draw(ctx, b.type, sx, sy, b.w, b.h, ts, now, night || 0);
+
+            // Ambient chimney smoke for houses & forge
+            if (b.type === "house" || b.type === "forge" || b.type === "shop") {
+                const chimneyX = sx + wpx * 0.72;
+                const chimneyY = sy + 6;
+                const puffCount = b.type === "forge" ? 5 : 3;
+                for (let p = 0; p < puffCount; p++) {
+                    const phase = ((now * 0.0012 + p * 0.45) % 2.0);
+                    const puffY = chimneyY - phase * 18;
+                    const puffX = chimneyX + Math.sin(now * 0.002 + p + b.col) * (phase * 6);
+                    const puffRadius = 2.5 + phase * 4.5;
+                    const alpha = Math.max(0, (1 - phase / 2.0) * 0.35);
+                    ctx.fillStyle = b.type === "forge" ? `rgba(90, 85, 80, ${alpha})` : `rgba(220, 225, 230, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(puffX, puffY, puffRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
         }
     }
 
-    // Gatherable resource nodes (trees/rocks/bushes/herbs) drawn procedurally.
+    // Gatherable resource nodes (trees/rocks/bushes/herbs/orchard/coastal) drawn procedurally.
     drawResourceNodes(nodes, camera) {
         if (!nodes) return;
         const ctx = this.ctx;
@@ -142,7 +163,7 @@ class Renderer {
             ctx.ellipse(s.x, by + 2, 11, 4, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            if (n.type === "tree") {
+            if (n.type === "tree" || n.type === "apple_tree" || n.type === "cherry_tree") {
                 // trunk
                 ctx.fillStyle = "#5c3a22";
                 ctx.fillRect(cx - 2.5, by - (n.depleted ? 5 : 14), 5, n.depleted ? 6 : 15);
@@ -155,6 +176,22 @@ class Renderer {
                     ctx.arc(cx + 6, by - 22, 7, 0, Math.PI * 2); ctx.fill();
                     ctx.fillStyle = "rgba(255,255,255,0.10)";
                     ctx.beginPath(); ctx.arc(cx - 4, by - 26, 3, 0, Math.PI * 2); ctx.fill();
+
+                    // Orchard fruits
+                    if (n.type === "apple_tree" || n.type === "cherry_tree") {
+                        const isApple = n.type === "apple_tree";
+                        ctx.fillStyle = isApple ? "#e6392b" : "#b31a38";
+                        ctx.beginPath();
+                        ctx.arc(cx - 6, by - 20, 2.8, 0, Math.PI * 2);
+                        ctx.arc(cx + 5, by - 22, 2.8, 0, Math.PI * 2);
+                        ctx.arc(cx, by - 25, 2.8, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = "rgba(255,255,255,0.35)";
+                        ctx.beginPath();
+                        ctx.arc(cx - 7, by - 21, 0.8, 0, Math.PI * 2);
+                        ctx.arc(cx + 4, by - 23, 0.8, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 } else {
                     // stump rings
                     ctx.fillStyle = "#7a5030";
@@ -204,6 +241,24 @@ class Renderer {
                 if (!n.depleted) {
                     ctx.fillStyle = "#e8d24a";
                     ctx.beginPath(); ctx.arc(cx, by - 10, 2, 0, Math.PI * 2); ctx.fill();
+                }
+            } else if (n.type === "seashell") {
+                if (!n.depleted) {
+                    ctx.fillStyle = "#f8f5ee";
+                    ctx.beginPath();
+                    ctx.arc(cx, by - 3, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = "#e0a899";
+                    ctx.beginPath();
+                    ctx.arc(cx, by - 3, 2.5, 0, Math.PI);
+                    ctx.fill();
+                }
+            } else if (n.type === "driftwood") {
+                if (!n.depleted) {
+                    ctx.fillStyle = "#7a6a58";
+                    ctx.fillRect(cx - 8, by - 4, 16, 5);
+                    ctx.fillStyle = "#9c8a74";
+                    ctx.fillRect(cx - 7, by - 4, 14, 2);
                 }
             }
         }
@@ -268,15 +323,42 @@ class Renderer {
                     ctx.beginPath(); ctx.arc(cx + 5, by - 2, 1.6, 0, Math.PI * 2); ctx.fill();
                 }
             } else if (p.state === "ready") {
-                // leafy top + orange root (a little carrot)
-                ctx.fillStyle = "#4caf50";
-                ctx.beginPath();
-                ctx.moveTo(cx, by - 14); ctx.lineTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8);
-                ctx.closePath(); ctx.fill();
-                ctx.fillStyle = "#e8862b";
-                ctx.beginPath();
-                ctx.moveTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8); ctx.lineTo(cx, by);
-                ctx.closePath(); ctx.fill();
+                const key = p.cropKey || "veg";
+                if (key === "strawberry") {
+                    ctx.fillStyle = "#3d8a42";
+                    ctx.beginPath(); ctx.arc(cx - 4, by - 5, 4, 0, Math.PI * 2); ctx.arc(cx + 4, by - 5, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "#e83a4f";
+                    ctx.beginPath(); ctx.arc(cx - 3, by - 4, 3, 0, Math.PI * 2); ctx.arc(cx + 4, by - 5, 3.2, 0, Math.PI * 2); ctx.fill();
+                } else if (key === "tomato") {
+                    ctx.strokeStyle = "#2d7a35"; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(cx, by); ctx.lineTo(cx, by - 12); ctx.stroke();
+                    ctx.fillStyle = "#e6392b";
+                    ctx.beginPath(); ctx.arc(cx - 3, by - 7, 3.5, 0, Math.PI * 2); ctx.arc(cx + 3, by - 5, 3.5, 0, Math.PI * 2); ctx.fill();
+                } else if (key === "pumpkin") {
+                    ctx.fillStyle = "#e6731e";
+                    ctx.beginPath(); ctx.ellipse(cx, by - 6, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "#4a8a38";
+                    ctx.fillRect(cx - 1, by - 12, 2, 3);
+                } else if (key === "corn") {
+                    ctx.strokeStyle = "#4fae53"; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.moveTo(cx, by); ctx.lineTo(cx, by - 15); ctx.stroke();
+                    ctx.fillStyle = "#f5d038";
+                    ctx.fillRect(cx - 2, by - 13, 4, 7);
+                } else if (key === "wheat") {
+                    ctx.strokeStyle = "#e8c85c"; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(cx - 2, by); ctx.lineTo(cx - 4, by - 13);
+                    ctx.moveTo(cx + 2, by); ctx.lineTo(cx + 4, by - 13); ctx.stroke();
+                } else {
+                    // leafy top + orange root (a little carrot)
+                    ctx.fillStyle = "#4caf50";
+                    ctx.beginPath();
+                    ctx.moveTo(cx, by - 14); ctx.lineTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8);
+                    ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = "#e8862b";
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 4, by - 8); ctx.lineTo(cx + 4, by - 8); ctx.lineTo(cx, by);
+                    ctx.closePath(); ctx.fill();
+                }
             }
         }
     }
@@ -322,48 +404,266 @@ class Renderer {
         }
     }
 
-    // Full-screen day/night tint drawn over the world (below the DOM HUD).
-    drawNightOverlay(light, camera) {
-        if (!light || light.a <= 0.002) return;
+    // Full-screen day/night tint with dynamic light sources (lamps, windows, player lantern).
+    drawNightOverlay(light, camera, sources) {
+        if (!light || light.a <= 0.04 || !light.night || light.night <= 0.01) return;
         const ctx = this.ctx;
-        ctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
-        ctx.fillRect(0, 0, camera.viewW, camera.viewH);
+        const W = camera.viewW, H = camera.viewH;
+
+        // If no light sources or simple context, draw uniform tint.
+        if (!sources || typeof document === "undefined") {
+            ctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
+            ctx.fillRect(0, 0, W, H);
+            return;
+        }
+
+        if (!this._lightCanvas) {
+            this._lightCanvas = document.createElement("canvas");
+        }
+        if (this._lightCanvas.width !== W || this._lightCanvas.height !== H) {
+            this._lightCanvas.width = W;
+            this._lightCanvas.height = H;
+        }
+        const lctx = this._lightCanvas.getContext("2d");
+        if (!lctx) {
+            ctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
+            ctx.fillRect(0, 0, W, H);
+            return;
+        }
+
+        // Fill darkness tint
+        lctx.globalCompositeOperation = "source-over";
+        lctx.fillStyle = `rgba(${light.r},${light.g},${light.b},${light.a})`;
+        lctx.fillRect(0, 0, W, H);
+
+        // Carve out light circles with destination-out
+        lctx.globalCompositeOperation = "destination-out";
+
+        const punchLight = (sx, sy, radius, intensity) => {
+            if (sx < -radius || sy < -radius || sx > W + radius || sy > H + radius) return;
+            try {
+                const grd = lctx.createRadialGradient(sx, sy, 0, sx, sy, radius);
+                grd.addColorStop(0, `rgba(0,0,0,${intensity || 1.0})`);
+                grd.addColorStop(0.4, `rgba(0,0,0,${(intensity || 1.0) * 0.7})`);
+                grd.addColorStop(1, "rgba(0,0,0,0)");
+                lctx.fillStyle = grd;
+                lctx.beginPath();
+                lctx.arc(sx, sy, radius, 0, Math.PI * 2);
+                lctx.fill();
+            } catch (e) {
+                // fallback
+                lctx.fillStyle = "rgba(0,0,0,0.6)";
+                lctx.beginPath();
+                lctx.arc(sx, sy, radius * 0.7, 0, Math.PI * 2);
+                lctx.fill();
+            }
+        };
+
+        const ts = sources.tileSize || 32;
+
+        // 1. Street lamps
+        if (sources.furniture) {
+            for (const f of sources.furniture) {
+                if (f.kind === "lamp") {
+                    const sx = Math.round(f.col * ts + ts * 0.5 - camera.x);
+                    const sy = Math.round(f.row * ts + ts * 0.5 - camera.y);
+                    punchLight(sx, sy, 85, 0.95);
+                } else if (f.kind === "fireplace" || f.kind === "stove" || f.kind === "forgeFire") {
+                    const sx = Math.round(f.col * ts + ts * 0.8 - camera.x);
+                    const sy = Math.round(f.row * ts + ts * 0.5 - camera.y);
+                    punchLight(sx, sy, 65, 0.90);
+                }
+            }
+        }
+
+        // 2. Building windows & forge fire
+        if (sources.buildings) {
+            for (const b of sources.buildings) {
+                const sx = Math.round(b.col * ts + b.w * ts * 0.5 - camera.x);
+                const sy = Math.round(b.row * ts + b.h * ts * 0.6 - camera.y);
+                if (b.type === "forge") {
+                    punchLight(sx, sy, 80, 0.92);
+                } else if (b.type === "house" || b.type === "shop") {
+                    punchLight(sx, sy, 70, 0.85);
+                } else if (b.type === "gate") {
+                    punchLight(sx, sy, 60, 0.75);
+                }
+            }
+        }
+
+        // 3. Player lantern (when dark)
+        if (sources.player && light.a > 0.15) {
+            const px = Math.round(sources.player.x - camera.x);
+            const py = Math.round(sources.player.y - camera.y);
+            punchLight(px, py, 60, 0.88);
+        }
+
+        // Blit darkness mask to screen
+        ctx.drawImage(this._lightCanvas, 0, 0);
+
+        // Soft warm glow overlay on lamps and windows
+        if (sources.furniture && light.a > 0.08) {
+            for (const f of sources.furniture) {
+                if (f.kind === "lamp") {
+                    const sx = Math.round(f.col * ts + ts * 0.5 - camera.x);
+                    const sy = Math.round(f.row * ts + ts * 0.5 - camera.y);
+                    if (sx >= -50 && sy >= -50 && sx <= W + 50 && sy <= H + 50) {
+                        ctx.fillStyle = "rgba(255,210,120,0.18)";
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 60, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+    }
+
+    // Ambient floating petals / leaves, night fireflies, weather rain/storm/snow/fog.
+    drawAmbient(camera, zoneName, light, weather, season) {
+        const ctx = this.ctx;
+        const now = Date.now();
+        const W = camera.viewW, H = camera.viewH;
+
+        const isOutdoor = zoneName !== "home" && zoneName !== "shop_in" && zoneName !== "forge_in" && zoneName !== "cave" && zoneName !== "Твой дом" && zoneName !== "Лавка" && zoneName !== "Кузница" && zoneName !== "Пещера";
+
+        if (isOutdoor) {
+            // 1. Dynamic weather effects
+            if (weather && weather.isRain) {
+                const storm = weather.id === "storm";
+                const count = storm ? 65 : 35;
+                ctx.strokeStyle = "rgba(180, 225, 255, 0.60)";
+                ctx.lineWidth = storm ? 1.5 : 1.1;
+                for (let i = 0; i < count; i++) {
+                    const seed = i * 83.7;
+                    const spX = storm ? 0.35 : 0.15;
+                    const spY = storm ? 0.95 : 0.65;
+                    const x = ((now * spX + seed * 23) % (W + 60)) - 30;
+                    const y = ((now * spY + seed * 47) % (H + 60)) - 30;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x - (storm ? 6 : 2), y + (storm ? 12 : 8));
+                    ctx.stroke();
+                }
+
+                // Lightning flashes during storms
+                if (storm) {
+                    const stormCycle = Math.sin(now / 1500) * Math.sin(now / 390);
+                    if (stormCycle > 0.88) {
+                        const alpha = (stormCycle - 0.88) * 3.8;
+                        ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.55, alpha)})`;
+                        ctx.fillRect(0, 0, W, H);
+                    }
+                }
+            } else if (weather && weather.isSnow) {
+                // Gentle swirling snowflakes
+                const count = 35;
+                ctx.fillStyle = "rgba(240, 248, 255, 0.85)";
+                for (let i = 0; i < count; i++) {
+                    const seed = i * 67.3;
+                    const x = ((now * 0.04 + Math.sin(now / 450 + i) * 18 + seed * 19) % (W + 40)) - 20;
+                    const y = ((now * 0.07 + seed * 31) % (H + 40)) - 20;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (weather && weather.id === "fog") {
+                // Soft horizontal mist
+                ctx.fillStyle = "rgba(220, 230, 240, 0.18)";
+                for (let i = 0; i < 4; i++) {
+                    const seed = i * 110.5;
+                    const y = ((seed * 17) % H);
+                    const wave = Math.sin(now / 800 + i) * 15;
+                    ctx.fillRect(0, y + wave, W, 28);
+                }
+            }
+
+            // 2. Daytime petals / autumn leaves
+            if (!weather || (!weather.isRain && !weather.isSnow)) {
+                const isAutumn = season && season.id === "autumn";
+                const count = 10;
+                for (let i = 0; i < count; i++) {
+                    const seed = i * 137.5;
+                    const speedX = 0.045 + (i % 3) * 0.015;
+                    const speedY = 0.025 + (i % 2) * 0.010;
+                    const x = ((now * speedX + seed * 12) % (W + 60)) - 30;
+                    const y = ((now * speedY + seed * 23 + Math.sin(now / 400 + i) * 15) % (H + 60)) - 30;
+
+                    const isPetal = i % 2 === 0;
+                    if (isAutumn) {
+                        ctx.fillStyle = isPetal ? "rgba(220, 110, 40, 0.70)" : "rgba(200, 70, 40, 0.65)";
+                    } else {
+                        ctx.fillStyle = isPetal ? "rgba(255,182,193,0.65)" : "rgba(220,165,80,0.60)";
+                    }
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, isPetal ? 3 : 4, isPetal ? 2 : 2.5, Math.sin(now / 500 + i), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // 3. Dusk / night fireflies
+            if (light && light.a > 0.25 && (!weather || !weather.isRain)) {
+                const fireflies = 8;
+                for (let i = 0; i < fireflies; i++) {
+                    const seed = i * 97.3;
+                    const wx = (seed * 19 + Math.sin(now / 700 + i * 1.5) * 45) % (26 * 32);
+                    const wy = (seed * 29 + Math.cos(now / 600 + i * 1.8) * 35) % (18 * 32);
+                    const sx = Math.round(wx - camera.x);
+                    const sy = Math.round(wy - camera.y);
+                    if (sx < -10 || sy < -10 || sx > W + 10 || sy > H + 10) continue;
+
+                    const pulse = 0.4 + 0.5 * Math.sin(now / 350 + i * 2.1);
+                    if (pulse > 0.15) {
+                        ctx.fillStyle = `rgba(210,255,100,${pulse * 0.85})`;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = `rgba(210,255,100,${pulse * 0.25})`;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
     }
 
     drawPortals(list, camera) {
         if (!list) return;
         const ctx = this.ctx;
-        const t = (Date.now() % 1600) / 1600;         // 0..1 pulse
-        const glow = 0.35 + 0.25 * Math.sin(t * Math.PI * 2);
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = "20px serif";
+        const now = Date.now();
         for (const p of list) {
+            // Outdoor portals (path to forest, cave entrance) get an atmospheric ground beacon;
+            // Indoor doorways already have their doorway tiles.
+            if (p.to === "village" && p.label === "На улицу") continue;
+
             const s = camera.worldToScreen(p.px, p.py);
-            ctx.fillStyle = `rgba(201,162,75,${glow})`;
+            const pulse = 0.4 + 0.3 * Math.sin(now / 400 + (p.px + p.py));
+            ctx.save();
+            ctx.fillStyle = `rgba(220,180,90,${pulse * 0.28})`;
             ctx.beginPath();
-            ctx.arc(s.x, s.y, 15, 0, Math.PI * 2);
+            ctx.ellipse(s.x, s.y + 4, 12, 5, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = "rgba(255,225,150,0.9)";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.fillText(p.emoji || "🚪", s.x, s.y + 1);
+            ctx.restore();
         }
     }
 
     drawInteractables(list, camera) {
+        if (!list) return;
         const ctx = this.ctx;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = "22px serif";
+        const now = Date.now();
         for (const it of list) {
-            const s = camera.worldToScreen(it.px, it.py);
-            // marker plate
-            ctx.fillStyle = "rgba(13,16,23,0.55)";
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, 16, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillText(it.emoji || "❔", s.x, s.y + 1);
+            // For doors, shops, beds, stoves, boards, cats, wells, etc., the physical art is already visible.
+            // If it's a standalone wild NPC or dungeon lair without existing architecture, draw a clean subtle floating icon.
+            if (it.action === "npc" || (it.action === "dungeon" && !it.to)) {
+                const s = camera.worldToScreen(it.px, it.py);
+                const bob = Math.sin(now / 350 + (it.px + it.py)) * 2;
+                ctx.save();
+                ctx.font = "20px serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(it.emoji || "✨", s.x, s.y - 10 + bob);
+                ctx.restore();
+            }
         }
     }
 
@@ -479,6 +779,75 @@ class Renderer {
         ctx.beginPath();
         ctx.arc(cx, s.y + h * 0.24, w * 0.28, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // Dynamic rising floating numbers & notifications (+25 XP, +1 Wood, +50 Gold)
+    drawFloatingTexts(texts, camera) {
+        if (!texts || !texts.length) return;
+        const ctx = this.ctx;
+        ctx.save();
+        for (const ft of texts) {
+            const s = camera.worldToScreen(ft.x, ft.y);
+            const progress = (ft.t || 0) / (ft.maxT || 1.2);
+            const alpha = Math.max(0, 1 - progress);
+            const riseY = s.y - progress * 24;
+
+            ctx.font = `bold ${ft.size || 12}px system-ui, sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            // Crisp dark drop-shadow outline
+            ctx.strokeStyle = `rgba(10, 14, 22, ${alpha * 0.9})`;
+            ctx.lineWidth = 3;
+            ctx.strokeText(ft.text, s.x, riseY);
+
+            ctx.fillStyle = ft.color ? ft.color.replace("ALPHA", alpha) : `rgba(255, 230, 100, ${alpha})`;
+            ctx.fillText(ft.text, s.x, riseY);
+        }
+        ctx.restore();
+    }
+
+    // Bouncy speech & emote bubbles over characters/mobs (❤️, 💬, 💡, 💤, ✨, ❗)
+    drawEmotes(emotes, camera) {
+        if (!emotes || !emotes.length) return;
+        const ctx = this.ctx;
+        const now = Date.now();
+        ctx.save();
+        for (const em of emotes) {
+            const s = camera.worldToScreen(em.x, em.y);
+            const bob = Math.sin(now * 0.006 + (em.x + em.y)) * 2;
+            const life = Math.min(1, (em.t || 0) / 0.2); // pop-in scale
+            const fade = em.life !== undefined ? Math.min(1, em.life / 0.3) : 1;
+            const bubbleY = s.y - (em.offsetY || 36) + bob;
+
+            ctx.globalAlpha = fade;
+
+            // Speech bubble background
+            ctx.fillStyle = "#ffffff";
+            ctx.strokeStyle = "#2b2622";
+            ctx.lineWidth = 1.5;
+
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(s.x - 12 * life, bubbleY - 12 * life, 24 * life, 20 * life, 6)
+                          : ctx.rect(s.x - 12 * life, bubbleY - 12 * life, 24 * life, 20 * life);
+            ctx.fill();
+            ctx.stroke();
+
+            // Bubble tail
+            ctx.beginPath();
+            ctx.moveTo(s.x - 3, bubbleY + 8 * life);
+            ctx.lineTo(s.x, bubbleY + 13 * life);
+            ctx.lineTo(s.x + 3, bubbleY + 8 * life);
+            ctx.fill();
+            ctx.stroke();
+
+            // Inner icon
+            ctx.font = `${14 * life}px serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(em.icon || "❤️", s.x, bubbleY - 1);
+        }
+        ctx.restore();
     }
 }
 

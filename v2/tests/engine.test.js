@@ -617,3 +617,1019 @@ describe("Interiors", () => {
         expect(tm.tileAt(1, 1)).toBe("o");           // art unchanged
     });
 });
+
+// ---------------------------------------------------------------------------
+// Fishing system
+// ---------------------------------------------------------------------------
+describe("Fishing system", () => {
+    it("casts line with delay shortened by better rods", () => {
+        const { FishingSystem } = loadEngine().exports;
+        const f = new FishingSystem({ rng: () => 0 });
+        const c1 = f.cast(1);
+        const c3 = f.cast(3);
+        expect(c1.delay > c3.delay).toBe(true);
+        expect(c1.rodLevel).toBe(1);
+        expect(c3.rodLevel).toBe(3);
+    });
+
+    it("catches fish and grants resources and xp", () => {
+        const { FishingSystem } = loadEngine().exports;
+        const f = new FishingSystem({ rng: () => 0.1 });
+        const res = f.catchFish(1);
+        expect(res.ok).toBe(true);
+        expect(typeof res.res).toBe("string");
+        expect(res.amount >= 1).toBe(true);
+        expect(res.xp > 0).toBe(true);
+    });
+
+    it("tier 1 rod catches common fish, tier 2 rod unlocks pike", () => {
+        const { FishingSystem } = loadEngine().exports;
+        // On tier 1 rod, pike (minRod: 2) must never be drawn
+        const f1 = new FishingSystem({ rng: () => 0.999 });
+        const res1 = f1.catchFish(1);
+        expect(res1.res !== "fish_pike").toBe(true);
+
+        // On tier 2 rod, pike is accessible
+        const f2 = new FishingSystem({ rng: () => 0.99 });
+        const res2 = f2.catchFish(2);
+        expect(res2.ok).toBe(true);
+    });
+
+    it("better rods can hook double catches or bonus items", () => {
+        const { FishingSystem } = loadEngine().exports;
+        // Rng configured to trigger treasureRoll < 0.12 * level
+        let doubleSeen = false;
+        for (let i = 0; i < 20; i++) {
+            const f = new FishingSystem({ rng: () => 0.05 });
+            const res = f.catchFish(3);
+            if (res.amount === 2 || res.bonus) doubleSeen = true;
+        }
+        expect(doubleSeen).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cooking system
+// ---------------------------------------------------------------------------
+describe("Cooking system", () => {
+    it("lists recipes with descriptions, stats and ingredient requirements", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        const list = cs.list(bag);
+        expect(list.length >= 5).toBe(true);
+        expect(list.some(r => r.id === "dish_stew")).toBe(true);
+        expect(list.some(r => r.id === "dish_fish")).toBe(true);
+        expect(list.some(r => r.id === "dish_pie")).toBe(true);
+    });
+
+    it("detects when ingredients are missing and refuses to cook", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        expect(cs.canCook("dish_stew", bag)).toBe(false);
+        const r = cs.cook("dish_stew", bag);
+        expect(r.ok).toBe(false);
+        expect(bag.count("dish_stew")).toBe(0);
+    });
+
+    it("cooks when ingredients are present in bag, consuming them and yielding dish", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("veg", 2);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_stew", bag)).toBe(true);
+        const res = cs.cook("dish_stew", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("veg")).toBe(0);
+        expect(bag.count("herb")).toBe(0);
+        expect(bag.count("dish_stew")).toBe(1);
+    });
+
+    it("supports cooking from home storage chest when bag is short", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        const storage = new ResourceBag();
+        bag.add("veg", 1);
+        storage.add("veg", 1);
+        storage.add("herb", 1);
+        expect(cs.canCook("dish_stew", bag, storage)).toBe(true);
+        const res = cs.cook("dish_stew", bag, storage);
+        expect(res.ok).toBe(true);
+        expect(bag.count("veg")).toBe(0);
+        expect(storage.count("veg")).toBe(0);
+        expect(storage.count("herb")).toBe(0);
+        expect(bag.count("dish_stew")).toBe(1);
+    });
+
+    it("supports alternative fish ingredients for grilled fish", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("crayfish", 2);
+        bag.add("wood", 1);
+        expect(cs.canCook("dish_fish", bag)).toBe(true);
+        const res = cs.cook("dish_fish", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("crayfish")).toBe(0);
+        expect(bag.count("dish_fish")).toBe(1);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Tools and forge upgrades
+// ---------------------------------------------------------------------------
+describe("Tools and upgrades", () => {
+    it("starts at tier 1 with defined names and info", () => {
+        const { Tools } = loadEngine().exports;
+        const t = new Tools();
+        expect(t.level("rod")).toBe(1);
+        expect(t.level("axe")).toBe(1);
+        expect(t.level("pickaxe")).toBe(1);
+        expect(t.level("can")).toBe(1);
+        expect(t.info("rod").name.includes("удочка")).toBe(true);
+    });
+
+    it("refuses upgrade when resources or gold are missing", () => {
+        const { Tools, ResourceBag } = loadEngine().exports;
+        const t = new Tools();
+        const hero = { gold: 10, inventory: [] };
+        const bag = new ResourceBag();
+        const check = t.canUpgrade("rod", hero, bag);
+        expect(check.ok).toBe(false);
+    });
+
+    it("upgrades tool tier, consuming gold and resources", () => {
+        const { Tools, ResourceBag } = loadEngine().exports;
+        const t = new Tools();
+        const hero = { gold: 100, inventory: [{ name: "Эссенция ковки", type: "essence" }] };
+        const bag = new ResourceBag();
+        bag.add("wood", 10);
+        const res = t.upgrade("rod", hero, bag);
+        expect(res.ok).toBe(true);
+        expect(t.level("rod")).toBe(2);
+        expect(hero.gold).toBe(50);
+        expect(bag.count("wood")).toBe(4);
+    });
+
+    it("tool upgrade bonus enhances gathering hit yield", () => {
+        const { ResourceNode } = loadEngine().exports;
+        const node = new ResourceNode({ type: "tree", col: 1, row: 1, hits: 2, bonus: 1 });
+        const res = node.hit(1); // toolBonus = 1
+        expect(res.amount >= 1).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Town aesthetics and outdoor furniture
+// ---------------------------------------------------------------------------
+describe("Town aesthetics and outdoor furniture", () => {
+    it("defines pixel art for outdoor village furniture", () => {
+        const { Furniture } = loadEngine().exports;
+        for (const kind of ["well", "board", "lamp", "bench", "stall", "flowerbed", "mailbox", "pier", "fountain"]) {
+            expect(!!Furniture.KINDS[kind]).toBe(true);
+            const size = Furniture.size(kind);
+            expect(size.w >= 1).toBe(true);
+            expect(size.h >= 1).toBe(true);
+        }
+    });
+
+    it("village map has outdoor furniture and square interactables", () => {
+        const { MAPS } = loadEngine().exports;
+        const v = MAPS.village;
+        expect((v.furniture || []).length >= 5).toBe(true);
+        const well = v.interactables.find(i => i.action === "well");
+        const board = v.interactables.find(i => i.action === "board");
+        const cat = v.interactables.find(i => i.action === "cat");
+        expect(!!well).toBe(true);
+        expect(!!board).toBe(true);
+        expect(!!cat).toBe(true);
+    });
+
+    it("MobRig supports peaceful village fauna (cat, chicken, duck)", () => {
+        const { MobRig } = loadEngine().exports;
+        for (const kind of ["cat", "chicken", "duck"]) {
+            const art = MobRig.compose(kind, 0);
+            expect(!!art).toBe(true);
+            expect(art.w > 0).toBe(true);
+            expect(art.h > 0).toBe(true);
+            expect(MobRig.heightScale(kind) > 0).toBe(true);
+        }
+    });
+    it("TileArt provides organic water autotiling and connected tree canopies", () => {
+        const { TileArt } = loadEngine().exports;
+        // Standalone water and water with sand shore neighbors
+        const wCenter = TileArt.compose("water", 0, { up: true, down: true, left: true, right: true });
+        const wShore = TileArt.compose("water", 0, { up: false, down: true, left: false, right: true });
+        expect(wCenter.w).toBe(16);
+        expect(wCenter.h).toBe(16);
+        expect(wShore.w).toBe(16);
+        expect(wShore.h).toBe(16);
+
+        // Connected forest canopy vs standalone trees
+        const tOak = TileArt.compose("tree", 0);
+        const tPine = TileArt.compose("tree2", 0);
+        const tForest = TileArt.compose("tree", 0, { up: true, down: false, left: true, right: true });
+        expect(tOak.w).toBe(16);
+        expect(tPine.w).toBe(16);
+        expect(tForest.w).toBe(16);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Dynamic Weather & Four Seasons Calendar
+// ---------------------------------------------------------------------------
+describe("Weather and 4-season calendar system", () => {
+    it("cycles through Spring, Summer, Autumn and Winter across 28 days each", () => {
+        const { WeatherSystem, SEASONS } = loadEngine().exports;
+        const ws = new WeatherSystem();
+        expect(ws.getSeason(1).id).toBe("spring");
+        expect(ws.getSeason(28).id).toBe("spring");
+        expect(ws.getSeason(29).id).toBe("summer");
+        expect(ws.getSeason(56).id).toBe("summer");
+        expect(ws.getSeason(57).id).toBe("autumn");
+        expect(ws.getSeason(84).id).toBe("autumn");
+        expect(ws.getSeason(85).id).toBe("winter");
+        expect(ws.getSeason(112).id).toBe("winter");
+        expect(ws.getSeason(113).id).toBe("spring"); // wraps around to spring in year 2
+    });
+
+    it("generates deterministic weather and provides forecast for tomorrow", () => {
+        const { WeatherSystem } = loadEngine().exports;
+        const ws = new WeatherSystem();
+        const w1 = ws.getWeather(5);
+        const w1Repeat = ws.getWeather(5);
+        expect(w1.id).toBe(w1Repeat.id);
+        expect(typeof w1.name).toBe("string");
+        expect(typeof w1.emoji).toBe("string");
+
+        const forecast = ws.getTomorrowForecast(5);
+        expect(forecast.tomorrowDay).toBe(6);
+        expect(forecast.weather.id).toBe(ws.getWeather(6).id);
+    });
+
+    it("auto-waters growing farm plots on rainy dawn", () => {
+        const { Farm } = loadEngine().exports;
+        const f = new Farm({ rng: () => 0.9 });
+        f.till(1, 1);
+        f.plant(1, 1, 1, 1, "strawberry");
+        expect(f.plot(1, 1).progress).toBe(0);
+
+        // Day 2 dawn with rain (isRaining = true) -> automatically watered & advances progress
+        f.onNewDay(2, true);
+        expect(f.plot(1, 1).progress).toBe(1);
+
+        // Day 3 dawn with rain -> advances progress again
+        f.onNewDay(3, true);
+        expect(f.plot(1, 1).progress).toBe(2);
+
+        // Day 4 dawn with rain -> mature ready for harvest (strawberry growDays = 3)
+        f.onNewDay(4, true);
+        expect(f.plot(1, 1).state).toBe("ready");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-crop Agriculture & Fruit Orchards
+// ---------------------------------------------------------------------------
+describe("Multi-crop agriculture and fruit orchards", () => {
+    it("defines 6 distinct crops with seasonal compatibility and grow times", () => {
+        const { CROPS } = loadEngine().exports;
+        const keys = ["veg", "strawberry", "tomato", "corn", "pumpkin", "wheat"];
+        for (const k of keys) {
+            expect(!!CROPS[k]).toBe(true);
+            expect(CROPS[k].growDays >= 2).toBe(true);
+            expect(typeof CROPS[k].name).toBe("string");
+            expect(typeof CROPS[k].seedRes).toBe("string");
+        }
+    });
+
+    it("supports harvesting distinct crop yields from plots", () => {
+        const { Farm } = loadEngine().exports;
+        const f = new Farm({ rng: () => 0.9 });
+        f.till(5, 5);
+        f.plant(5, 5, 1, 1, "pumpkin");
+        f.water(5, 5, 1);
+        f.onNewDay(2);
+        f.water(5, 5, 2);
+        f.onNewDay(3);
+        f.water(5, 5, 3);
+        f.onNewDay(4);
+        f.water(5, 5, 4);
+        f.onNewDay(5);
+        expect(f.plot(5, 5).state).toBe("ready");
+        const res = f.harvest(5, 5);
+        expect(res.ok).toBe(true);
+        expect(res.crop).toBe("pumpkin");
+        expect(res.emoji).toBe("🎃");
+    });
+
+    it("village orchard features harvestable apple and cherry trees", () => {
+        const { MAPS, ResourceNode } = loadEngine().exports;
+        const v = MAPS.village;
+        const appleNodeDef = v.resources.find(r => r.type === "apple_tree");
+        const cherryNodeDef = v.resources.find(r => r.type === "cherry_tree");
+        expect(!!appleNodeDef).toBe(true);
+        expect(!!cherryNodeDef).toBe(true);
+
+        const appleNode = new ResourceNode(appleNodeDef);
+        const harvest = appleNode.hit();
+        expect(harvest.res).toBe("apple");
+        expect(harvest.amount >= 1).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Coastal Beach Zone & Deep-Sea Fishing
+// ---------------------------------------------------------------------------
+describe("Coastal Beach Zone and marine ecology", () => {
+    it("beach zone is valid, rectangular, has portals, spawns, fauna and resources", () => {
+        const { MAPS, tileInfo } = loadEngine().exports;
+        const b = MAPS.beach;
+        expect(!!b).toBe(true);
+        expect(b.rows.length).toBe(18);
+        const widths = new Set(b.rows.map(r => r.length));
+        expect(widths.size).toBe(1);
+        expect(tileInfo(b.rows[b.spawn.row][b.spawn.col]).solid).toBe(false);
+
+        // Portals link back to village
+        const toVillage = b.portals.find(p => p.to === "village");
+        expect(!!toVillage).toBe(true);
+        expect(tileInfo(b.rows[toVillage.row][toVillage.col]).solid).toBe(false);
+
+        // Beach resources
+        expect(b.resources.some(r => r.type === "seashell")).toBe(true);
+        expect(b.resources.some(r => r.type === "driftwood")).toBe(true);
+        expect(b.resources.some(r => r.type === "seaweed")).toBe(true);
+
+        // Peaceful fauna (crabs & seagulls)
+        expect(b.enemies.some(e => e.kind === "crab")).toBe(true);
+        expect(b.enemies.some(e => e.kind === "seagull")).toBe(true);
+    });
+
+    it("catches saltwater marine fish in ocean waters", () => {
+        const { FishingSystem, OCEAN_FISH_TABLE } = loadEngine().exports;
+        expect(OCEAN_FISH_TABLE.length >= 4).toBe(true);
+        const f = new FishingSystem({ rng: () => 0.05 });
+        const res = f.catchFish(3, true); // tier 3 rod in ocean
+        expect(res.ok).toBe(true);
+        expect(["fish_flounder", "fish_tuna", "lobster", "pearl"].includes(res.res)).toBe(true);
+    });
+
+    it("MobRig supports coastal fauna art (crab, seagull)", () => {
+        const { MobRig } = loadEngine().exports;
+        for (const kind of ["crab", "seagull"]) {
+            const art = MobRig.compose(kind, 0);
+            expect(!!art).toBe(true);
+            expect(art.w > 0).toBe(true);
+            expect(art.h > 0).toBe(true);
+        }
+    });
+
+    it("Furniture supports lighthouse and umbrella pieces", () => {
+        const { Furniture } = loadEngine().exports;
+        for (const kind of ["lighthouse", "umbrella"]) {
+            expect(!!Furniture.KINDS[kind]).toBe(true);
+            const size = Furniture.size(kind);
+            expect(size.w >= 1).toBe(true);
+            expect(size.h >= 1).toBe(true);
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Expanded Cooking Recipes
+// ---------------------------------------------------------------------------
+describe("Expanded cooking recipes and artisan goods", () => {
+    it("cooks apple cider from orchard apples", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("apple", 2);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_cider", bag)).toBe(true);
+        const res = cs.cook("dish_cider", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_cider")).toBe(1);
+    });
+
+    it("cooks strawberry jam from fresh strawberries and berries", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("strawberry", 2);
+        bag.add("berry", 1);
+        expect(cs.canCook("dish_jam", bag)).toBe(true);
+        const res = cs.cook("dish_jam", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_jam")).toBe(1);
+    });
+
+    it("cooks pumpkin soup from autumn pumpkin harvest", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("pumpkin", 1);
+        bag.add("veg", 1);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_pumpkin_soup", bag)).toBe(true);
+        const res = cs.cook("dish_pumpkin_soup", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_pumpkin_soup")).toBe(1);
+    });
+
+    it("cooks seafood pasta from wheat, tomato and lobster", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("wheat", 1);
+        bag.add("tomato", 1);
+        bag.add("lobster", 1);
+        expect(cs.canCook("dish_pasta", bag)).toBe(true);
+        const res = cs.cook("dish_pasta", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_pasta")).toBe(1);
+    });
+});
+
+describe("Mobile Controls & Village Life Refinement", () => {
+    it("Player2D scales walking speed with analog joystick magnitude", () => {
+        const { Player2D, Input, TileMap, MAPS } = loadEngine().exports;
+        const pSlow = new Player2D(384, 320);
+        const pFast = new Player2D(384, 320);
+        const map = new TileMap(MAPS.village.rows);
+
+        const inputSlow = new Input();
+        inputSlow.setAnalog(0.3, 0); // Gentle tilt
+        pSlow.update(0.1, inputSlow.axis(), map);
+
+        const inputFast = new Input();
+        inputFast.setAnalog(1.0, 0); // Full tilt
+        pFast.update(0.1, inputFast.axis(), map);
+
+        expect(pSlow.vx).toBeGreaterThan(0);
+        expect(pFast.vx).toBeGreaterThan(pSlow.vx);
+        expect(pFast.x).toBeGreaterThan(pSlow.x);
+    });
+
+    it("detectEncounter ignores friendly fauna (cats, ducks, chickens)", () => {
+        const { Enemy2D, Player2D, detectEncounter } = loadEngine().exports;
+        const player = new Player2D(100, 100);
+        const cat = new Enemy2D(100, 100, { kind: "cat" });
+        const duck = new Enemy2D(100, 100, { kind: "duck" });
+        const goblin = new Enemy2D(100, 100, { kind: "goblin" });
+
+        expect(detectEncounter(player, [cat, duck])).toBe(null);
+        expect(detectEncounter(player, [cat, goblin])).toBe(goblin);
+    });
+
+    it("Starosta Святослав is registered as a full NPC with dialogue, schedule and requests", () => {
+        const { MAPS, Requests, Social } = loadEngine().exports;
+        const starosta = (MAPS.village.npcs || []).find(n => n.id === "elder");
+        expect(Boolean(starosta)).toBe(true);
+        expect(starosta.name).toBe("Староста Святослав");
+        expect(starosta.schedule.length).toBeGreaterThan(1);
+
+        const social = new Social();
+        const reqSys = new Requests();
+        social.talk("elder"); // Chat to establish friendship (points = 20)
+        const req = reqSys.ensure("elder", social.points("elder"), 1);
+        expect(Boolean(req)).toBe(true);
+        expect(req.gold).toBeGreaterThan(0);
+    });
+
+    it("TileArt procedural pine/fir tree generates organic layered bough canopy without crashing", () => {
+        const { TileArt } = loadEngine().exports;
+        const pineSolo = TileArt.compose("tree2", 0, {});
+        expect(Boolean(pineSolo && pineSolo.grid)).toBe(true);
+        expect(pineSolo.grid.length).toBe(16);
+        expect(pineSolo.grid[0].length).toBe(16);
+
+        const pineConnected = TileArt.compose("tree2", 0, { up: true, down: false, left: true, right: false });
+        expect(Boolean(pineConnected && pineConnected.grid)).toBe(true);
+    });
+});
+
+describe("Ranching & Farm Animals System", () => {
+    it("creates animals with correct species attributes and default state", () => {
+        const { FarmAnimal, ANIMAL_TYPES } = loadEngine().exports;
+        const hen = new FarmAnimal({ type: "chicken", name: "Ряба" });
+        expect(hen.type).toBe("chicken");
+        expect(hen.name).toBe("Ряба");
+        expect(hen.hearts).toBe(0);
+        expect(hen.meta.product).toBe("egg");
+
+        const cow = new FarmAnimal({ type: "cow", name: "Зорька", friendship: 350 });
+        expect(cow.type).toBe("cow");
+        expect(cow.hearts).toBe(3);
+        expect(cow.meta.product).toBe("milk");
+    });
+
+    it("pets animal once per day, increasing friendship points", () => {
+        const { FarmAnimal } = loadEngine().exports;
+        const cow = new FarmAnimal({ type: "cow", name: "Бурёнка" });
+        const res1 = cow.pet();
+        expect(res1.ok).toBe(true);
+        expect(cow.friendship).toBe(25);
+        expect(cow.petted).toBe(true);
+
+        const res2 = cow.pet();
+        expect(res2.ok).toBe(false);
+        expect(cow.friendship).toBe(25);
+    });
+
+    it("feeds animal using hay/wheat from bag, increasing friendship", () => {
+        const { FarmAnimal, ResourceBag } = loadEngine().exports;
+        const hen = new FarmAnimal({ type: "chicken", name: "Ряба" });
+        const bag = new ResourceBag();
+
+        const failRes = hen.feed(bag);
+        expect(failRes.ok).toBe(false);
+
+        bag.add("wheat", 2);
+        const okRes = hen.feed(bag);
+        expect(okRes.ok).toBe(true);
+        expect(hen.fed).toBe(true);
+        expect(bag.count("wheat")).toBe(1);
+    });
+
+    it("harvests products and yields quality large eggs/milk at high friendship", () => {
+        const { FarmAnimal, ResourceBag } = loadEngine().exports;
+        const bag = new ResourceBag();
+        const cow = new FarmAnimal({ type: "cow", name: "Бурёнка", friendship: 800, hasProduct: true });
+
+        const res = cow.harvest(bag);
+        expect(res.ok).toBe(true);
+        expect(cow.hasProduct).toBe(false);
+        expect(bag.count("milk") + bag.count("milk_large")).toBe(1);
+    });
+
+    it("RanchSystem manages herds, feeds/pets all and advances days", () => {
+        const { RanchSystem, ResourceBag } = loadEngine().exports;
+        const ranch = new RanchSystem();
+        const bag = new ResourceBag();
+        bag.add("hay", 10);
+
+        expect(ranch.list.length).toBeGreaterThan(2);
+        const petRes = ranch.petAll();
+        expect(petRes.ok).toBe(true);
+        expect(petRes.count).toBe(ranch.list.length);
+
+        const feedRes = ranch.feedAll(bag);
+        expect(feedRes.ok).toBe(true);
+
+        ranch.onNewDay(2, false);
+        for (const a of ranch.list) {
+            expect(a.petted).toBe(false);
+            expect(a.fed).toBe(false);
+            expect(a.hasProduct).toBe(true);
+        }
+    });
+});
+
+describe("Deep Mines & Smelting System", () => {
+    it("MinesSystem descends and ascends through procedural levels", () => {
+        const { MinesSystem } = loadEngine().exports;
+        const mines = new MinesSystem();
+        expect(mines.floor).toBe(1);
+
+        expect(mines.descend()).toBe(2);
+        expect(mines.descend()).toBe(3);
+        expect(mines.deepestFloor).toBe(3);
+
+        expect(mines.ascend()).toBe(2);
+        expect(mines.floor).toBe(2);
+    });
+
+    it("generates procedural mine maps with veins, ladders and enemies based on depth", () => {
+        const { MinesSystem } = loadEngine().exports;
+        const mines = new MinesSystem();
+        const fl1 = mines.generateFloor(1);
+        expect(fl1.indoor).toBe(true);
+        expect(fl1.rows.length).toBe(16);
+        expect(fl1.rows[0].length).toBe(22);
+        expect(fl1.resources.some(r => r.res === "coal" || r.res === "ore_copper")).toBe(true);
+
+        const fl7 = mines.generateFloor(7);
+        expect(fl7.resources.some(r => r.res === "ore_gold" || r.res === "ore_iron")).toBe(true);
+        expect(fl7.enemies.length).toBeGreaterThan(1);
+    });
+
+    it("SmeltingSystem smelts copper, iron and gold bars from ore + coal", () => {
+        const { SmeltingSystem, ResourceBag } = loadEngine().exports;
+        const smelting = new SmeltingSystem();
+        const bag = new ResourceBag();
+
+        expect(smelting.canSmelt("bar_copper", bag)).toBe(false);
+        bag.add("ore_copper", 3);
+        bag.add("coal", 1);
+        expect(smelting.canSmelt("bar_copper", bag)).toBe(true);
+
+        const res = smelting.smelt("bar_copper", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("bar_copper")).toBe(1);
+        expect(bag.count("ore_copper")).toBe(0);
+        expect(bag.count("coal")).toBe(0);
+    });
+});
+
+describe("Home Decoration & Customization System", () => {
+    it("DecorSystem sets wallpaper and flooring styles", () => {
+        const { DecorSystem } = loadEngine().exports;
+        const decor = new DecorSystem();
+        expect(decor.flooring).toBe("floor");
+
+        const r1 = decor.setFlooring("carpet_red");
+        expect(r1.ok).toBe(true);
+        expect(decor.flooring).toBe("carpet_red");
+
+        const r2 = decor.setWallpaper("stone_brick");
+        expect(r2.ok).toBe(true);
+        expect(decor.wallpaper).toBe("stone_brick");
+    });
+
+    it("buys and places furniture pieces consuming materials and gold", () => {
+        const { DecorSystem, ResourceBag } = loadEngine().exports;
+        const decor = new DecorSystem();
+        const bag = new ResourceBag();
+        bag.add("wood", 10);
+        bag.add("wool", 5);
+
+        let gold = 200;
+        const res = decor.buyAndPlace("decor_sofa", 3, 4, bag, (cost) => {
+            if (gold >= cost) { gold -= cost; return true; }
+            return false;
+        });
+
+        expect(res.ok).toBe(true);
+        expect(decor.furniture.length).toBe(1);
+        expect(decor.furniture[0].kind).toBe("sofa");
+        expect(gold).toBe(115);
+        expect(bag.count("wood")).toBe(7);
+        expect(bag.count("wool")).toBe(3);
+    });
+});
+
+describe("Culinary Arts & Gourmet Expansion", () => {
+    it("cooks farm omelette from eggs and herbs", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("egg", 2);
+        bag.add("herb", 1);
+        expect(cs.canCook("dish_omelette", bag)).toBe(true);
+        const res = cs.cook("dish_omelette", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_omelette")).toBe(1);
+    });
+
+    it("cooks berry pancakes from eggs, milk, wheat and berries", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("egg", 1);
+        bag.add("milk", 1);
+        bag.add("wheat", 1);
+        bag.add("berry", 2);
+        expect(cs.canCook("dish_pancake", bag)).toBe(true);
+        const res = cs.cook("dish_pancake", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_pancake")).toBe(1);
+    });
+
+    it("cooks artisan cheese from fresh milk", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("milk", 2);
+        expect(cs.canCook("dish_cheese", bag)).toBe(true);
+        const res = cs.cook("dish_cheese", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_cheese")).toBe(1);
+    });
+
+    it("cooks golden elixir cider from apples and gold bar", () => {
+        const { CookingSystem, ResourceBag } = loadEngine().exports;
+        const cs = new CookingSystem();
+        const bag = new ResourceBag();
+        bag.add("apple", 2);
+        bag.add("bar_gold", 1);
+        expect(cs.canCook("dish_gold_cider", bag)).toBe(true);
+        const res = cs.cook("dish_gold_cider", bag);
+        expect(res.ok).toBe(true);
+        expect(bag.count("dish_gold_cider")).toBe(1);
+    });
+});
+
+describe("Visual & UI Renaissance System", () => {
+    it("Portraits provides 64x64 procedural pixel-art grids for all villagers and characters", () => {
+        const { Portraits } = loadEngine().exports;
+        expect(Boolean(Portraits)).toBe(true);
+        expect(Portraits.W).toBe(64);
+        expect(Portraits.H).toBe(64);
+
+        const characterIds = ["hero", "marta", "boris", "lena", "tomila", "kuzma", "elder", "cat"];
+        for (const id of characterIds) {
+            const grid = Portraits.getGrid(id);
+            expect(Boolean(grid)).toBe(true);
+            expect(grid.length).toBe(64);
+            expect(grid[0].length).toBe(64);
+
+            // Verify grid contains colored pixels
+            let pixelCount = 0;
+            for (let y = 0; y < 64; y++) {
+                for (let x = 0; x < 64; x++) {
+                    if (grid[y][x]) pixelCount++;
+                }
+            }
+            expect(pixelCount).toBeGreaterThan(100);
+        }
+    });
+
+    it("Portraits.render produces grid and returns cached instance", () => {
+        const { Portraits } = loadEngine().exports;
+        const res1 = Portraits.render("marta", "neutral");
+        expect(Boolean(res1 && res1.grid)).toBe(true);
+        const res2 = Portraits.render("marta", "neutral");
+        expect(res1).toBe(res2);
+    });
+
+    it("Portraits.portraitHtml produces valid markup with fallback or img element", () => {
+        const { Portraits } = loadEngine().exports;
+        const htmlMarta = Portraits.portraitHtml("marta");
+        expect(typeof htmlMarta).toBe("string");
+        expect(htmlMarta.includes("dlgPortrait")).toBe(true);
+
+        const htmlCat = Portraits.portraitHtml("cat");
+        expect(typeof htmlCat).toBe("string");
+        expect(htmlCat.includes("dlgPortrait")).toBe(true);
+    });
+
+    it("Portraits safely falls back to hero for unknown character IDs", () => {
+        const { Portraits } = loadEngine().exports;
+        const gridUnknown = Portraits.getGrid("mysterious_stranger");
+        expect(Boolean(gridUnknown)).toBe(true);
+        expect(gridUnknown.length).toBe(64);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Skills & Masteries Progression System
+// ---------------------------------------------------------------------------
+describe("Skills & Masteries Progression System", () => {
+    it("defines 6 mastery disciplines with leveling curves and perks", () => {
+        const { SKILL_DEFS, SkillsSystem } = loadEngine().exports;
+        expect(!!SKILL_DEFS).toBe(true);
+        const keys = Object.keys(SKILL_DEFS);
+        expect(keys.length).toBe(6);
+        expect(keys.includes("farming")).toBe(true);
+        expect(keys.includes("mining")).toBe(true);
+        expect(keys.includes("foraging")).toBe(true);
+        expect(keys.includes("fishing")).toBe(true);
+        expect(keys.includes("combat")).toBe(true);
+        expect(keys.includes("magic")).toBe(true);
+
+        const skills = new SkillsSystem();
+        for (const k of keys) {
+            expect(skills.getLevel(k)).toBe(1);
+            expect(skills.getXp(k)).toBe(0);
+        }
+    });
+
+    it("earns XP and levels up with milestone perk points", () => {
+        const { SkillsSystem } = loadEngine().exports;
+        const skills = new SkillsSystem();
+        expect(skills.getLevel("farming")).toBe(1);
+        const res1 = skills.addXp("farming", 50);
+        expect(res1.leveledUp).toBe(false);
+        expect(skills.getXp("farming")).toBe(50);
+
+        // Level up past threshold (100 xp)
+        const res2 = skills.addXp("farming", 60);
+        expect(res2.leveledUp).toBe(true);
+        expect(res2.newLevel).toBe(2);
+        expect(skills.getLevel("farming")).toBe(2);
+    });
+
+    it("unlocks perks and computes active passive bonuses", () => {
+        const { SkillsSystem } = loadEngine().exports;
+        const skills = new SkillsSystem();
+        // Give enough XP to reach level 5
+        skills.addXp("farming", 1000);
+        expect(skills.getLevel("farming") >= 4).toBe(true);
+
+        // Unlock green_thumb perk
+        const unlockRes = skills.unlockPerk("farming", "green_thumb");
+        expect(unlockRes.ok).toBe(true);
+        expect(skills.hasPerk("farming", "green_thumb")).toBe(true);
+
+        // Check bonuses
+        const bonuses = skills.getAllBonuses();
+        expect(bonuses.doubleHarvest > 0).toBe(true);
+    });
+
+    it("serializes and restores skill progress", () => {
+        const { SkillsSystem } = loadEngine().exports;
+        const skills = new SkillsSystem();
+        skills.addXp("mining", 300);
+        skills.unlockPerk("mining", "geologist");
+
+        const data = skills.serialize();
+        const restored = new SkillsSystem(data);
+        expect(restored.getLevel("mining")).toBe(skills.getLevel("mining"));
+        expect(restored.getXp("mining")).toBe(skills.getXp("mining"));
+        expect(restored.hasPerk("mining", "geologist")).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Character Creation, Origins & Multiplayer Sync Packet
+// ---------------------------------------------------------------------------
+describe("Character Creation, Emergent Destiny Classes & Multiplayer Sync Packet", () => {
+    it("defines emergent Destiny classes with titles, requirements and descriptions", () => {
+        const { DESTINY_CLASSES, CharCreation } = loadEngine().exports;
+        expect(DESTINY_CLASSES !== undefined).toBe(true);
+        const classKeys = Object.keys(DESTINY_CLASSES);
+        expect(classKeys.length >= 10).toBe(true);
+        expect(classKeys.includes("novice")).toBe(true);
+        expect(classKeys.includes("farmer")).toBe(true);
+        expect(classKeys.includes("miner")).toBe(true);
+        expect(classKeys.includes("forager")).toBe(true);
+        expect(classKeys.includes("fisher")).toBe(true);
+        expect(classKeys.includes("warrior")).toBe(true);
+        expect(classKeys.includes("mage")).toBe(true);
+        expect(classKeys.includes("smith")).toBe(true);
+        expect(classKeys.includes("druid")).toBe(true);
+        expect(classKeys.includes("paladin")).toBe(true);
+        expect(classKeys.includes("ruler")).toBe(true);
+
+        for (const k of classKeys) {
+            const cls = DESTINY_CLASSES[k];
+            expect(typeof cls.name).toBe("string");
+            expect(typeof cls.desc).toBe("string");
+            expect(typeof cls.title).toBe("string");
+            expect(typeof cls.bonusText).toBe("string");
+            expect(typeof cls.reqs).toBe("object");
+        }
+    });
+
+    it("creates custom character profile and applies name to player", () => {
+        const { CharCreation, CharacterProfile } = loadEngine().exports;
+        const profile = CharCreation.createProfile({
+            name: "Радомир",
+            gender: "masculine",
+            origin: "novice",
+            hairStyle: "crop",
+            hairColor: "#5c3317",
+            shirtColor: "#2e5c8a",
+            pantsColor: "#2c3e50"
+        });
+
+        expect(profile instanceof CharacterProfile).toBe(true);
+        expect(profile.name).toBe("Радомир");
+        expect(profile.gender).toBe("masculine");
+
+        const look = profile.getLook();
+        expect(look.shirt).toBe("#2e5c8a");
+        expect(look.pants).toBe("#2c3e50");
+        expect(look.hair).toBe("#5c3317");
+
+        // Mock hero and bag
+        const mockHero = { name: "Герой", maxHealth: 100, health: 100, maxEnergy: 100, energy: 100, gold: 50 };
+        CharCreation.applyOrigin(profile, mockHero);
+
+        expect(mockHero.name).toBe("Радомир");
+    });
+
+    it("dynamically unlocks emergent classes as skills level up (Albion Online Destiny Board)", () => {
+        const { CharCreation, CharacterProfile, SkillsSystem } = loadEngine().exports;
+        const profile = CharCreation.createProfile({ name: "Ярослав" });
+        const skills = new SkillsSystem();
+
+        // Initially novice
+        expect(profile.getActiveTitle(skills)).toBe("Новичок");
+        let unlocked = profile.getUnlockedClasses(skills);
+        expect(unlocked.some(c => c.id === "novice")).toBe(true);
+        expect(unlocked.some(c => c.id === "farmer")).toBe(false);
+
+        // Level up farming to level 3
+        skills.addXp("farming", 650); // Level 3 reached
+        expect(skills.getLevel("farming") >= 3).toBe(true);
+        unlocked = profile.getUnlockedClasses(skills);
+        expect(unlocked.some(c => c.id === "farmer")).toBe(true);
+        expect(profile.getActiveTitle(skills)).toBe("Агроном");
+
+        // Level up combat and magic to unlock Paladin
+        skills.addXp("combat", 1500); // Level 4
+        skills.addXp("magic", 650);   // Level 3
+        expect(skills.getLevel("combat") >= 4).toBe(true);
+        expect(skills.getLevel("magic") >= 3).toBe(true);
+        unlocked = profile.getUnlockedClasses(skills);
+        expect(unlocked.some(c => c.id === "paladin")).toBe(true);
+        expect(skills.getActiveTitle()).toBe("Паладин");
+    });
+
+    it("serializes and deserializes multiplayer world sync packets", () => {
+        const { WorldSyncPacket } = loadEngine().exports;
+        const packet = WorldSyncPacket.createStatePacket({
+            playerId: "player-alpha-1",
+            zone: "village",
+            x: 240,
+            y: 320,
+            facing: "down",
+            moving: true,
+            frame: 2,
+            action: "swing_axe"
+        });
+
+        const json = WorldSyncPacket.serialize(packet);
+        expect(typeof json).toBe("string");
+        const parsed = WorldSyncPacket.deserialize(json);
+        expect(parsed.valid).toBe(true);
+        expect(parsed.data.playerId).toBe("player-alpha-1");
+        expect(parsed.data.zone).toBe("village");
+        expect(parsed.data.x).toBe(240);
+        expect(parsed.data.action).toBe("swing_axe");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Homestead Upgrades & Community Restoration Projects
+// ---------------------------------------------------------------------------
+describe("Homestead Upgrades & Community Restoration Projects", () => {
+    it("defines house expansion tiers and upgrades smoothly", () => {
+        const { HOUSE_TIERS, HomesteadSystem } = loadEngine().exports;
+        expect(HOUSE_TIERS.length).toBe(3);
+        expect(HOUSE_TIERS[0].name).toBe("Уютная лесная избушка");
+        expect(HOUSE_TIERS[1].name).toBe("Деревенская усадьба");
+        expect(HOUSE_TIERS[2].name).toBe("Боярские хоромы");
+
+        const hs = new HomesteadSystem();
+        expect(hs.tier).toBe(1);
+        expect(hs.maxGardenPlots).toBe(8);
+
+        // Upgrade to tier 2 with mock bag and gold
+        const mockBag = { count: () => 100, remove: () => true };
+        const mockHero = { gold: 5000 };
+        const res = hs.upgradeHouse(mockBag, (cost) => { mockHero.gold -= cost; return true; });
+        expect(res.ok).toBe(true);
+        expect(hs.tier).toBe(2);
+        expect(hs.maxGardenPlots).toBe(16);
+    });
+
+    it("tracks Starosta community restoration projects and completion", () => {
+        const { COMMUNITY_PROJECTS, HomesteadSystem } = loadEngine().exports;
+        const projectKeys = Object.keys(COMMUNITY_PROJECTS);
+        expect(projectKeys.length >= 4).toBe(true);
+        expect(projectKeys.includes("bridge_fix")).toBe(true);
+        expect(projectKeys.includes("lanterns")).toBe(true);
+        expect(projectKeys.includes("windmill")).toBe(true);
+        expect(projectKeys.includes("greenhouse")).toBe(true);
+
+        const hs = new HomesteadSystem();
+        expect(hs.isProjectCompleted("bridge_fix")).toBe(false);
+
+        // Contribute materials
+        const mockBag = { count: () => 100, remove: () => true };
+        const contribRes = hs.contributeProject("bridge_fix", mockBag, () => true);
+        expect(contribRes.ok).toBe(true);
+        expect(hs.isProjectCompleted("bridge_fix")).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Hotbar & Realistic Tool System
+// ---------------------------------------------------------------------------
+describe("Hotbar & Realistic Tool System", () => {
+    it("supports 6 hotbar slots and active tool switching", () => {
+        const { Tools } = loadEngine().exports;
+        const t = new Tools();
+        expect(t.has("pickaxe")).toBe(true);
+        expect(t.has("axe")).toBe(true);
+        expect(t.has("hoe")).toBe(true);
+        expect(t.has("rod")).toBe(true);
+        expect(t.has("can")).toBe(true);
+
+        expect(t.activeSlot).toBe(0);
+        expect(t.getActiveToolKey()).toBe("axe");
+
+        t.setActiveSlot(1);
+        expect(t.activeSlot).toBe(1);
+        expect(t.getActiveToolKey()).toBe("pickaxe");
+
+        t.setActiveSlot(2);
+        expect(t.getActiveToolKey()).toBe("hoe");
+    });
+
+    it("strictly verifies required tool and level for tasks", () => {
+        const { Tools } = loadEngine().exports;
+        const t = new Tools();
+        expect(t.require("axe", 1)).toBe(true);
+        expect(t.require("axe", 2)).toBe(false); // only tier 1 initially
+        expect(t.require("sword", 1)).toBe(false); // sword not in basic tool set
+    });
+});
+
+

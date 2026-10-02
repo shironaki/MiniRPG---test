@@ -42,6 +42,7 @@
         p: "pants", P: "pantsSh",
         b: "boot", B: "bootSh",
         a: "hat", A: "hatSh",
+        r: "beard", R: "beardSh"
     };
 
     // ---- grid helpers -------------------------------------------------------
@@ -163,6 +164,19 @@
         // hide hat if look.hat is null
         if (!L.hat) for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
             if (g[y][x] === "a" || g[y][x] === "A") g[y][x] = ".";
+
+        // beard layer for elders / bearded characters
+        if (L.beard) {
+            if (d === "side") {
+                rect(g, 9, 9, 3, 3, "r");
+                px(g, 10, 8, "r");
+                px(g, 11, 11, "R");
+            } else if (d !== "up") {
+                rect(g, 5, 9, 6, 3, "r");
+                rect(g, 6, 8, 4, 1, "r"); // mustache
+                px(g, 6, 12, "R"); px(g, 9, 12, "R");
+            }
+        }
 
         // key grid -> colour grid
         const col = [];
