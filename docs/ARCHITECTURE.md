@@ -78,7 +78,7 @@ world/requests.js world/maps.js
 entities/mover.js entities/player.js entities/enemy.js entities/npc.js
 battle/battle2d.js battle/battleui.js
 ui/menus.js
-render/tilesart.js render/buildings.js render/furniture.js render/character.js render/mobs.js
+render/tilesart.js render/buildings.js render/furniture.js render/character.js render/mobs.js render/portraits.js
 render/renderer.js
 main.js
 ```
@@ -133,11 +133,13 @@ main.js
 ### 3.6 `render/` — только пиксели
 | Файл | Что рисует |
 |------|-----------|
-| `tilesart.js` | `TileArt`: трава, вода, деревья, тропинки, камни, заборы; анимации травы/воды |
+| `tilesart.js` | `TileArt`: трава (полевые цветы, клевер), вода, деревья (дубы, хвойные лапы), тропинки, камни, заборы; анимации травы/воды |
 | `buildings.js` | `BuildingArt`: дом, лавка, кузница, врата испытаний; дым, портал, **светящиеся ночью окна** |
+| `furniture.js` | `Furniture`: уличная и домашняя мебель, декорации, камин, верстак, плавильня, загон |
 | `character.js` | `CharacterRig`: послойный пиксель-арт героя и NPC (тело/одежда/волосы/экипировка), 4 направления, цикл ходьбы, перекраска |
-| `mobs.js` | `MobRig`: гоблин, скелет, волк |
-| `renderer.js` | дирижёр отрисовки: `drawMap`, `drawBuildings`, `drawFarm`, `drawResourceNodes`, `drawNPCs`, `drawEnemies`, `drawPlayer`, `drawPortals`, `drawInteractables`, `drawNightOverlay` |
+| `mobs.js` | `MobRig`: гоблин, скелет, волк, кот, куры, коровы, овцы, утки, крабы, чайки |
+| `portraits.js` | `Portraits`: процедурные 64x64 пиксель-арт портреты персонажей (Герой, Марта, Борис, Лена, Томила, Кузьма, Староста Святослав, Кот Мурзик) для диалогов и интерфейса |
+| `renderer.js` | дирижёр отрисовки: `drawMap`, `drawBuildings`, `drawFarm`, `drawResourceNodes`, `drawNPCs`, `drawEnemies`, `drawPlayer`, `drawPortals`, `drawInteractables`, `drawNightOverlay`, `drawWeather`, `drawEmotes`, `drawFloatingTexts` |
 
 Растровых спрайтов в v2 **нет** — весь арт процедурный, генерируется кодом.
 

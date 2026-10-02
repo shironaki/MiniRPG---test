@@ -1322,3 +1322,56 @@ describe("Culinary Arts & Gourmet Expansion", () => {
         expect(bag.count("dish_gold_cider")).toBe(1);
     });
 });
+
+describe("Visual & UI Renaissance System", () => {
+    it("Portraits provides 64x64 procedural pixel-art grids for all villagers and characters", () => {
+        const { Portraits } = loadEngine().exports;
+        expect(Boolean(Portraits)).toBe(true);
+        expect(Portraits.W).toBe(64);
+        expect(Portraits.H).toBe(64);
+
+        const characterIds = ["hero", "marta", "boris", "lena", "tomila", "kuzma", "elder", "cat"];
+        for (const id of characterIds) {
+            const grid = Portraits.getGrid(id);
+            expect(Boolean(grid)).toBe(true);
+            expect(grid.length).toBe(64);
+            expect(grid[0].length).toBe(64);
+
+            // Verify grid contains colored pixels
+            let pixelCount = 0;
+            for (let y = 0; y < 64; y++) {
+                for (let x = 0; x < 64; x++) {
+                    if (grid[y][x]) pixelCount++;
+                }
+            }
+            expect(pixelCount).toBeGreaterThan(100);
+        }
+    });
+
+    it("Portraits.render produces grid and returns cached instance", () => {
+        const { Portraits } = loadEngine().exports;
+        const res1 = Portraits.render("marta", "neutral");
+        expect(Boolean(res1 && res1.grid)).toBe(true);
+        const res2 = Portraits.render("marta", "neutral");
+        expect(res1).toBe(res2);
+    });
+
+    it("Portraits.portraitHtml produces valid markup with fallback or img element", () => {
+        const { Portraits } = loadEngine().exports;
+        const htmlMarta = Portraits.portraitHtml("marta");
+        expect(typeof htmlMarta).toBe("string");
+        expect(htmlMarta.includes("dlgPortrait")).toBe(true);
+
+        const htmlCat = Portraits.portraitHtml("cat");
+        expect(typeof htmlCat).toBe("string");
+        expect(htmlCat.includes("dlgPortrait")).toBe(true);
+    });
+
+    it("Portraits safely falls back to hero for unknown character IDs", () => {
+        const { Portraits } = loadEngine().exports;
+        const gridUnknown = Portraits.getGrid("mysterious_stranger");
+        expect(Boolean(gridUnknown)).toBe(true);
+        expect(gridUnknown.length).toBe(64);
+    });
+});
+

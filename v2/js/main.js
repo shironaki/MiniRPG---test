@@ -44,6 +44,17 @@
     let flash = "", flashT = 0;
     function showFlash(text, secs) { flash = text; flashT = secs || 1.6; }
 
+    // Dynamic rising floating texts (+1 Wood, +25 XP, +50 Gold) & Emote bubbles
+    const floatingTexts = [];
+    function addFloatingText(text, x, y, color = "rgba(255, 230, 100, ALPHA)", size = 12, maxT = 1.3) {
+        floatingTexts.push({ text, x, y, color, size, t: 0, maxT });
+    }
+
+    const emotes = [];
+    function addEmote(icon, x, y, life = 1.8, offsetY = 36) {
+        emotes.push({ icon, x, y, life, t: 0, offsetY });
+    }
+
     function getMap(id) {
         if (typeof id === "object" && id) return id;
         if (typeof id === "string" && id.startsWith("mine_floor_") && mines) {
@@ -113,6 +124,8 @@
         hero, journal, host, refresh: refreshStats, social, resources,
         requests, storage, tools, cooking, fishing, weather,
         ranch, smelting, decor, mines,
+        addEmote: (icon, x, y, life, offY) => addEmote(icon, x !== undefined ? x : player.centerX, y !== undefined ? y : player.centerY, life, offY),
+        addFloatingText: (text, x, y, col, sz, maxT) => addFloatingText(text, x !== undefined ? x : player.centerX, y !== undefined ? y : player.centerY - 16, col, sz, maxT),
         enterMines: (fl) => {
             closeInteraction();
             loadZone(`mine_floor_${fl || 1}`);
@@ -122,17 +135,27 @@
     };
 
     function refreshStats() {
+        const hpPct = Math.max(0, Math.min(100, Math.round((hero.health / hero.maxHealth) * 100)));
+        const enPct = Math.max(0, Math.min(100, Math.round((hero.energy / hero.maxEnergy) * 100)));
         let html =
-            `<span>❤️ ${Math.max(0, hero.health)}/${hero.maxHealth}</span>` +
-            `<span>⚡ ${hero.energy}/${hero.maxEnergy}</span>` +
-            `<span>⭐ ур.${hero.level}</span>` +
-            `<span>💰 ${hero.gold}</span>` +
-            `<span>☯️ ${hero.karma || 0}</span>`;
+            `<div class="statBarWrap" title="Здоровье">
+                <span>❤️</span>
+                <div class="statBar"><div class="statFillHp" style="width:${hpPct}%"></div></div>
+                <span>${Math.max(0, hero.health)}/${hero.maxHealth}</span>
+            </div>` +
+            `<div class="statBarWrap" title="Энергия">
+                <span>⚡</span>
+                <div class="statBar"><div class="statFillEn" style="width:${enPct}%"></div></div>
+                <span>${hero.energy}/${hero.maxEnergy}</span>
+            </div>` +
+            `<span class="statLevelBadge">⭐ ур.${hero.level}</span>` +
+            `<span class="statGoldBadge">💰 ${hero.gold}</span>` +
+            `<span class="statKarmaBadge">☯️ ${hero.karma || 0}</span>`;
         const bag = resources.entries();
         if (bag.length) {
             const meta = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
-            html += `<span class="sep">·</span>` + bag.map(e =>
-                `<span>${(meta[e.res] && meta[e.res].emoji) || "📦"} ${e.n}</span>`).join("");
+            html += `<span class="statSep">·</span>` + bag.map(e =>
+                `<span>${(meta[e.res] && meta[e.res].emoji) || "📦"} ${e.n}</span>`).join(" ");
         }
         statsEl.innerHTML = html;
     }
@@ -363,8 +386,10 @@
     function workPlot(cell) {
         const act = farm.actionFor(cell.col, cell.row);
         let r;
-        if (act === "till") r = farm.till(cell.col, cell.row);
-        else if (act === "plant") {
+        if (act === "till") {
+            r = farm.till(cell.col, cell.row);
+            if (r.ok) addFloatingText("🪓 Вспахано", cell.px, cell.py - 12, "rgba(200, 180, 140, ALPHA)");
+        } else if (act === "plant") {
             let chosenSeed = null;
             let chosenCrop = "veg";
             const seedTypes = [
@@ -384,12 +409,19 @@
             }
             if (chosenSeed) {
                 r = farm.plant(cell.col, cell.row, dayCount, resources.count(chosenSeed), chosenCrop);
-                if (r.ok && r.consumeSeed) resources.remove(chosenSeed, 1);
+                if (r.ok && r.consumeSeed) {
+                    resources.remove(chosenSeed, 1);
+                    addFloatingText(`🌱 Посажено: ${chosenCrop}`, cell.px, cell.py - 12, "rgba(120, 240, 140, ALPHA)");
+                }
             } else {
                 r = farm.plant(cell.col, cell.row, dayCount, 0, "veg");
             }
         } else if (act === "water") {
             r = farm.water(cell.col, cell.row, dayCount);
+            if (r.ok) {
+                addFloatingText("💧 Полит", cell.px, cell.py - 12, "rgba(56, 189, 248, ALPHA)");
+                addEmote("💧", cell.px, cell.py - 24, 1.2);
+            }
         } else {
             r = farm.harvest(cell.col, cell.row);
             if (r.ok) {
@@ -399,6 +431,8 @@
                 }
                 resources.add(r.crop, amount);
                 r.amount = amount;
+                addFloatingText(`+${amount} ${r.crop}`, cell.px, cell.py - 14, "rgba(255, 215, 0, ALPHA)", 14);
+                addEmote("✨", cell.px, cell.py - 24, 1.4);
             }
         }
         if (r && r.msg) showFlash(r.msg, 1.3);
@@ -421,6 +455,7 @@
         // Foraging bushes sometimes yields a seed for the farm.
         if (node.type === "bush" && Math.random() < 0.5) { resources.add("seeds", 1); extra = " 🌰+1"; }
         showFlash((r.felled ? `${em} +${r.amount} — собрано!` : `${em} +${r.amount}`) + extra, 1.2);
+        addFloatingText(`+${r.amount} ${em}`, node.px, node.py - 12, "rgba(100, 255, 120, ALPHA)");
         journal.onResourceGathered && journal.onResourceGathered(r.res, r.amount);
         refreshStats();
     }
@@ -435,6 +470,8 @@
         hero.addExperience(res.xp || 5);
         const extra = res.bonus ? ` и со дна: ${res.bonus.emoji} ${res.bonus.name}` : "";
         showFlash(`🎣 ${res.msg}${extra} (+${res.xp || 5}✨)`, 2);
+        addFloatingText(`+${res.amount} ${res.res}`, player.centerX, player.centerY - 16, "rgba(56, 189, 248, ALPHA)", 13);
+        addEmote("🎣", player.centerX, player.centerY - 22, 1.5);
         journal.onResourceGathered && journal.onResourceGathered(res.res, res.amount);
         refreshStats();
     }
@@ -648,6 +685,17 @@
         for (const e of enemies) e.update(dt, tilemap);
         for (const n of npcs) n.update(dt, tilemap, clockMin);
         for (const r of resourceNodes) r.update(dt);
+
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            floatingTexts[i].t += dt;
+            if (floatingTexts[i].t >= floatingTexts[i].maxT) floatingTexts.splice(i, 1);
+        }
+        for (let i = emotes.length - 1; i >= 0; i--) {
+            emotes[i].t += dt;
+            emotes[i].life -= dt;
+            if (emotes[i].life <= 0) emotes.splice(i, 1);
+        }
+
         camera.follow(player.centerX, player.centerY, tilemap.pixelWidth, tilemap.pixelHeight);
         nearest = findNearest();
 
@@ -695,7 +743,13 @@
             renderer.drawWeather(camera, curW.id, performance.now() / 1000);
         }
         if (typeof renderer.drawAmbient === "function") {
-            renderer.drawAmbient(camera, zoneName, light);
+            renderer.drawAmbient(camera, zoneName, light, curW, curSeason);
+        }
+        if (typeof renderer.drawEmotes === "function") {
+            renderer.drawEmotes(emotes, camera);
+        }
+        if (typeof renderer.drawFloatingTexts === "function") {
+            renderer.drawFloatingTexts(floatingTexts, camera);
         }
 
         if (flashT > 0) {
@@ -725,8 +779,12 @@
         social, resources, farm, weather,
         get npcs() { return npcs; },
         get nodes() { return resourceNodes; },
+        get enemies() { return enemies; },
         get farmPlots() { return farmPlots; },
         get furniture() { return furniture; },
+        get floatingTexts() { return floatingTexts; },
+        get emotes() { return emotes; },
+        addFloatingText, addEmote,
         requests, storage, tools, cooking, fishing,
         ranch, smelting, decor, mines,
         sleepUntilMorning, fishAtPond,

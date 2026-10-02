@@ -78,8 +78,22 @@
                 ? `${sellEquip}${sellRes}`
                 : `<p class="hint">Рюкзак пуст.</p>`;
 
-            paint(`<h2>🏪 Лавка</h2><p class="gold">💰 ${ctx.hero.gold}</p>
-                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+            const portrait = (typeof Portraits !== "undefined")
+                ? Portraits.portraitHtml("tomila")
+                : `<div class="dlgPortraitBox"><span>🛍️</span></div>`;
+
+            paint(`
+                <div class="dlgLayout" style="margin-bottom:8px;">
+                    <div class="dlgPortraitCol">
+                        <div class="dlgPortraitBox">${portrait}</div>
+                        <div class="dlgSpeakerName">Томила</div>
+                    </div>
+                    <div class="dlgSpeechCol">
+                        <div class="dlgBubble"><p>«Добро пожаловать в деревенскую лавку! У меня только лучшие семена, снаряжение и припасы.»</p></div>
+                        ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                    </div>
+                </div>
+                <p class="gold">💰 Золото: ${ctx.hero.gold}</p>
                 <h4 class="mGroup">Товары</h4>${buyItems}${buySeeds}
                 <h4 class="mGroup">Продажа</h4>${sellHtml}`, onClick);
         }
@@ -169,9 +183,23 @@
                     <button class="mBtn ${tab === "tools" ? "" : "ghost"}" data-tab="tools">🪓 Инструменты</button>
                 </div>`;
 
-            paint(`<h2>🔨 Кузница</h2><p class="gold">💰 ${ctx.hero.gold} · 🔩 ${ess}</p>
+            const portrait = (typeof Portraits !== "undefined")
+                ? Portraits.portraitHtml("kuzma")
+                : `<div class="dlgPortraitBox"><span>🔨</span></div>`;
+
+            paint(`
+                <div class="dlgLayout" style="margin-bottom:8px;">
+                    <div class="dlgPortraitCol">
+                        <div class="dlgPortraitBox">${portrait}</div>
+                        <div class="dlgSpeakerName">Кузнец Кузьма</div>
+                    </div>
+                    <div class="dlgSpeechCol">
+                        <div class="dlgBubble"><p>«Огонь в горне пылает жарко! Закалю твоё оружие и выкую надёжные инструменты.»</p></div>
+                        ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                    </div>
+                </div>
+                <p class="gold">💰 ${ctx.hero.gold} · 🔩 ${ess}</p>
                 ${tabs}
-                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
                 ${tab === "gear" ? gearBody : toolsBody}
                 <p class="hint">🔩 Эссенции ковки выпадают из побеждённых врагов и сундуков.</p>`, onClick);
         }
@@ -294,16 +322,43 @@
         let extra = "";
         function render() {
             if (d.isEnded()) {
-                paint(`<h2>🧑 Староста</h2><p>Береги себя, странник.</p>${extra ? `<p class="flash">${esc(extra)}</p>` : ""}`);
+                const portrait = (typeof Portraits !== "undefined")
+                    ? Portraits.portraitHtml("elder")
+                    : `<div class="dlgPortraitBox"><span>🧑</span></div>`;
+                paint(`
+                    <div class="dlgLayout">
+                        <div class="dlgPortraitCol">
+                            <div class="dlgPortraitBox">${portrait}</div>
+                            <div class="dlgSpeakerName">Староста Святослав</div>
+                        </div>
+                        <div class="dlgSpeechCol">
+                            <div class="dlgBubble"><p>«Береги себя, странник. Пусть духи предков хранят тебя на тропах.»</p></div>
+                            ${extra ? `<p class="flash">${esc(extra)}</p>` : ""}
+                        </div>
+                    </div>`);
                 return;
             }
             const node = d.current();
             const opts = node.choices
                 .map((c, i) => ({ c, i }))
                 .filter(({ c, i }) => !(c.once && d.taken[`${d.nodeId}:${i}`]));
-            const btns = opts.map(({ c, i }) => `<button class="mBtn wide" data-c="${i}">${esc(c.label)}</button>`).join("");
-            paint(`<h2>${esc(node.speaker || "🧑 Староста")}</h2><p>${esc(node.text)}</p>
-                ${extra ? `<p class="flash">${esc(extra)}</p>` : ""}${btns}`, onClick);
+            const btns = opts.map(({ c, i }) => `<button class="mBtn dlgChoiceBtn" data-c="${i}">➤ ${esc(c.label)}</button>`).join("");
+            const portrait = (typeof Portraits !== "undefined")
+                ? Portraits.portraitHtml("elder")
+                : `<div class="dlgPortraitBox"><span>🧑</span></div>`;
+
+            paint(`
+                <div class="dlgLayout">
+                    <div class="dlgPortraitCol">
+                        <div class="dlgPortraitBox">${portrait}</div>
+                        <div class="dlgSpeakerName">${esc(node.speaker || "Староста Святослав")}</div>
+                    </div>
+                    <div class="dlgSpeechCol">
+                        <div class="dlgBubble"><p>«${esc(node.text)}»</p></div>
+                        ${extra ? `<p class="flash">${esc(extra)}</p>` : ""}
+                        <div class="dlgChoices">${btns}</div>
+                    </div>
+                </div>`, onClick);
         }
         function onClick(e) {
             const b = e.target.closest("button"); if (!b || b.dataset.c === undefined) return;
@@ -342,7 +397,7 @@
                 <strong>Поручение (выполнено ${done})</strong>
                 <p>«${esc(req.text)}»</p>
                 <p class="qr">Принести: ${m.emoji || "📦"} ${esc(m.name || req.res)} ×${req.n} (у вас: ${have}) · Награда: 💰 ${req.gold}</p>
-                <button class="mBtn ${can ? "" : "ghost"}" data-fulfil="1" ${can ? "" : "disabled"}>${can ? "Отдать припасы" : "Не хватает"}</button>
+                <button class="mBtn ${can ? "primary" : "ghost"}" data-fulfil="1" ${can ? "" : "disabled"}>${can ? "Отдать припасы" : "Не хватает"}</button>
             </div>`;
         }
         function render() {
@@ -361,13 +416,28 @@
                     ${it.emoji || "📦"} ${esc(it.name)} ${loved ? "💖" : ""}</button>`;
             }).join("");
 
-            paint(`<h2>${npc.emoji || "🧑"} ${esc(npc.name)} <small>${esc(npc.role || "")}</small></h2>
-                <p class="gold">${heartBar()} (${social.points(npc.id)}/1000)</p>
-                <p><em>«${esc(line)}»</em></p>
-                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+            const portrait = (typeof Portraits !== "undefined")
+                ? Portraits.portraitHtml(npc.id)
+                : `<div class="dlgPortraitBox"><span>${npc.emoji || "🧑"}</span></div>`;
+
+            paint(`
+                <div class="dlgLayout">
+                    <div class="dlgPortraitCol">
+                        <div class="dlgPortraitBox">${portrait}</div>
+                        <div class="dlgSpeakerName">${esc(npc.name)}</div>
+                        <div class="dlgHeartGauge">${heartBar()}</div>
+                        <small style="color:#ffd88a;font-size:11px;">${social.points(npc.id)}/1000</small>
+                    </div>
+                    <div class="dlgSpeechCol">
+                        <div class="dlgBubble">
+                            <p>«${esc(line)}»</p>
+                        </div>
+                        ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                    </div>
+                </div>
                 <h4 class="mGroup">Общение</h4>
                 <div class="row"><span>Поговорить</span>
-                <button class="mBtn" data-talk="1" ${canTalk ? "" : "disabled"}>${canTalk ? "💬 Поболтать" : "Уже говорили"}</button></div>
+                <button class="mBtn primary" data-talk="1" ${canTalk ? "" : "disabled"}>${canTalk ? "💬 Поболтать" : "Уже говорили"}</button></div>
                 <h4 class="mGroup">Поручения</h4>${requestBlock()}
                 <h4 class="mGroup">Подарить</h4>
                 ${canGift ? `<p class="hint">💖 — житель особенно любит этот предмет.</p>` : `<p class="hint">Сегодня подарок уже вручён.</p>`}
@@ -710,22 +780,36 @@
         const RES = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
         function render() {
             const fishCount = (ctx.resources ? (ctx.resources.count("perch") + ctx.resources.count("carp") + ctx.resources.count("pike")) : 0);
-            paint(`<h2>🐱 Кот Мурзик</h2>
-                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
-                <p class="hint">Рыжий деревенский кот с пушистым хвостом и белыми лапками. Он довольно жмурится на солнышке и мурлычет.</p>
+            const portrait = (typeof Portraits !== "undefined")
+                ? Portraits.portraitHtml("cat")
+                : `<div class="dlgPortraitBox"><span>🐱</span></div>`;
+
+            paint(`
+                <div class="dlgLayout" style="margin-bottom:8px;">
+                    <div class="dlgPortraitCol">
+                        <div class="dlgPortraitBox">${portrait}</div>
+                        <div class="dlgSpeakerName">Кот Мурзик</div>
+                    </div>
+                    <div class="dlgSpeechCol">
+                        <div class="dlgBubble"><p>«Муррр... 🐾 (Мурзик греется на солнышке, довольно щурится и ласково мурлычет)»</p></div>
+                        ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                    </div>
+                </div>
                 <div class="row">
                     <span>🐾 Погладить за ушком</span>
-                    <button class="mBtn" data-pet="1">Погладить (+15❤️)</button>
+                    <button class="mBtn primary" data-pet="1">Погладить (+15❤️)</button>
                 </div>
                 <div class="row">
                     <span>🐟 Угостить свежей рыбкой</span>
-                    ${fishCount > 0 ? `<button class="mBtn" data-feed="1">Дать рыбку</button>` : `<button class="mBtn ghost" disabled>Нет рыбы в сумке</button>`}
+                    ${fishCount > 0 ? `<button class="mBtn" data-feed="1">Дать рыбку (+10💰, +25✨)</button>` : `<button class="mBtn ghost" disabled>Нет рыбы в сумке</button>`}
                 </div>`, onClick);
         }
         function onClick(e) {
             const b = e.target.closest("button"); if (!b) return;
             if (b.dataset.pet) {
                 ctx.hero.health = Math.min(ctx.hero.maxHealth, ctx.hero.health + 15);
+                if (typeof ctx.addEmote === "function") ctx.addEmote("❤️");
+                if (typeof ctx.addFloatingText === "function") ctx.addFloatingText("+15 ❤️", undefined, undefined, "rgba(244, 114, 182, ALPHA)");
                 msg = `💖 Муррр... Мурзик довольно заурчал и потёрся головой о твою ладонь (+15❤️)!`;
             } else if (b.dataset.feed) {
                 let fishKey = "perch";
@@ -737,6 +821,8 @@
                     ctx.resources.remove(fishKey, 1);
                     ctx.hero.gold += 10;
                     ctx.hero.gainXp(25);
+                    if (typeof ctx.addEmote === "function") ctx.addEmote("🐟");
+                    if (typeof ctx.addFloatingText === "function") ctx.addFloatingText("+10 💰", undefined, undefined, "rgba(255, 215, 0, ALPHA)");
                     msg = `🐟 Мурзик с удовольствием схрумкал рыбку и выкатил лапкой из-под крыльца блестящую монетку (+10💰, +25✨)!`;
                 }
             }

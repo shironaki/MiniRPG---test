@@ -42,9 +42,15 @@
             if ((i + variant) % 3 === 0) { px(g, x, y, dark); px(g, x, y + 1, dark); }
             else if ((i + variant) % 3 === 1) px(g, x, y, light);
         });
-        if (variant === 2) { // a little flower
-            px(g, 6, 6, "#f0e58a"); px(g, 6, 5, "#e8d24a");
-            px(g, 11, 9, "#d76a8a"); px(g, 11, 8, "#efa6bd");
+        if (variant % 4 === 1) { // delicate white & golden wildflowers
+            px(g, 6, 6, "#ffffff"); px(g, 6, 5, "#ffe66d");
+            px(g, 12, 9, "#ffffff"); px(g, 11, 9, "#ffe66d");
+        } else if (variant % 4 === 2) { // soft pink & lilac clover flowers
+            px(g, 4, 10, "#e88eb0"); px(g, 4, 9, "#f7cad9");
+            px(g, 10, 4, "#b988e0"); px(g, 11, 4, "#d8b6f5");
+        } else if (variant % 4 === 3) { // tiny smooth garden pebble
+            px(g, 8, 12, "#7a8a70"); px(g, 9, 12, "#9bb090");
+            px(g, 9, 13, "#5a6850");
         }
         return g;
     }

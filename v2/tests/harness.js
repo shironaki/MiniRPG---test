@@ -38,7 +38,8 @@ const FILES = [
     "js/render/furniture.js",
     "js/render/mobs.js",
     "js/render/tilesart.js",
-    "js/render/buildings.js"
+    "js/render/buildings.js",
+    "js/render/portraits.js"
 ];
 
 const EXPORTED = [
@@ -57,7 +58,7 @@ const EXPORTED = [
     "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
     "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem",
     "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP",
-    "Furniture", "MobRig", "TileArt", "BuildingArt"
+    "Furniture", "MobRig", "TileArt", "BuildingArt", "Portraits"
 ];
 
 function loadEngine() {

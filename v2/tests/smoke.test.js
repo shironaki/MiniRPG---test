@@ -383,6 +383,46 @@ describe("v2 smoke › playing", () => {
         expect(g.v2.decor.wallpaper).toBe("stone_brick");
     });
 
+    it("interacts with Starosta Elder and displays dialogue with portrait header", () => {
+        const g = boot();
+        g.tick(16.7);
+        // Find Elder NPC in village
+        const elder = g.v2.npcs.find(n => n.id === "elder");
+        expect(Boolean(elder)).toBe(true);
+        g.v2.player.x = elder.centerX - 10;
+        g.v2.player.y = elder.centerY;
+        g.tick(16.7);
+        g.tap("KeyE");
+        g.tick(16.7);
+
+        const html = g.html("overlayBody");
+        expect(html.includes("Староста Святослав")).toBe(true);
+        expect(html.includes("dlgPortrait") || html.includes("dlgPortraitCard")).toBe(true);
+    });
+
+    it("triggers floating texts and emote animations on fishing and actions", () => {
+        const g = boot();
+        g.tick(16.7);
+
+        // Fish at pond generates floating text and fishing emote
+        const beforeTexts = (g.v2.floatingTexts || []).length;
+        const beforeEmotes = (g.v2.emotes || []).length;
+        g.v2.fishAtPond(false);
+        const afterTexts = (g.v2.floatingTexts || []).length;
+        const afterEmotes = (g.v2.emotes || []).length;
+
+        expect(afterTexts).toBeGreaterThan(beforeTexts);
+        expect(afterEmotes).toBeGreaterThan(beforeEmotes);
+        expect(g.v2.emotes[g.v2.emotes.length - 1].icon).toBe("🎣");
+
+        // Direct helper checks
+        g.v2.addEmote("❤️", 120, 140);
+        expect(g.v2.emotes[g.v2.emotes.length - 1].icon).toBe("❤️");
+
+        g.v2.addFloatingText("+50 Gold", 120, 140);
+        expect(g.v2.floatingTexts[g.v2.floatingTexts.length - 1].text).toBe("+50 Gold");
+    });
+
     it("survives a long session: 400 frames across the day/night cycle", () => {
         const g = boot();
         for (let i = 0; i < 400; i++) g.tick(50);    // ~20s → clock advances

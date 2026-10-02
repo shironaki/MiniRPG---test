@@ -34,9 +34,9 @@ const FILES = [
     "v2/js/entities/mover.js", "v2/js/entities/player.js", "v2/js/entities/enemy.js",
     "v2/js/entities/npc.js",
     "v2/js/battle/battle2d.js", "v2/js/battle/battleui.js",
-    "v2/js/ui/menus.js",
     "v2/js/render/tilesart.js", "v2/js/render/buildings.js", "v2/js/render/furniture.js",
-    "v2/js/render/character.js", "v2/js/render/mobs.js", "v2/js/render/renderer.js",
+    "v2/js/render/character.js", "v2/js/render/mobs.js", "v2/js/render/portraits.js", "v2/js/render/renderer.js",
+    "v2/js/ui/menus.js",
     "v2/js/main.js"
 ];
 
@@ -46,7 +46,7 @@ const EXPORTED = [
     "Requests", "Farm", "NPC2D", "ITEMS", "TILES", "tileInfo", "TileMap",
     "FishingSystem", "CookingSystem", "Tools", "RECIPES", "TOOL_TIERS",
     "ANIMAL_TYPES", "FarmAnimal", "RanchSystem", "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
-    "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem", "WeatherSystem"
+    "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem", "WeatherSystem", "Portraits"
 ];
 
 // Every canvas method becomes a no-op; a few must return usable objects.

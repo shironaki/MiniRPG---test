@@ -125,6 +125,24 @@ class Renderer {
             ctx.fillStyle = "rgba(0,0,0,0.16)";
             ctx.fillRect(sx + 2, sy + hpx - 2, wpx - 4, 3);
             BuildingArt.draw(ctx, b.type, sx, sy, b.w, b.h, ts, now, night || 0);
+
+            // Ambient chimney smoke for houses & forge
+            if (b.type === "house" || b.type === "forge" || b.type === "shop") {
+                const chimneyX = sx + wpx * 0.72;
+                const chimneyY = sy + 6;
+                const puffCount = b.type === "forge" ? 5 : 3;
+                for (let p = 0; p < puffCount; p++) {
+                    const phase = ((now * 0.0012 + p * 0.45) % 2.0);
+                    const puffY = chimneyY - phase * 18;
+                    const puffX = chimneyX + Math.sin(now * 0.002 + p + b.col) * (phase * 6);
+                    const puffRadius = 2.5 + phase * 4.5;
+                    const alpha = Math.max(0, (1 - phase / 2.0) * 0.35);
+                    ctx.fillStyle = b.type === "forge" ? `rgba(90, 85, 80, ${alpha})` : `rgba(220, 225, 230, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(puffX, puffY, puffRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
         }
     }
 
@@ -761,6 +779,75 @@ class Renderer {
         ctx.beginPath();
         ctx.arc(cx, s.y + h * 0.24, w * 0.28, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // Dynamic rising floating numbers & notifications (+25 XP, +1 Wood, +50 Gold)
+    drawFloatingTexts(texts, camera) {
+        if (!texts || !texts.length) return;
+        const ctx = this.ctx;
+        ctx.save();
+        for (const ft of texts) {
+            const s = camera.worldToScreen(ft.x, ft.y);
+            const progress = (ft.t || 0) / (ft.maxT || 1.2);
+            const alpha = Math.max(0, 1 - progress);
+            const riseY = s.y - progress * 24;
+
+            ctx.font = `bold ${ft.size || 12}px system-ui, sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            // Crisp dark drop-shadow outline
+            ctx.strokeStyle = `rgba(10, 14, 22, ${alpha * 0.9})`;
+            ctx.lineWidth = 3;
+            ctx.strokeText(ft.text, s.x, riseY);
+
+            ctx.fillStyle = ft.color ? ft.color.replace("ALPHA", alpha) : `rgba(255, 230, 100, ${alpha})`;
+            ctx.fillText(ft.text, s.x, riseY);
+        }
+        ctx.restore();
+    }
+
+    // Bouncy speech & emote bubbles over characters/mobs (❤️, 💬, 💡, 💤, ✨, ❗)
+    drawEmotes(emotes, camera) {
+        if (!emotes || !emotes.length) return;
+        const ctx = this.ctx;
+        const now = Date.now();
+        ctx.save();
+        for (const em of emotes) {
+            const s = camera.worldToScreen(em.x, em.y);
+            const bob = Math.sin(now * 0.006 + (em.x + em.y)) * 2;
+            const life = Math.min(1, (em.t || 0) / 0.2); // pop-in scale
+            const fade = em.life !== undefined ? Math.min(1, em.life / 0.3) : 1;
+            const bubbleY = s.y - (em.offsetY || 36) + bob;
+
+            ctx.globalAlpha = fade;
+
+            // Speech bubble background
+            ctx.fillStyle = "#ffffff";
+            ctx.strokeStyle = "#2b2622";
+            ctx.lineWidth = 1.5;
+
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(s.x - 12 * life, bubbleY - 12 * life, 24 * life, 20 * life, 6)
+                          : ctx.rect(s.x - 12 * life, bubbleY - 12 * life, 24 * life, 20 * life);
+            ctx.fill();
+            ctx.stroke();
+
+            // Bubble tail
+            ctx.beginPath();
+            ctx.moveTo(s.x - 3, bubbleY + 8 * life);
+            ctx.lineTo(s.x, bubbleY + 13 * life);
+            ctx.lineTo(s.x + 3, bubbleY + 8 * life);
+            ctx.fill();
+            ctx.stroke();
+
+            // Inner icon
+            ctx.font = `${14 * life}px serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(em.icon || "❤️", s.x, bubbleY - 1);
+        }
+        ctx.restore();
     }
 }
 
