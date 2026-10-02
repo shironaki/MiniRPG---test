@@ -663,26 +663,26 @@
         plant:     { w: 1, h: 1, make: plant },
         // Decorative furniture
         bookshelf: { w: 2, h: 2, make: bookshelf },
-        sofa:      { w: 2, h: 1, make: sofa },
+        sofa:      { w: 2, h: 1, make: sofa, walkable: true },
         clock:     { w: 1, h: 1, make: clock, animated: true },
-        armchair:  { w: 1, h: 1, make: armchair },
-        feeder:    { w: 2, h: 1, make: feeder },
+        armchair:  { w: 1, h: 1, make: armchair, walkable: true },
+        feeder:    { w: 2, h: 1, make: feeder, walkable: true },
         furnace:   { w: 1, h: 1, make: furnace, animated: true },
         ladderDown:{ w: 1, h: 1, make: ladderDown, walkable: true },
         // Village outdoor furniture & props
         well:      { w: 2, h: 2, make: well, animated: true },
         board:     { w: 2, h: 1, make: board },
-        lamp:      { w: 1, h: 2, make: lamp, animated: true },
-        bench:     { w: 2, h: 1, make: bench },
+        lamp:      { w: 1, h: 2, make: lamp, animated: true, solidCols: 1, solidRows: 1, solidOffY: 1 },
+        bench:     { w: 2, h: 1, make: bench, walkable: true },
         stall:     { w: 2, h: 2, make: stall },
-        flowerbed: { w: 2, h: 1, make: flowerbed },
+        flowerbed: { w: 2, h: 1, make: flowerbed, walkable: true },
         fenceH:    { w: 1, h: 1, make: fenceH },
         fenceV:    { w: 1, h: 1, make: fenceV },
-        mailbox:   { w: 1, h: 1, make: mailbox },
+        mailbox:   { w: 1, h: 1, make: mailbox, walkable: true },
         fountain:  { w: 2, h: 2, make: fountain, animated: true },
         pier:      { w: 2, h: 1, make: pier, walkable: true },
-        lighthouse:{ w: 2, h: 3, make: lighthouse, animated: true },
-        umbrella:  { w: 2, h: 2, make: beachUmbrella }
+        lighthouse:{ w: 2, h: 3, make: lighthouse, animated: true, solidCols: 2, solidRows: 2, solidOffY: 1 },
+        umbrella:  { w: 2, h: 2, make: beachUmbrella, walkable: true }
     };
 
     const _cache = new Map();

@@ -103,13 +103,17 @@
 
         // type extras
         if (c.type === "shop") {
-            // striped awning above the door
-            const aw = Math.round(W * 0.5), ax = Math.round(W / 2 - aw / 2), ay = wy + Math.round((H - wy) * 0.02);
-            for (let i = 0; i < aw; i++) rect(g, ax + i, ay, 1, 3, (i % 2 ? c.awn2 : c.awn1));
-            rect(g, ax, ay + 3, aw, 1, c.roofSh);
-            // hanging sign with a coin
-            rect(g, Math.round(W * 0.62), wy + 2, Math.round(W * 0.16), Math.round(W * 0.12), c.sign);
-            px(g, Math.round(W * 0.68), wy + 4, "#fff2c0");
+            // Striped awning above the entrance door
+            const aw = Math.round(W * 0.44), ax = Math.round(W / 2 - aw / 2), ay = wy + Math.round((H - wy) * 0.04);
+            for (let i = 0; i < aw; i++) rect(g, ax + i, ay, 1, 4, (i % 2 ? c.awn2 : c.awn1));
+            rect(g, ax, ay + 4, aw, 1, c.roofSh);
+            // Signboard centered directly above the entrance awning (not over windows!)
+            const sw = Math.max(12, Math.round(W * 0.28)), sh = 6;
+            const sx = Math.round((W - sw) / 2), sy = Math.max(0, wy - 4);
+            rect(g, sx, sy, sw, sh, "#422810"); // dark wood border
+            rect(g, sx + 1, sy + 1, sw - 2, sh - 2, c.sign); // golden face
+            rect(g, sx + Math.round(sw * 0.35), sy + 2, Math.max(1, Math.round(sw * 0.3)), 2, "#422810"); // glyph
+            px(g, sx + Math.round(sw * 0.5), sy + 3, "#ffd700");
         }
         return g;
     }

@@ -1,7 +1,7 @@
 /**
- * v2 bootstrap — wires the canvas, world, hero, camera, input and loop.
- * Free-roam a tiled village with camera follow, wall collision, living NPCs,
- * farming, gathering, fishing, cooking, tool upgrades, and interiors.
+ * v2 bootstrap — wires the canvas, world, hero, camera, input, and loop.
+ * Free-roam a living tiled valley with camera follow, realistic tool mechanics,
+ * living NPCs, farm homestead, deep mines, culinary arts, and sandbox progression.
  */
 (function () {
     const canvas = document.getElementById("game");
@@ -24,7 +24,7 @@
     const DAY_REAL_SEC = 300;             // 5 real minutes = one full day
     const MIN_PER_SEC = 1440 / DAY_REAL_SEC;
 
-    // Persistent social, gathering & farming state (survive zone changes).
+    // Persistent systems (survive zone changes).
     const social = new Social();
     const resources = new ResourceBag();
     const farm = new Farm();
@@ -38,7 +38,36 @@
     const smelting = (typeof SmeltingSystem !== "undefined") ? new SmeltingSystem() : null;
     const decor = (typeof DecorSystem !== "undefined") ? new DecorSystem() : null;
     const mines = (typeof MinesSystem !== "undefined") ? new MinesSystem() : null;
-    resources.add("seeds", 6);            // a starter pouch of seeds
+    const skills = (typeof SkillsSystem !== "undefined") ? new SkillsSystem() : null;
+    const homestead = (typeof HomesteadSystem !== "undefined") ? new HomesteadSystem() : null;
+
+    // Starter pouch and tools
+    resources.add("seeds", 6);
+    if (storage) {
+        storage.add("wood", 15);
+        storage.add("stone", 10);
+        storage.add("bread", 2);
+    }
+
+    // Hero stats & character profile
+    const hero = new Player("Любомир");
+    const journal = new QuestJournal();
+    let charProfile = null;
+
+    // Try to load saved profile
+    try {
+        const rawProf = localStorage.getItem("v2_char_profile");
+        if (rawProf && typeof CharacterProfile !== "undefined") {
+            charProfile = new CharacterProfile(JSON.parse(rawProf));
+            charProfile.applyToPlayer(hero, tools, resources);
+            player.look = charProfile.getLook();
+        }
+    } catch (e) { /* ignore */ }
+
+    const host = {
+        player: hero,
+        adjustKarma(n) { hero.karma = (hero.karma || 0) + n; }
+    };
 
     // Transient on-screen feedback (gathering, gifts, catches) — fades on its own.
     let flash = "", flashT = 0;
@@ -93,15 +122,21 @@
         }
         furniture = furnList;
 
-        // Furniture occupies real space: block its footprint so the hero
-        // walks around obstacles instead of through them (rugs stay walkable).
+        // Furniture footprint blocking with fine walkable rules
         if (typeof Furniture !== "undefined") {
             for (const f of furniture) {
                 const def = Furniture.KINDS[f.kind];
                 if (!def || def.walkable) continue;
                 const size = Furniture.size(f.kind);
-                for (let j = 0; j < size.h; j++)
-                    for (let i = 0; i < size.w; i++) tilemap.block(f.col + i, f.row + j);
+                const blockCols = def.solidCols || size.w;
+                const blockRows = def.solidRows || size.h;
+                const offC = def.solidOffX || 0;
+                const offR = def.solidOffY || 0;
+                for (let j = 0; j < blockRows; j++) {
+                    for (let i = 0; i < blockCols; i++) {
+                        tilemap.block(f.col + offC + i, f.row + offR + j);
+                    }
+                }
             }
         }
         zoneName = mapData.name || (typeof id === "string" ? id : "Локация");
@@ -113,17 +148,10 @@
         if (input && input.consumePressed) input.consumePressed();
     }
 
-    // Persistent v1 hero drives stats/progression; Player2D handles position.
-    const hero = new Player("Герой");
-    const journal = new QuestJournal();
-    const host = {
-        player: hero,
-        adjustKarma(n) { hero.karma = (hero.karma || 0) + n; }
-    };
     const menuCtx = {
         hero, journal, host, refresh: refreshStats, social, resources,
         requests, storage, tools, cooking, fishing, weather,
-        ranch, smelting, decor, mines,
+        ranch, smelting, decor, mines, skills, homestead,
         addEmote: (icon, x, y, life, offY) => addEmote(icon, x !== undefined ? x : player.centerX, y !== undefined ? y : player.centerY, life, offY),
         addFloatingText: (text, x, y, col, sz, maxT) => addFloatingText(text, x !== undefined ? x : player.centerX, y !== undefined ? y : player.centerY - 16, col, sz, maxT),
         enterMines: (fl) => {
@@ -135,29 +163,46 @@
     };
 
     function refreshStats() {
+        if (!statsEl) return;
         const hpPct = Math.max(0, Math.min(100, Math.round((hero.health / hero.maxHealth) * 100)));
         const enPct = Math.max(0, Math.min(100, Math.round((hero.energy / hero.maxEnergy) * 100)));
-        let html =
-            `<div class="statBarWrap" title="Здоровье">
-                <span>❤️</span>
-                <div class="statBar"><div class="statFillHp" style="width:${hpPct}%"></div></div>
-                <span>${Math.max(0, hero.health)}/${hero.maxHealth}</span>
-            </div>` +
-            `<div class="statBarWrap" title="Энергия">
-                <span>⚡</span>
-                <div class="statBar"><div class="statFillEn" style="width:${enPct}%"></div></div>
-                <span>${hero.energy}/${hero.maxEnergy}</span>
-            </div>` +
-            `<span class="statLevelBadge">⭐ ур.${hero.level}</span>` +
-            `<span class="statGoldBadge">💰 ${hero.gold}</span>` +
-            `<span class="statKarmaBadge">☯️ ${hero.karma || 0}</span>`;
-        const bag = resources.entries();
-        if (bag.length) {
-            const meta = (typeof RESOURCES !== "undefined") ? RESOURCES : {};
-            html += `<span class="statSep">·</span>` + bag.map(e =>
-                `<span>${(meta[e.res] && meta[e.res].emoji) || "📦"} ${e.n}</span>`).join(" ");
-        }
-        statsEl.innerHTML = html;
+
+        const hotbarHtml = (tools && typeof tools.getHotbar === "function")
+            ? tools.getHotbar().map((s, idx) => `
+                <div class="hotbarSlot ${s.active ? "active" : ""}" data-hotbar-slot="${idx}" title="${s.name}">
+                    <span class="slotNum">${s.slot}</span>
+                    <span class="slotIcon">${s.emoji}</span>
+                    ${s.level > 1 ? `<span class="slotLv">${s.level}</span>` : ""}
+                </div>`).join("")
+            : "";
+
+        statsEl.innerHTML = `
+            <div id="playerCard">
+                <div class="playerHead">
+                    <div class="avatarCircle">🧑</div>
+                    <div class="nameWrap">
+                        <strong class="heroName">${hero.name || "Любомир"}</strong>
+                        <span class="statLevelBadge">⭐ Ур. ${hero.level}</span>
+                    </div>
+                </div>
+                <div class="statGauges">
+                    <div class="statBarWrap hpWrap" title="Здоровье">
+                        <span>❤️</span>
+                        <div class="statBar"><div class="statFillHp" style="width:${hpPct}%"></div></div>
+                        <span class="statVal">${Math.max(0, hero.health)}/${hero.maxHealth}</span>
+                    </div>
+                    <div class="statBarWrap enWrap" title="Энергия">
+                        <span>⚡</span>
+                        <div class="statBar"><div class="statFillEn" style="width:${enPct}%"></div></div>
+                        <span class="statVal">${hero.energy}/${hero.maxEnergy}</span>
+                    </div>
+                </div>
+                <div class="playerCoins">
+                    <span class="statGoldBadge">💰 ${hero.gold}</span>
+                </div>
+            </div>
+            <div id="quickHotbar">${hotbarHtml}</div>
+        `;
     }
 
     const camera = new Camera(canvas.width, canvas.height);
@@ -165,11 +210,22 @@
     input.attach(window);
     const renderer = new Renderer(ctx);
 
-    // Hero and all mobs are drawn from code (CharacterRig / MobRig) — no image
-    // files to load. Kept null so the renderer's rig paths are used.
+    // Hero and all mobs are drawn from code (CharacterRig / MobRig)
     renderer.sprites = null;
 
-    // On-screen touch controls → feed the same Input as the keyboard.
+    // Hotbar click events
+    if (statsEl) {
+        statsEl.addEventListener("click", (e) => {
+            const slot = e.target.closest("[data-hotbar-slot]");
+            if (slot && tools) {
+                const idx = parseInt(slot.dataset.hotbarSlot, 10);
+                tools.setActiveSlot(idx);
+                refreshStats();
+            }
+        });
+    }
+
+    // On-screen touch controls
     (function wireTouch() {
         const touch = document.getElementById("touch");
         if (!touch) return;
@@ -196,65 +252,28 @@
     let nearest = null;
     const INTERACT_RADIUS = 44;
 
-    // Immersive = touch device OR fullscreen: the canvas fills the whole stage
-    // (which itself fills the viewport), so nothing ever needs page scrolling.
-    function immersive() {
-        return !!document.fullscreenElement ||
-            window.matchMedia("(pointer: coarse)").matches;
-    }
-
     function resize() {
-        const imm = immersive();
-        document.body.classList.toggle("immersive", imm);
-        document.documentElement.classList.toggle("immersive", imm);
-        const dpr = window.devicePixelRatio || 1;
-        const ts = mapData.tileSize;
-        let cw, ch, zoom;
-        if (immersive()) {
-            cw = stage.clientWidth || window.innerWidth;
-            ch = stage.clientHeight || window.innerHeight;
-            canvas.style.width = "";
-            canvas.style.height = "";
-            zoom = Math.max(1, 56 / ts);
-        } else {
-            // Desktop windowed: use most of the viewport, keeping 16:9
-            const vw = stage.clientWidth || window.innerWidth;
-            const vh = window.innerHeight;
-            let w = Math.min(vw, 1200);
-            let h = Math.min(Math.round(w * 9 / 16), Math.round(vh * 0.76));
-            w = Math.round(h * 16 / 9);
-            if (w > vw) { w = vw; h = Math.round(w * 9 / 16); }
-            cw = w; ch = h;
-            canvas.style.width = w + "px";
-            canvas.style.height = h + "px";
-            zoom = Math.max(1, 46 / ts);
-        }
-        canvas.width = Math.max(1, Math.round(cw * dpr));
-        canvas.height = Math.max(1, Math.round(ch * dpr));
-        ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
-        camera.resize(cw / zoom, ch / zoom);
+        const rect = stage.getBoundingClientRect();
+        canvas.width = Math.floor(rect.width);
+        canvas.height = Math.floor(rect.height);
+        camera.resize(canvas.width, canvas.height);
     }
     window.addEventListener("resize", resize);
     window.addEventListener("orientationchange", () => setTimeout(resize, 100));
-    document.addEventListener("fullscreenchange", () => setTimeout(resize, 50));
 
-    // Fullscreen toggle.
-    (function wireFullscreen() {
-        const fsBtn = document.getElementById("fsBtn");
-        if (!fsBtn) return;
+    // Fullscreen toggle
+    const fsBtn = document.getElementById("fsBtn");
+    if (fsBtn) {
         fsBtn.addEventListener("click", () => {
-            if (document.fullscreenElement) {
-                document.exitFullscreen && document.exitFullscreen();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
             } else {
-                const el = document.documentElement;
-                (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el);
+                document.exitFullscreen().catch(() => {});
             }
         });
-    })();
+    }
 
-    loadZone("village");
-
-    // ---- Control scheme (virtual joystick <-> D-pad), remembered locally -----
+    // ---- Control scheme (virtual joystick <-> D-pad) -----
     (function wireControlScheme() {
         const joystick = document.getElementById("joystick");
         const stick = document.getElementById("stick");
@@ -276,41 +295,33 @@
         toggle.addEventListener("click", () => apply(mode === "stick" ? "dpad" : "stick"));
         apply(mode);
 
-        // Analog joystick → Input.setAnalog with gentle walking curve and dynamic radius
         let active = false, cx = 0, cy = 0, stickRadius = 46;
-        const DEAD = 0.20; // 20% deadzone to prevent accidental drifting
+        const DEAD = 0.20;
         function point(e) { return e.touches ? (e.touches[0] || e.changedTouches[0]) : e; }
         function start(e) {
             active = true;
             const r = joystick.getBoundingClientRect();
-            cx = r.left + r.width / 2; cy = r.top + r.height / 2;
-            stickRadius = Math.max(36, Math.round(r.width * 0.42));
-            move(e); if (e.cancelable) e.preventDefault();
+            stickRadius = Math.max(30, r.width / 2 - 10);
+            cx = r.left + r.width / 2;
+            cy = r.top + r.height / 2;
+            move(e);
         }
         function move(e) {
             if (!active) return;
             const p = point(e);
             let dx = p.clientX - cx, dy = p.clientY - cy;
-            const d = Math.hypot(dx, dy) || 1;
-            const cl = Math.min(d, stickRadius);
-            const clampedX = (dx / d) * cl;
-            const clampedY = (dy / d) * cl;
-            stick.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+            const dist = Math.hypot(dx, dy);
+            if (dist > stickRadius) { dx = (dx / dist) * stickRadius; dy = (dy / dist) * stickRadius; }
+            stick.style.transform = `translate(${dx}px, ${dy}px)`;
 
-            // Compute normalized analog magnitude with exponential ease-in for gentle walking
-            const rawMag = cl / stickRadius;
-            if (rawMag <= DEAD) {
-                input.setAnalog(0, 0);
+            const norm = Math.min(1, dist / stickRadius);
+            if (norm < DEAD) {
+                input.clearAnalog();
             } else {
-                // Remap DEAD..1.0 to 0.0..1.0, then apply smooth ease-in curve (power of 1.4)
-                let mag = (rawMag - DEAD) / (1 - DEAD);
-                mag = Math.max(0, Math.min(1, mag));
-                mag = Math.pow(mag, 1.4); // slight tilt = slow stroll (30-40%), full tilt = run
-                const nx = (dx / d) * mag;
-                const ny = (dy / d) * mag;
-                input.setAnalog(nx, ny);
+                const scaledMag = Math.pow((norm - DEAD) / (1 - DEAD), 1.4);
+                input.setAnalog((dx / dist) * scaledMag, (dy / dist) * scaledMag);
             }
-            if (e.cancelable) e.preventDefault();
+            if (e.cancelable && e.type !== "mousemove") e.preventDefault();
         }
         function end() {
             active = false;
@@ -343,62 +354,65 @@
             if (d <= bestD) {
                 bestD = d;
                 const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[r.res] : null;
-                best = { kind: "resource", target: r, emoji: (meta && meta.emoji) || "🌿", label: gatherVerb(r.type) };
+                const emoji = (meta && meta.emoji) || "📦";
+                const toolHint = (r.type === "tree" || r.type === "driftwood") ? "🪓" : (r.type === "rock" || r.type.startsWith("ore_") ? "⛏️" : "✋");
+                best = { kind: "resource", target: r, emoji, label: `${toolHint} ${meta ? meta.name : r.type}` };
             }
         }
-        for (const c of farmPlots) {
-            const d = Math.hypot(c.px - player.centerX, c.py - player.centerY);
+        for (const f of farmPlots) {
+            const d = Math.hypot(f.px - player.centerX, f.py - player.centerY);
             if (d <= bestD) {
                 bestD = d;
-                const act = farm.actionFor(c.col, c.row);
-                best = { kind: "farm", target: c, emoji: farmEmoji(act), label: farmVerb(act) };
+                const act = farm.actionFor(f.col, f.row);
+                const labels = {
+                    till: "🌾 Вспахать мотыгой",
+                    plant: "🌰 Посадить семена",
+                    water: "🪣 Полить лейкой",
+                    harvest: "🥕 Собрать урожай"
+                };
+                best = { kind: "farm", target: f, emoji: "🌱", label: labels[act] || "Грядка" };
             }
         }
         return best;
     }
 
-    function gatherVerb(type) {
-        return type === "tree" ? "Рубить дерево"
-            : type === "apple_tree" ? "Собрать яблоки"
-            : type === "cherry_tree" ? "Собрать вишню"
-            : type === "seashell" ? "Собрать ракушку"
-            : type === "driftwood" ? "Собрать плавник"
-            : type === "seaweed" ? "Собрать ламинарию"
-            : type === "rock" ? "Добыть камень"
-            : type === "ore_copper_node" ? "Добыть медную руду"
-            : type === "ore_iron_node" ? "Добыть железную руду"
-            : type === "ore_gold_node" ? "Добыть золотую руду"
-            : type === "coal_node" ? "Добыть уголь"
-            : type === "gem_node" ? "Добыть самоцвет"
-            : type === "herb" ? "Собрать травы" : "Собрать ягоды";
+    // Daily dawn: skip to 08:00
+    function sleepUntilMorning() {
+        onDawn(dayCount + 1);
+        clockMin = 8 * 60;
+        hero.health = hero.maxHealth;
+        hero.energy = hero.maxEnergy;
+        showFlash("☀️ Наступило утро. Силы полностью восстановлены!", 2);
+        addFloatingText("Полный отдых ❤️⚡", player.centerX, player.centerY - 20, "rgba(74, 222, 128, ALPHA)", 14);
+        addEmote("💤", player.centerX, player.centerY - 24, 2.0);
+        refreshStats();
     }
 
-    function farmVerb(act) {
-        return act === "till" ? "Вспахать грядку"
-            : act === "plant" ? "Посадить семена"
-            : act === "water" ? "Полить" : "Собрать урожай";
-    }
-    function farmEmoji(act) {
-        return act === "till" ? "🪓" : act === "plant" ? "🌱" : act === "water" ? "💧" : "🥕";
-    }
-
-    // Quick, non-pausing farm work driven by the plot's current state.
     function workPlot(cell) {
         const act = farm.actionFor(cell.col, cell.row);
         let r;
         if (act === "till") {
+            if (!tools || !tools.has("hoe")) {
+                showFlash("🌾 Нужна мотыга, чтобы вспахать землю!", 1.5);
+                addFloatingText("Нужна мотыга! 🌾", cell.px, cell.py - 12, "rgba(239, 68, 68, ALPHA)", 13);
+                addEmote("❓", player.centerX, player.centerY - 22, 1.2);
+                return;
+            }
             r = farm.till(cell.col, cell.row);
-            if (r.ok) addFloatingText("🪓 Вспахано", cell.px, cell.py - 12, "rgba(200, 180, 140, ALPHA)");
+            if (r.ok) {
+                addFloatingText("🪓 Вспахано", cell.px, cell.py - 12, "rgba(200, 180, 140, ALPHA)");
+                if (skills) skills.addXp("farming", 4);
+            }
         } else if (act === "plant") {
             let chosenSeed = null;
             let chosenCrop = "veg";
             const seedTypes = [
-                { seed: "seeds", crop: "veg" },
-                { seed: "seeds_strawberry", crop: "strawberry" },
-                { seed: "seeds_tomato", crop: "tomato" },
-                { seed: "seeds_corn", crop: "corn" },
-                { seed: "seeds_pumpkin", crop: "pumpkin" },
-                { seed: "seeds_wheat", crop: "wheat" }
+                { seed: "seed_strawberry", crop: "strawberry" },
+                { seed: "seed_tomato", crop: "tomato" },
+                { seed: "seed_corn", crop: "corn" },
+                { seed: "seed_pumpkin", crop: "pumpkin" },
+                { seed: "seed_wheat", crop: "wheat" },
+                { seed: "seeds", crop: "veg" }
             ];
             for (const st of seedTypes) {
                 if (resources.count(st.seed) > 0) {
@@ -412,15 +426,23 @@
                 if (r.ok && r.consumeSeed) {
                     resources.remove(chosenSeed, 1);
                     addFloatingText(`🌱 Посажено: ${chosenCrop}`, cell.px, cell.py - 12, "rgba(120, 240, 140, ALPHA)");
+                    if (skills) skills.addXp("farming", 6);
                 }
             } else {
                 r = farm.plant(cell.col, cell.row, dayCount, 0, "veg");
             }
         } else if (act === "water") {
+            if (!tools || !tools.has("can")) {
+                showFlash("🪣 Нужна лейка, чтобы полить посевы!", 1.5);
+                addFloatingText("Нужна лейка! 🪣", cell.px, cell.py - 12, "rgba(239, 68, 68, ALPHA)", 13);
+                addEmote("❓", player.centerX, player.centerY - 22, 1.2);
+                return;
+            }
             r = farm.water(cell.col, cell.row, dayCount);
             if (r.ok) {
                 addFloatingText("💧 Полит", cell.px, cell.py - 12, "rgba(56, 189, 248, ALPHA)");
                 addEmote("💧", cell.px, cell.py - 24, 1.2);
+                if (skills) skills.addXp("farming", 5);
             }
         } else {
             r = farm.harvest(cell.col, cell.row);
@@ -429,10 +451,12 @@
                 if (tools && tools.level("can") >= 3 && Math.random() < 0.4) {
                     amount += 1;
                 }
+                if (skills) amount += skills.bonus("crop_yield");
                 resources.add(r.crop, amount);
                 r.amount = amount;
                 addFloatingText(`+${amount} ${r.crop}`, cell.px, cell.py - 14, "rgba(255, 215, 0, ALPHA)", 14);
                 addEmote("✨", cell.px, cell.py - 24, 1.4);
+                if (skills) skills.addXp("farming", 15);
             }
         }
         if (r && r.msg) showFlash(r.msg, 1.3);
@@ -441,18 +465,46 @@
 
     // A quick, non-pausing gather. Adds to the bag and gives feedback.
     function gatherFrom(node) {
+        // Strict tool checking
+        if (node.type === "tree" || node.type === "driftwood") {
+            if (!tools || !tools.has("axe")) {
+                showFlash("🪓 Нужен топор, чтобы рубить дерево!", 1.5);
+                addFloatingText("Нужен топор! 🪓", node.px, node.py - 12, "rgba(239, 68, 68, ALPHA)", 13);
+                addEmote("❓", player.centerX, player.centerY - 22, 1.2);
+                return;
+            }
+        } else if (node.type === "rock" || node.type.startsWith("ore_") || node.type === "coal_node" || node.type === "gem_node") {
+            if (!tools || !tools.has("pickaxe")) {
+                showFlash("⛏️ Нужна кирка, чтобы раскалывать породу!", 1.5);
+                addFloatingText("Нужна кирка! ⛏️", node.px, node.py - 12, "rgba(239, 68, 68, ALPHA)", 13);
+                addEmote("❓", player.centerX, player.centerY - 22, 1.2);
+                return;
+            }
+        }
+
         let toolBonus = 0;
         if (tools) {
             if (node.type === "tree" || node.type === "driftwood") toolBonus = tools.level("axe") - 1;
             else if (node.type === "rock" || node.type.startsWith("ore_") || node.type === "coal_node" || node.type === "gem_node") toolBonus = tools.level("pickaxe") - 1;
         }
+        if (skills) {
+            if (node.type === "tree" || node.type === "driftwood") toolBonus += skills.bonus("wood_yield");
+            else if (node.type === "rock" || node.type.startsWith("ore_")) toolBonus += skills.bonus("ore_yield");
+        }
+
         const r = node.hit(toolBonus);
         if (!r) return;
         resources.add(r.res, r.amount);
+
+        if (skills) {
+            if (node.type === "tree" || node.type === "driftwood") skills.addXp("foraging", 8);
+            else if (node.type === "rock" || node.type.startsWith("ore_") || node.type === "coal_node" || node.type === "gem_node") skills.addXp("mining", 10);
+            else skills.addXp("foraging", 5);
+        }
+
         const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[r.res] : null;
         const em = (meta && meta.emoji) || "📦";
         let extra = "";
-        // Foraging bushes sometimes yields a seed for the farm.
         if (node.type === "bush" && Math.random() < 0.5) { resources.add("seeds", 1); extra = " 🌰+1"; }
         showFlash((r.felled ? `${em} +${r.amount} — собрано!` : `${em} +${r.amount}`) + extra, 1.2);
         addFloatingText(`+${r.amount} ${em}`, node.px, node.py - 12, "rgba(100, 255, 120, ALPHA)");
@@ -460,14 +512,21 @@
         refreshStats();
     }
 
-    // Fishing at the pond or ocean beach: casts a line and hooks a catch.
+    // Fishing at the pond or ocean beach
     function fishAtPond(isOcean = false) {
+        if (!tools || !tools.has("rod")) {
+            showFlash("🎣 Нужна удочка, чтобы рыбачить!", 1.5);
+            addFloatingText("Нужна удочка! 🎣", player.centerX, player.centerY - 16, "rgba(239, 68, 68, ALPHA)", 13);
+            addEmote("❓", player.centerX, player.centerY - 22, 1.2);
+            return;
+        }
         const rodLv = tools ? tools.level("rod") : 1;
         const fishSys = fishing || new FishingSystem();
         const res = fishSys.catchFish(rodLv, isOcean);
         resources.add(res.res, res.amount);
         if (res.bonus) resources.add(res.bonus.res, res.bonus.amount);
         hero.addExperience(res.xp || 5);
+        if (skills) skills.addXp("fishing", 12);
         const extra = res.bonus ? ` и со дна: ${res.bonus.emoji} ${res.bonus.name}` : "";
         showFlash(`🎣 ${res.msg}${extra} (+${res.xp || 5}✨)`, 2);
         addFloatingText(`+${res.amount} ${res.res}`, player.centerX, player.centerY - 16, "rgba(56, 189, 248, ALPHA)", 13);
@@ -497,18 +556,7 @@
             showFlash(`🪜 Вы спустились на ярус ${nextFl} глубоких шахт.`, 2);
             return;
         }
-        if (it.action === "mine_ascend") {
-            if (mines && mines.floor > 1) {
-                const prevFl = mines.ascend();
-                loadZone(`mine_floor_${prevFl}`);
-                showFlash(`🪜 Вы поднялись на ярус ${prevFl}.`, 1.5);
-            } else {
-                if (mines) mines.reset();
-                loadZone("cave", { col: 9, row: 5 });
-                showFlash(`🌲 Вы вышли из шахты в пещеру.`, 1.5);
-            }
-            return;
-        }
+
         paused = true;
         const dispatch = {
             shop: V2Menus.shop,
@@ -524,7 +572,9 @@
             ranch: V2Menus.ranch,
             smelt: V2Menus.smelt,
             decor: V2Menus.decor,
-            mines: V2Menus.mines
+            mines: V2Menus.mines,
+            skills: V2Menus.skills,
+            homestead: V2Menus.homestead
         };
         const open = dispatch[it.action];
         if (open) { open(menuCtx); return; }
@@ -538,141 +588,133 @@
         const curWeather = weather ? weather.getWeather(dayCount) : null;
         const isRain = curWeather && curWeather.isRain;
         const isWinter = weather ? (weather.getSeason(dayCount).id === "winter") : false;
-        farm.onNewDay(dayCount, isRain);
-        social.setDay(dayCount);
-        if (ranch) ranch.onNewDay(dayCount, isWinter);
-        if (isRain) {
-            showFlash(`🌧️ Дождь полил все грядки в долине!`, 2.5);
-        }
-    }
 
-    /**
-     * Sleeping in your own bed ends the day: the clock jumps to next morning,
-     * crops advance, and the hero wakes up rested. The one way to skip a night.
-     */
-    function sleepUntilMorning() {
-        const nextDay = dayCount + 1;
-        clockMin = 8 * 60;
-        onDawn(nextDay);
-        hero.health = hero.maxHealth;
-        if (hero.maxEnergy) hero.energy = hero.maxEnergy;
-        const seasonInfo = weather ? weather.getSeason(dayCount) : null;
-        const seasonStr = seasonInfo ? ` · ${seasonInfo.emoji} ${seasonInfo.name}` : "";
-        showFlash(`😴 Выспался. Наступил день ${dayCount}${seasonStr}.`, 2);
-        refreshStats();
-        input.consumePressed();
-    }
+        if (ranch) ranch.onDawn();
 
-    function respawnHero() {
-        player.x = mapData.spawn.col * mapData.tileSize + 6;
-        player.y = mapData.spawn.row * mapData.tileSize + 6;
-        input.consumePressed();
-    }
-
-    function openEncounter(foe) {
-        paused = true;
-        openBattle(hero, foe.kind, hero.level, {
-            onWin(bc) {
-                journal.onEnemyDefeated(bc.enemy);   // advance side quests
-                foe.alive = false;          // defeated foe leaves the map
-                respawnHero();
-                refreshStats();
-                paused = false;
-            },
-            onFlee() {
-                foe.x = foe.homeX; foe.y = foe.homeY;
-                respawnHero();
-                paused = false;
-            },
-            onLose() {
-                // Full heal + respawn: a forgiving overworld defeat for the prototype.
-                hero.health = hero.maxHealth;
-                foe.x = foe.homeX; foe.y = foe.homeY;
-                respawnHero();
-                paused = false;
+        // Advance growing plots
+        farm.onDawn((c, r) => {
+            if (isRain && !isWinter) {
+                farm.water(c, r, dayCount);
             }
         });
     }
+
     function closeInteraction() {
-        paused = false;
         overlay.classList.add("hidden");
+        overlayBody.innerHTML = "";
+        paused = false;
         refreshStats();
-        input.consumePressed();
+        if (input && input.consumePressed) input.consumePressed();
     }
     overlayClose.addEventListener("click", closeInteraction);
-
-    function describe(action) {
-        switch (action) {
-            case "npc": return "Староста ждёт вестей о подземелье. Здесь начнутся диалоги и главный квест.";
-            case "shop": return "Лавка торговца — покупка и продажа снаряжения, рыбы и семян.";
-            case "forge": return "Кузница — улучшение снаряжения и рабочих инструментов.";
-            case "dungeon": return "Врата испытаний — вход в процедурное подземелье.";
-            case "quests": return "Доска квестов — побочные и спутниковые задания.";
-            case "storage": return "Домашний сундук — здесь хранятся припасы.";
-            case "sleep": return "Кровать — поспать до утра.";
-            case "cooking": return "Очаг — приготовление сытных блюд и целебных отваров.";
-            case "fishing": return "Пруд — ловля рыбы на удочку.";
-            default: return "Точка интереса.";
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !overlay.classList.contains("hidden")) {
+            closeInteraction();
         }
-    }
+        // Hotbar shortcuts 1..6
+        if (tools && !paused && e.key >= "1" && e.key <= "6") {
+            tools.setActiveSlot(parseInt(e.key, 10) - 1);
+            refreshStats();
+        }
+    });
 
     function escapeText(s) {
-        return (typeof escapeHtml === "function") ? escapeHtml(s) : String(s);
+        return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // ---- day/night lighting -------------------------------------------------
-    // Keyframes by hour: overlay tint {r,g,b} and alpha. Interpolated + wrapped.
-    const LIGHT_KEYS = [
-        { h: 0,  a: 0.60, r: 16, g: 20, b: 58 },   // deep night
-        { h: 5,  a: 0.52, r: 24, g: 26, b: 72 },
-        { h: 6.5, a: 0.30, r: 150, g: 90, b: 70 },  // dawn (warm)
-        { h: 8,  a: 0.0,  r: 0, g: 0, b: 0 },       // morning
-        { h: 17, a: 0.0,  r: 0, g: 0, b: 0 },       // day
-        { h: 18.5, a: 0.30, r: 180, g: 95, b: 40 }, // dusk (orange)
-        { h: 20, a: 0.44, r: 44, g: 36, b: 82 },
-        { h: 22, a: 0.60, r: 16, g: 20, b: 58 },
-        { h: 24, a: 0.60, r: 16, g: 20, b: 58 }
-    ];
-    function lightingFor(min) {
-        const h = min / 60;
-        let a = LIGHT_KEYS[0], b = LIGHT_KEYS[LIGHT_KEYS.length - 1];
-        for (let i = 0; i < LIGHT_KEYS.length - 1; i++) {
-            if (h >= LIGHT_KEYS[i].h && h <= LIGHT_KEYS[i + 1].h) { a = LIGHT_KEYS[i]; b = LIGHT_KEYS[i + 1]; break; }
-        }
-        const span = (b.h - a.h) || 1, t = Math.min(1, Math.max(0, (h - a.h) / span));
-        const lerp = (x, y) => Math.round(x + (y - x) * t);
-        const alpha = a.a + (b.a - a.a) * t;
-        return { r: lerp(a.r, b.r), g: lerp(a.g, b.g), b: lerp(a.b, b.b), a: alpha, night: Math.min(1, alpha / 0.6) };
+    function describe(action) {
+        const d = {
+            shop: "Добро пожаловать в деревенскую лавку! Здесь можно купить снаряжение и продать добычу.",
+            forge: "Жаркий горн и наковальня. Кузнец готов улучшить твоё оружие за золото и эссенции.",
+            quests: "Доска заданий: жители деревни просят о помощи.",
+            npc: "Житель деревни приветливо кивает тебе.",
+            dungeon: "Древние врата ведут в процедурные подземелья с опасными монстрами и сокровищами.",
+            well: "Глубокий колодец со студёной водой."
+        };
+        return d[action] || "Интерактивный объект.";
     }
+
+    function lightingFor(min) {
+        const dawn = 6 * 60, noon = 12 * 60, dusk = 19 * 60, night = 22 * 60;
+        let r = 255, g = 255, b = 255, a = 0, nightRatio = 0;
+        if (min >= night || min < dawn) {
+            r = 15; g = 20; b = 50; a = 0.58; nightRatio = 1.0;
+        } else if (min >= dawn && min < noon) {
+            const t = (min - dawn) / (noon - dawn);
+            r = 255; g = Math.round(200 + 55 * t); b = Math.round(160 + 95 * t); a = 0.28 * (1 - t);
+            nightRatio = 0.4 * (1 - t);
+        } else if (min >= noon && min < dusk) {
+            a = 0; nightRatio = 0;
+        } else {
+            const t = (min - dusk) / (night - dusk);
+            r = Math.round(255 - 240 * t); g = Math.round(180 - 160 * t); b = Math.round(140 - 90 * t); a = 0.58 * t;
+            nightRatio = t;
+        }
+        return { r, g, b, a, night: nightRatio };
+    }
+
     function clockLabel(min) {
-        const h = Math.floor(min / 60), m = Math.floor(min % 60);
-        const icon = (h >= 6 && h < 8) ? "🌅" : (h >= 8 && h < 18) ? "☀️" : (h >= 18 && h < 20) ? "🌇" : "🌙";
+        const h = Math.floor(min / 60);
+        const m = Math.floor(min % 60);
+        const icon = (h >= 6 && h < 19) ? "☀️" : (h >= 19 && h < 22) ? "🌅" : "🌙";
         return `${icon} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     }
 
     function update(dt) {
         const prev = clockMin;
         clockMin = (clockMin + dt * MIN_PER_SEC) % 1440;
-        if (clockMin < prev) { onDawn(dayCount + 1); }  // dawn → new day
+        if (clockMin < prev) { onDawn(dayCount + 1); }
         social.setDay(dayCount);
         if (flashT > 0) flashT = Math.max(0, flashT - dt);
         if (paused) return;
-        // Open the backpack/equipment panel anywhere with I.
+
+        // Hotbar selection shortcuts 1..6
+        if (input.wasPressed("Digit1") || input.wasPressed("Numpad1")) { tools.setActiveSlot(0); refreshStats(); }
+        if (input.wasPressed("Digit2") || input.wasPressed("Numpad2")) { tools.setActiveSlot(1); refreshStats(); }
+        if (input.wasPressed("Digit3") || input.wasPressed("Numpad3")) { tools.setActiveSlot(2); refreshStats(); }
+        if (input.wasPressed("Digit4") || input.wasPressed("Numpad4")) { tools.setActiveSlot(3); refreshStats(); }
+        if (input.wasPressed("Digit5") || input.wasPressed("Numpad5")) { tools.setActiveSlot(4); refreshStats(); }
+        if (input.wasPressed("Digit6") || input.wasPressed("Numpad6")) { tools.setActiveSlot(5); refreshStats(); }
+
+        // Open backpack/equipment with I
         if (input.wasPressed("KeyI")) {
             paused = true;
             V2Menus.inventory(menuCtx);
             input.consumePressed();
             return;
         }
-        // Edge-triggered interaction.
+
+        // Open Skills Panel with K
+        if (input.wasPressed("KeyK")) {
+            paused = true;
+            V2Menus.skills(menuCtx);
+            input.consumePressed();
+            return;
+        }
+
+        // Open Character Customization with C
+        if (input.wasPressed("KeyC")) {
+            paused = true;
+            V2Menus.charCreation(menuCtx);
+            input.consumePressed();
+            return;
+        }
+
+        // Open Homestead Panel with H
+        if (input.wasPressed("KeyH")) {
+            paused = true;
+            V2Menus.homestead(menuCtx);
+            input.consumePressed();
+            return;
+        }
+
+        // Edge-triggered interaction
         if ((input.wasPressed("KeyE") || input.wasPressed("Enter") || input.wasPressed("Space")) && nearest) {
-            // Hold on to the selection: entering a door reloads the zone and
-            // clears `nearest` underneath us.
             const sel = nearest;
             if (sel.kind === "resource") {
-                gatherFrom(sel.target);          // quick action, keep playing
+                gatherFrom(sel.target);
             } else if (sel.kind === "farm") {
-                workPlot(sel.target);            // quick action, keep playing
+                workPlot(sel.target);
             } else {
                 openInteraction(sel);
             }
@@ -683,7 +725,7 @@
 
         player.update(dt, input.axis(), tilemap);
         for (const e of enemies) e.update(dt, tilemap);
-        for (const n of npcs) n.update(dt, tilemap, clockMin);
+        for (const n of npcs) n.update(dt, tilemap, clockMin, player.box);
         for (const r of resourceNodes) r.update(dt);
 
         for (let i = floatingTexts.length - 1; i >= 0; i--) {
@@ -699,22 +741,20 @@
         camera.follow(player.centerX, player.centerY, tilemap.pixelWidth, tilemap.pixelHeight);
         nearest = findNearest();
 
-        // Walking onto a portal tile travels to the linked zone.
+        // Walking onto a portal tile travels to linked zone
         const pcol = tilemap.colAtPixel(player.centerX);
         const prow = tilemap.rowAtPixel(player.centerY);
         for (const p of portals) {
             if (p.col === pcol && p.row === prow) { loadZone(p.to, p.spawn); return; }
         }
 
-        // Bumping into a roaming foe triggers an encounter.
+        // Bumping into a roaming foe triggers an encounter
         const foe = detectEncounter(player.box, enemies);
         if (foe) openEncounter(foe);
     }
 
     function render() {
-        // Indoor zones (the cave) ignore the outdoor day/night lighting.
         const indoor = !!mapData.indoor;
-        // Lamp-lit rooms get a gentle warm wash; the cave stays plain dark.
         const light = indoor
             ? (mapData.warm ? { r: 255, g: 176, b: 88, a: 0.12, night: 0 } : { a: 0, night: 0 })
             : lightingFor(clockMin);
@@ -752,16 +792,39 @@
             renderer.drawFloatingTexts(floatingTexts, camera);
         }
 
+        // Contextual floating action prompt over interacted target
+        if (nearest && nearest.target && typeof nearest.target.px === "number") {
+            const sc = camera.worldToScreen(nearest.target.px, nearest.target.py);
+            ctx.save();
+            ctx.font = "bold 11px sans-serif";
+            const text = `[E] ${nearest.label}`;
+            const tw = ctx.measureText(text).width;
+            const px = Math.max(tw / 2 + 6, Math.min(camera.viewW - tw / 2 - 6, sc.x));
+            const py = Math.max(16, sc.y - 24);
+
+            ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+            ctx.strokeStyle = "#eab308";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(px - tw / 2 - 8, py - 10, tw + 16, 20, 10);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#fef08a";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, px, py);
+            ctx.restore();
+        }
+
         if (flashT > 0) {
             hud.textContent = flash;
             hud.classList.add("active");
         } else {
             const weatherBadge = curW ? ` ${curW.emoji}` : "";
             const seasonBadge = curSeason ? `${curSeason.emoji} ` : "";
-            hud.textContent = nearest
-                ? `Нажми E — ${nearest.emoji} ${nearest.label}`
-                : `📍 ${zoneName} · ${seasonBadge}${curSeason ? curSeason.name : "Сезон"} (День ${dayCount}) ·${weatherBadge} ${clockLabel(clockMin)} · E — действие · I — рюкзак`;
-            hud.classList.toggle("active", !!nearest);
+            hud.textContent = `📍 ${zoneName} · ${seasonBadge}${curSeason ? curSeason.name : "Сезон"} (День ${dayCount}) ·${weatherBadge} ${clockLabel(clockMin)} · E — действие · I — рюкзак`;
+            hud.classList.remove("active");
         }
     }
 
@@ -769,11 +832,12 @@
     const loop = new Loop(update, render);
     loop.start();
 
-    // Expose for debugging / future bridging.
+    // Start in village
+    loadZone("village");
+
+    // Expose for testing and debugging
     window.__v2 = {
         player, camera, input, loop,
-        // `tilemap`/`mapData` are rebuilt on every zone change — expose them
-        // as getters so the handle never points at a stale map.
         get tilemap() { return tilemap; },
         get mapData() { return mapData; },
         social, resources, farm, weather,
@@ -786,8 +850,8 @@
         get emotes() { return emotes; },
         addFloatingText, addEmote,
         requests, storage, tools, cooking, fishing,
-        ranch, smelting, decor, mines,
-        sleepUntilMorning, fishAtPond,
+        ranch, smelting, decor, mines, skills, homestead,
+        sleepUntilMorning, fishAtPond, closeInteraction,
         get zone() { return zoneName; },
         get clock() { return clockMin; },
         get day() { return dayCount; }

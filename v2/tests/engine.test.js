@@ -1375,3 +1375,221 @@ describe("Visual & UI Renaissance System", () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Skills & Masteries Progression System
+// ---------------------------------------------------------------------------
+describe("Skills & Masteries Progression System", () => {
+    it("defines 6 mastery disciplines with leveling curves and perks", () => {
+        const { SKILL_DEFS, SkillsSystem } = loadEngine().exports;
+        expect(!!SKILL_DEFS).toBe(true);
+        const keys = Object.keys(SKILL_DEFS);
+        expect(keys.length).toBe(6);
+        expect(keys.includes("farming")).toBe(true);
+        expect(keys.includes("mining")).toBe(true);
+        expect(keys.includes("foraging")).toBe(true);
+        expect(keys.includes("fishing")).toBe(true);
+        expect(keys.includes("combat")).toBe(true);
+        expect(keys.includes("magic")).toBe(true);
+
+        const skills = new SkillsSystem();
+        for (const k of keys) {
+            expect(skills.getLevel(k)).toBe(1);
+            expect(skills.getXp(k)).toBe(0);
+        }
+    });
+
+    it("earns XP and levels up with milestone perk points", () => {
+        const { SkillsSystem } = loadEngine().exports;
+        const skills = new SkillsSystem();
+        expect(skills.getLevel("farming")).toBe(1);
+        const res1 = skills.addXp("farming", 50);
+        expect(res1.leveledUp).toBe(false);
+        expect(skills.getXp("farming")).toBe(50);
+
+        // Level up past threshold (100 xp)
+        const res2 = skills.addXp("farming", 60);
+        expect(res2.leveledUp).toBe(true);
+        expect(res2.newLevel).toBe(2);
+        expect(skills.getLevel("farming")).toBe(2);
+    });
+
+    it("unlocks perks and computes active passive bonuses", () => {
+        const { SkillsSystem } = loadEngine().exports;
+        const skills = new SkillsSystem();
+        // Give enough XP to reach level 5
+        skills.addXp("farming", 1000);
+        expect(skills.getLevel("farming") >= 4).toBe(true);
+
+        // Unlock green_thumb perk
+        const unlockRes = skills.unlockPerk("farming", "green_thumb");
+        expect(unlockRes.ok).toBe(true);
+        expect(skills.hasPerk("farming", "green_thumb")).toBe(true);
+
+        // Check bonuses
+        const bonuses = skills.getAllBonuses();
+        expect(bonuses.doubleHarvest > 0).toBe(true);
+    });
+
+    it("serializes and restores skill progress", () => {
+        const { SkillsSystem } = loadEngine().exports;
+        const skills = new SkillsSystem();
+        skills.addXp("mining", 300);
+        skills.unlockPerk("mining", "geologist");
+
+        const data = skills.serialize();
+        const restored = new SkillsSystem(data);
+        expect(restored.getLevel("mining")).toBe(skills.getLevel("mining"));
+        expect(restored.getXp("mining")).toBe(skills.getXp("mining"));
+        expect(restored.hasPerk("mining", "geologist")).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Character Creation, Origins & Multiplayer Sync Packet
+// ---------------------------------------------------------------------------
+describe("Character Creation, Origins & Multiplayer Sync Packet", () => {
+    it("defines 5 starter origins with distinct descriptions and starter gear", () => {
+        const { ORIGINS, CharCreation } = loadEngine().exports;
+        const originKeys = Object.keys(ORIGINS);
+        expect(originKeys.length).toBe(5);
+        expect(originKeys.includes("farmer")).toBe(true);
+        expect(originKeys.includes("warrior")).toBe(true);
+        expect(originKeys.includes("mage")).toBe(true);
+        expect(originKeys.includes("smith")).toBe(true);
+        expect(originKeys.includes("wanderer")).toBe(true);
+
+        for (const k of originKeys) {
+            const org = ORIGINS[k];
+            expect(typeof org.name).toBe("string");
+            expect(typeof org.desc).toBe("string");
+            expect(Array.isArray(org.starterItems)).toBe(true);
+        }
+    });
+
+    it("creates custom character profile and applies origin bonuses", () => {
+        const { CharCreation, CharacterProfile } = loadEngine().exports;
+        const profile = CharCreation.createProfile({
+            name: "Радомир",
+            gender: "masculine",
+            origin: "farmer",
+            hairStyle: "crop",
+            hairColor: "#5c3317",
+            shirtColor: "#2e5c8a",
+            pantsColor: "#2c3e50"
+        });
+
+        expect(profile instanceof CharacterProfile).toBe(true);
+        expect(profile.name).toBe("Радомир");
+        expect(profile.origin).toBe("farmer");
+
+        // Mock hero and bag
+        const mockHero = { maxHealth: 100, health: 100, maxEnergy: 100, energy: 100, gold: 50 };
+        const mockBag = { items: {}, add(k, n) { this.items[k] = (this.items[k] || 0) + n; } };
+        CharCreation.applyOrigin(profile, mockHero, mockBag);
+
+        expect(mockHero.maxEnergy).toBe(120);
+        expect(mockBag.items["seeds"]).toBe(8);
+    });
+
+    it("serializes and deserializes multiplayer world sync packets", () => {
+        const { WorldSyncPacket } = loadEngine().exports;
+        const packet = WorldSyncPacket.createStatePacket({
+            playerId: "player-alpha-1",
+            zone: "village",
+            x: 240,
+            y: 320,
+            facing: "down",
+            moving: true,
+            frame: 2,
+            action: "swing_axe"
+        });
+
+        const json = WorldSyncPacket.serialize(packet);
+        expect(typeof json).toBe("string");
+        const parsed = WorldSyncPacket.deserialize(json);
+        expect(parsed.valid).toBe(true);
+        expect(parsed.data.playerId).toBe("player-alpha-1");
+        expect(parsed.data.zone).toBe("village");
+        expect(parsed.data.x).toBe(240);
+        expect(parsed.data.action).toBe("swing_axe");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Homestead Upgrades & Community Restoration Projects
+// ---------------------------------------------------------------------------
+describe("Homestead Upgrades & Community Restoration Projects", () => {
+    it("defines house expansion tiers and upgrades smoothly", () => {
+        const { HOUSE_TIERS, HomesteadSystem } = loadEngine().exports;
+        expect(HOUSE_TIERS.length).toBe(3);
+        expect(HOUSE_TIERS[0].name).toBe("Уютная лесная избушка");
+        expect(HOUSE_TIERS[1].name).toBe("Деревенская усадьба");
+        expect(HOUSE_TIERS[2].name).toBe("Боярские хоромы");
+
+        const hs = new HomesteadSystem();
+        expect(hs.tier).toBe(1);
+        expect(hs.maxGardenPlots).toBe(8);
+
+        // Upgrade to tier 2 with mock bag and gold
+        const mockBag = { count: () => 100, remove: () => true };
+        const mockHero = { gold: 5000 };
+        const res = hs.upgradeHouse(mockBag, (cost) => { mockHero.gold -= cost; return true; });
+        expect(res.ok).toBe(true);
+        expect(hs.tier).toBe(2);
+        expect(hs.maxGardenPlots).toBe(16);
+    });
+
+    it("tracks Starosta community restoration projects and completion", () => {
+        const { COMMUNITY_PROJECTS, HomesteadSystem } = loadEngine().exports;
+        const projectKeys = Object.keys(COMMUNITY_PROJECTS);
+        expect(projectKeys.length >= 4).toBe(true);
+        expect(projectKeys.includes("bridge_fix")).toBe(true);
+        expect(projectKeys.includes("lanterns")).toBe(true);
+        expect(projectKeys.includes("windmill")).toBe(true);
+        expect(projectKeys.includes("greenhouse")).toBe(true);
+
+        const hs = new HomesteadSystem();
+        expect(hs.isProjectCompleted("bridge_fix")).toBe(false);
+
+        // Contribute materials
+        const mockBag = { count: () => 100, remove: () => true };
+        const contribRes = hs.contributeProject("bridge_fix", mockBag, () => true);
+        expect(contribRes.ok).toBe(true);
+        expect(hs.isProjectCompleted("bridge_fix")).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Hotbar & Realistic Tool System
+// ---------------------------------------------------------------------------
+describe("Hotbar & Realistic Tool System", () => {
+    it("supports 6 hotbar slots and active tool switching", () => {
+        const { Tools } = loadEngine().exports;
+        const t = new Tools();
+        expect(t.has("pickaxe")).toBe(true);
+        expect(t.has("axe")).toBe(true);
+        expect(t.has("hoe")).toBe(true);
+        expect(t.has("rod")).toBe(true);
+        expect(t.has("can")).toBe(true);
+
+        expect(t.activeSlot).toBe(0);
+        expect(t.getActiveToolKey()).toBe("axe");
+
+        t.setActiveSlot(1);
+        expect(t.activeSlot).toBe(1);
+        expect(t.getActiveToolKey()).toBe("pickaxe");
+
+        t.setActiveSlot(2);
+        expect(t.getActiveToolKey()).toBe("hoe");
+    });
+
+    it("strictly verifies required tool and level for tasks", () => {
+        const { Tools } = loadEngine().exports;
+        const t = new Tools();
+        expect(t.require("axe", 1)).toBe(true);
+        expect(t.require("axe", 2)).toBe(false); // only tier 1 initially
+        expect(t.require("sword", 1)).toBe(false); // sword not in basic tool set
+    });
+});
+
+

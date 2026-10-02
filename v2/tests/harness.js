@@ -29,6 +29,9 @@ const FILES = [
     "js/world/animals.js",
     "js/world/mines.js",
     "js/world/decor.js",
+    "js/world/skills.js",
+    "js/world/character_creation.js",
+    "js/world/homestead.js",
     "js/world/requests.js",
     "js/world/maps.js",
     "js/entities/mover.js",
@@ -57,6 +60,9 @@ const EXPORTED = [
     "ANIMAL_TYPES", "FarmAnimal", "RanchSystem",
     "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
     "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem",
+    "SKILL_DEFS", "SkillsSystem",
+    "ORIGINS", "CharCreation", "CharacterProfile", "WorldSyncPacket",
+    "HOUSE_TIERS", "COMMUNITY_PROJECTS", "HomesteadSystem",
     "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP",
     "Furniture", "MobRig", "TileArt", "BuildingArt", "Portraits"
 ];

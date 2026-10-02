@@ -165,13 +165,14 @@ describe("v2 smoke › playing", () => {
         const g = boot();
         g.tick(16.7);
         g.v2.resources.add("wood", 5);
-        g.v2.storage.add("wood", 0);
         const bag = g.v2.resources.count("wood");
+        const initialStorage = g.v2.storage.count("wood");
         g.v2.resources.remove("wood", bag); g.v2.storage.add("wood", bag);
-        expect(g.v2.storage.count("wood")).toBe(bag);
+        expect(g.v2.storage.count("wood")).toBe(initialStorage + bag);
         expect(g.v2.resources.count("wood")).toBe(0);
         g.v2.storage.remove("wood", bag); g.v2.resources.add("wood", bag);
         expect(g.v2.resources.count("wood")).toBe(bag);
+        expect(g.v2.storage.count("wood")).toBe(initialStorage);
     });
 
     it("fishes at the village pond with E and adds fish to the bag", () => {
@@ -421,6 +422,54 @@ describe("v2 smoke › playing", () => {
 
         g.v2.addFloatingText("+50 Gold", 120, 140);
         expect(g.v2.floatingTexts[g.v2.floatingTexts.length - 1].text).toBe("+50 Gold");
+    });
+
+    it("switches hotbar tools with numeric keys 1-6", () => {
+        const g = boot();
+        g.tick(16.7);
+        expect(g.v2.tools.activeSlot).toBe(0);
+        expect(g.v2.tools.getActiveToolKey()).toBe("axe");
+
+        g.tap("Digit2");
+        g.tick(16.7);
+        expect(g.v2.tools.activeSlot).toBe(1);
+        expect(g.v2.tools.getActiveToolKey()).toBe("pickaxe");
+
+        g.tap("Digit3");
+        g.tick(16.7);
+        expect(g.v2.tools.activeSlot).toBe(2);
+        expect(g.v2.tools.getActiveToolKey()).toBe("hoe");
+
+        g.tap("Digit4");
+        g.tick(16.7);
+        expect(g.v2.tools.activeSlot).toBe(3);
+        expect(g.v2.tools.getActiveToolKey()).toBe("can");
+
+        g.tap("Digit5");
+        g.tick(16.7);
+        expect(g.v2.tools.activeSlot).toBe(4);
+        expect(g.v2.tools.getActiveToolKey()).toBe("rod");
+    });
+
+    it("opens skills & masteries panel and character creator modal", () => {
+        const g = boot();
+        g.tick(16.7);
+
+        // Open Skills Panel
+        g.tap("KeyK");
+        g.tick(16.7);
+        let overlay = g.html("overlayBody");
+        expect(overlay.includes("Мастерство") || overlay.includes("Земледелие") || overlay.includes("Навыки")).toBe(true);
+
+        // Close Skills Panel
+        g.v2.closeInteraction();
+        g.tick(16.7);
+
+        // Open Character Customization Modal
+        g.tap("KeyC");
+        g.tick(16.7);
+        overlay = g.html("overlayBody");
+        expect(overlay.includes("Создание героя") || overlay.includes("призвание") || overlay.includes("Земледелец")).toBe(true);
     });
 
     it("survives a long session: 400 frames across the day/night cycle", () => {

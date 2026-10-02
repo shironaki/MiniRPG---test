@@ -212,6 +212,10 @@ class RanchSystem {
         }
     }
 
+    onDawn(day, isWinter = false) {
+        this.onNewDay(day, isWinter);
+    }
+
     serialize() {
         return this.animals.map(a => ({
             id: a.id,

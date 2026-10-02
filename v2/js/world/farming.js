@@ -109,6 +109,10 @@ class Farm {
         }
     }
 
+    onDawn(day, isRaining = false) {
+        this.onNewDay(day, isRaining);
+    }
+
     // Contextual label + the action a single E-press performs on this plot.
     actionFor(col, row) {
         const p = this.plot(col, row);

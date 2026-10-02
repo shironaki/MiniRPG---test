@@ -74,6 +74,7 @@ engine/vec.js  engine/input.js  engine/camera.js  engine/loop.js
 world/tiles.js world/tilemap.js world/weather.js world/social.js world/resources.js
 world/farming.js world/fishing.js world/cooking.js world/tools.js
 world/animals.js world/mines.js world/decor.js
+world/skills.js world/character_creation.js world/homestead.js
 world/requests.js world/maps.js
 entities/mover.js entities/player.js entities/enemy.js entities/npc.js
 battle/battle2d.js battle/battleui.js
@@ -109,7 +110,10 @@ main.js
 | `decor.js` | `DecorSystem`, `FLOOR_STYLES`, `WALL_STYLES`, `DECOR_CATALOG`: кастомизация стен и полов, каталог декоративной мебели |
 | `fishing.js` | `FishingSystem`, `FISH_TABLE`, `OCEAN_FISH_TABLE`: ловля пресноводной рыбы в пруду (окунь, карп, щука, раки) и морской рыбы на побережье (камбала, тунец, омар, жемчуг), влияние удочки, шансы сокровищ |
 | `cooking.js` | `CookingSystem`, `RECIPES`: домашняя готовка и кулинарные деликатесы (омлет, блинчики, сыр, стейк, золотой сидр, похлёбка, уха, пирог, варенье, паста) |
-| `tools.js` | `Tools`, `TOOL_TIERS`: уровни и прокачка удочки, топора, кирки и лейки в кузнице |
+| `tools.js` | `Tools`, `TOOL_TIERS`, `HOTBAR_SLOTS`: уровни и прокачка инструментов (топор, кирка, мотыга, лейка, удочка), активный хотбар слотов 1–6, строгая валидация требований |
+| `skills.js` | `SkillsSystem`, `SKILL_DEFS`: 6 деревьев мастерства (земледелие, горное дело, собирательство, рыболовство, боевые искусства, магия) с прогрессией уровней 1–10 и талантами |
+| `character_creation.js` | `CharCreation`, `CharacterProfile`, `ORIGINS`: настройка внешности персонажа, 5 стартовых призваний (Земледелец, Воин, Маг, Кузнец, Путник) и контракт сетевых пакетов `WorldSyncPacket` |
+| `homestead.js` | `HomesteadSystem`, `HOUSE_TIERS`, `COMMUNITY_PROJECTS`: ранги расширения дома (избушка → усадьба → хоромы), лимиты грядок и проекты восстановления деревни у Старосты |
 | `requests.js` | `Requests`, `REQUEST_POOL`: поручения жителей на ресурсы, продукты, руды, рыбу и блюда за золото и дружбу |
 
 ### 3.3 `entities/` — то, что двигается

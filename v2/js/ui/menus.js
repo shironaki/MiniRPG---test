@@ -617,16 +617,26 @@
                 }).join("")
                 : `<p class="hint">Ресурсы не собраны. Руби деревья 🌳, добывай камень 🪨, лови рыбу 🎣 и собирай урожай 🥕.</p>`;
 
-            paint(`<h2>🎒 Снаряжение</h2>
-                <p class="gold">⚔️ ${ctx.hero.attack} · 🛡️ ${ctx.hero.defense} · ❤️ ${ctx.hero.health}/${ctx.hero.maxHealth} · ⚡ ${ctx.hero.energy}/${ctx.hero.maxEnergy}</p>
+            paint(`<h2>🎒 Рюкзак и снаряжение</h2>
+                <div style="display:flex;gap:6px;margin-bottom:10px;">
+                    <button class="mBtn" data-open-skills="1">⭐ Навыки</button>
+                    <button class="mBtn" data-open-homestead="1">🏡 Усадьба</button>
+                </div>
+                <p class="gold">⚔️ Атака: ${ctx.hero.attack} · 🛡️ Защита: ${ctx.hero.defense} · ❤️ ${ctx.hero.health}/${ctx.hero.maxHealth} · ⚡ ${ctx.hero.energy}/${ctx.hero.maxEnergy}</p>
                 ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
                 <h4 class="mGroup">Экипировка</h4>${eq}
-                <h4 class="mGroup">Рюкзак</h4>${inv}
-                <h4 class="mGroup">Припасы и еда</h4>${res}`, onClick);
+                <h4 class="mGroup">Предметы в рюкзаке</h4>${inv}
+                <h4 class="mGroup">Припасы, урожай и еда</h4>${res}`, onClick);
         }
         function onClick(e) {
             const b = e.target.closest("button"); if (!b) return;
-            if (b.dataset.eq !== undefined) {
+            if (b.dataset.openSkills) {
+                skills(ctx);
+                return;
+            } else if (b.dataset.openHomestead) {
+                homestead(ctx);
+                return;
+            } else if (b.dataset.eq !== undefined) {
                 msg = ctx.hero.equip(ctx.hero.inventory[+b.dataset.eq]).message;
             } else if (b.dataset.uneq) {
                 msg = ctx.hero.unequip(b.dataset.uneq).message;
@@ -1015,6 +1025,180 @@
         render();
     }
 
+    // ---- Skills & Mastery Tree (Навыки и мастерство) --------------------
+    function skills(ctx) {
+        const sSys = ctx.skills || (typeof SkillsSystem !== "undefined" ? new SkillsSystem() : null);
+        function render() {
+            if (!sSys) {
+                paint(`<h2>⭐ Навыки и мастерство</h2><p class="hint">Система навыков пока недоступна.</p>`);
+                return;
+            }
+            const list = sSys.allList();
+            const cards = list.map(sk => {
+                const perksList = Object.keys(sk.perks || {}).map(plv => {
+                    const p = sk.perks[plv];
+                    const unlocked = sk.level >= Number(plv);
+                    return `<div style="font-size:12px;margin:2px 0;opacity:${unlocked ? 1 : 0.55};">
+                        ${unlocked ? "🌟" : "🔒"} <strong>Ур. ${plv} — ${esc(p.name)}:</strong> ${esc(p.desc)}
+                    </div>`;
+                }).join("");
+
+                return `
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid #4a3828;border-radius:8px;padding:10px;margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <strong>${sk.emoji} ${esc(sk.name)}</strong>
+                            <span style="color:#ffd88a;font-weight:bold;">Уровень ${sk.level}/10</span>
+                        </div>
+                        <p style="font-size:12px;margin:0 0 6px 0;color:#cbd5e1;">${esc(sk.desc)}</p>
+                        <div style="background:#1e1e24;height:8px;border-radius:4px;overflow:hidden;margin-bottom:8px;">
+                            <div style="background:linear-gradient(90deg,#eab308,#f59e0b);width:${sk.pct}%;height:100%;"></div>
+                        </div>
+                        <small style="color:#94a3b8;display:block;margin-bottom:6px;">Опыт: ${sk.xp}/${sk.xpNeeded} XP (${sk.pct}%)</small>
+                        <div style="border-top:1px dashed rgba(255,255,255,0.1);padding-top:6px;">
+                            ${perksList}
+                        </div>
+                    </div>`;
+            }).join("");
+
+            paint(`<h2>⭐ Навыки и мастерство героя</h2>
+                <p class="hint">Каждое действие в мире (земледелие, добыча руды, собирательство, рыбалка, бой, магия) совершенствует ваше мастерство и открывает уникальные таланты.</p>
+                <div class="list">${cards}</div>`, () => {});
+        }
+        render();
+    }
+
+    // ---- Homestead & City-Building (Усадьба и развитие) -------------------
+    function homestead(ctx) {
+        let msg = "";
+        const hSys = ctx.homestead || (typeof HomesteadSystem !== "undefined" ? new HomesteadSystem() : null);
+
+        function render() {
+            if (!hSys) {
+                paint(`<h2>🏡 Усадьба</h2><p class="hint">Усадьба пока недоступна.</p>`);
+                return;
+            }
+            const curTier = hSys.getHouseTier();
+            const nextTier = hSys.getNextHouseTier();
+
+            let upgradeBlock = "";
+            if (nextTier) {
+                const cost = nextTier.cost || {};
+                const costParts = [];
+                if (cost.gold) costParts.push(`💰 ${cost.gold}`);
+                if (cost.wood) costParts.push(`🪵 ${cost.wood}`);
+                if (cost.stone) costParts.push(`🪨 ${cost.stone}`);
+                if (cost.bar_copper) costParts.push(`🧱 ${cost.bar_copper} медных слитков`);
+
+                const canUp = hSys.canUpgradeHouse(ctx.hero, ctx.resources).ok;
+                upgradeBlock = `
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid #785a30;border-radius:8px;padding:12px;margin:12px 0;">
+                        <h4 style="margin:0 0 6px 0;color:#ffd88a;">Следующее расширение: «${esc(nextTier.name)}»</h4>
+                        <p style="font-size:13px;margin:0 0 6px 0;">${esc(nextTier.desc)}</p>
+                        <p style="font-size:12px;margin:0 0 8px 0;" class="hint">Вместимость сундука: ${nextTier.chestSlots} ячеек · Доступно грядок: ${nextTier.maxFarmPlots}</p>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <small class="hint">Стоимость: ${costParts.join(" · ")}</small>
+                            <button class="mBtn ${canUp ? "primary" : "ghost"}" data-upgrade-house="1" ${canUp ? "" : "disabled"}>${canUp ? "Улучшить дом" : "Не хватает ресурсов"}</button>
+                        </div>
+                    </div>`;
+            } else {
+                upgradeBlock = `<div class="row" style="border-left:3px solid #22c55e;"><p style="margin:0;">🎉 Ваш дом улучшен до максимального уровня «${esc(curTier.name)}»!</p></div>`;
+            }
+
+            paint(`<h2>🏡 Твоя усадьба и владения</h2>
+                ${msg ? `<p class="flash">${esc(msg)}</p>` : ""}
+                <div class="row">
+                    <div>
+                        <strong>Текущее жилище: «${esc(curTier.name)}»</strong>
+                        <p style="font-size:12px;margin:2px 0;">${esc(curTier.desc)}</p>
+                        <small class="hint">Сундук: ${curTier.chestSlots} ячеек · Грядок в саду: ${hSys.unlockedPlots}</small>
+                    </div>
+                </div>
+                ${upgradeBlock}
+                <h4 class="mGroup">Общинные проекты деревни</h4>
+                <p class="hint">Посетите Доску объявлений на деревенской площади, чтобы помочь жителям восстановить мост, мельницу, фонари и теплицу!</p>`, onClick);
+        }
+
+        function onClick(e) {
+            const b = e.target.closest("button"); if (!b) return;
+            if (b.dataset.upgradeHouse && hSys) {
+                const res = hSys.upgradeHouse(ctx.hero, ctx.resources);
+                if (res.ok) {
+                    msg = `🎉 Усадьба успешно расширена до «${res.name}»! Вместимость и территория увеличены!`;
+                    if (typeof ctx.addEmote === "function") ctx.addEmote("✨");
+                } else {
+                    msg = res.msg || "Ошибка улучшения.";
+                }
+            }
+            ctx.refresh(); render();
+        }
+        render();
+    }
+
+    // ---- Character Creation Modal (Создание персонажа) -------------------
+    function charCreation(ctx, onComplete) {
+        let name = (ctx.hero && ctx.hero.name) || "Любомир";
+        let origin = "wanderer";
+        let hairColor = "#4a321e";
+        let shirtColor = "#3a6080";
+
+        const origins = (typeof ORIGINS !== "undefined") ? ORIGINS : {
+            farmer: { name: "Земледелец", emoji: "🌾", bonusText: "+20 Энергии, мотыга, лейка, семена." },
+            warrior: { name: "Воин", emoji: "⚔️", bonusText: "+25 Здоровья, меч, топор, кирка." },
+            mage: { name: "Чародей", emoji: "🔮", bonusText: "+30 Маны, удочка, целебный чай." },
+            smith: { name: "Кузнец", emoji: "🔨", bonusText: "Медная кирка, топор, руда и уголь." },
+            wanderer: { name: "Путник", emoji: "🧭", bonusText: "+15% скорости, все 5 инструментов." }
+        };
+
+        function render() {
+            const originCards = Object.keys(origins).map(k => {
+                const o = origins[k];
+                const active = origin === k;
+                return `
+                    <div style="background:${active ? "rgba(234,179,8,0.15)" : "rgba(255,255,255,0.03)"};border:2px solid ${active ? "#eab308" : "#4a3828"};border-radius:8px;padding:8px 10px;cursor:pointer;margin-bottom:8px;" data-pick-origin="${k}">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <strong>${o.emoji} ${esc(o.name)}</strong>
+                            <span>${active ? "✅" : "⚪"}</span>
+                        </div>
+                        <small style="color:#cbd5e1;display:block;margin-top:2px;">${esc(o.bonusText || o.desc || "")}</small>
+                    </div>`;
+            }).join("");
+
+            paint(`<h2>✨ Создание героя и выбор пути</h2>
+                <p class="hint">Добро пожаловать в долину! Выберите имя и стартовое призвание вашего персонажа.</p>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:13px;margin-bottom:4px;">Имя героя:</label>
+                    <input type="text" id="ccNameInput" value="${esc(name)}" maxlength="16" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:6px;border:1px solid #785a30;background:#18181f;color:#ffd88a;font-size:14px;">
+                </div>
+                <h4 class="mGroup">Стартовое призвание</h4>
+                ${originCards}
+                <div style="margin-top:16px;text-align:center;">
+                    <button class="mBtn primary" id="ccStartBtn" style="padding:10px 24px;font-size:15px;">Начать приключение 🌟</button>
+                </div>`, onClick);
+        }
+
+        function onClick(e) {
+            const pick = e.target.closest("[data-pick-origin]");
+            if (pick) {
+                origin = pick.dataset.pickOrigin;
+                render();
+                return;
+            }
+            if (e.target.id === "ccStartBtn" || e.target.closest("#ccStartBtn")) {
+                const inp = document.getElementById("ccNameInput");
+                if (inp && inp.value.trim()) name = inp.value.trim();
+
+                const profile = (typeof CharacterProfile !== "undefined")
+                    ? new CharacterProfile({ name, origin, hairColor, shirtColor })
+                    : { name, origin };
+
+                if (typeof onComplete === "function") {
+                    onComplete(profile);
+                }
+            }
+        }
+        render();
+    }
+
     // ---- Deep Mines Entrance (Спуск в шахты) --------------------------------
     function mines(ctx) {
         const mSys = ctx.mines || new MinesSystem();
@@ -1038,5 +1222,5 @@
         }
     }
 
-    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk, storage, cooking, board, well, cat, ranch, smelt, decor, mines };
+    window.V2Menus = { shop, forge, quests, dialogue, dungeon, inventory, townsfolk, storage, cooking, board, well, cat, ranch, smelt, decor, mines, skills, homestead, charCreation };
 })();

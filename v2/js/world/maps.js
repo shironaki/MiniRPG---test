@@ -18,7 +18,7 @@ const MAPS = {
             "T..HHHH.....,......HHHH..T",
             "T....pppppppppppppppppp..T",
             "T.....,.p...PPPPPP,......T",
-            "T.t..wwwp..PPPPPPP,...t,.T",
+            "T....wwwp..PPPPPPP,...t,.T",
             "T....wwwp..PPppppP......,T",
             "T,.t.wwwp..PPppppP..,..t.p",
             "T.,.....p..PPPPPPP...,...T",
@@ -36,8 +36,7 @@ const MAPS = {
         buildings: [
             { col: 3,  row: 2,  w: 4, h: 3, type: "house" },
             { col: 19, row: 2,  w: 4, h: 3, type: "shop" },
-            { col: 3,  row: 12, w: 4, h: 3, type: "forge" },
-            { col: 19, row: 11, w: 3, h: 4, type: "gate" }
+            { col: 3,  row: 12, w: 4, h: 3, type: "forge" }
         ],
         // Outdoor village furniture & decor
         furniture: [
@@ -48,13 +47,13 @@ const MAPS = {
             { col: 16, row: 6,  kind: "lamp" },      // Streetlamp NE of plaza (1x2)
             { col: 9,  row: 13, kind: "lamp" },      // Streetlamp SW of plaza (1x2)
             { col: 16, row: 13, kind: "lamp" },      // Streetlamp SE of plaza (1x2)
-            { col: 8,  row: 7,  kind: "bench" },     // Wooden bench by pond (2x1)
-            { col: 14, row: 11, kind: "bench" },     // Wooden bench on town square (2x1)
+            { col: 8,  row: 6,  kind: "bench" },     // Wooden bench by pond on grass (2x1)
+            { col: 17, row: 11, kind: "bench" },     // Wooden bench near plaza garden (2x1)
             { col: 17, row: 7,  kind: "stall" },     // Market stall on plaza (2x2)
 
-            // Player's Homestead & Shop Surrounding
-            { col: 2,  row: 5,  kind: "flowerbed" }, // Flowerbed by home (2x1)
-            { col: 6,  row: 5,  kind: "mailbox" },   // Mailbox by home (1x1)
+            // Player's Homestead & Garden
+            { col: 2,  row: 5,  kind: "mailbox" },   // Mailbox by homestead fence (1x1)
+            { col: 7,  row: 5,  kind: "flowerbed" }, // Flowerbed beside path (2x1)
             { col: 18, row: 5,  kind: "flowerbed" }, // Flowerbed by shop (2x1)
 
             // Lake / Pond Pier
@@ -63,7 +62,7 @@ const MAPS = {
             // Blacksmith Yard Timber & Barrels
             { col: 7,  row: 12, kind: "barrel" },    // Barrel near forge (1x1)
 
-            // Farm pasture & animal feeder
+            // Farm pasture & animal feeder in peaceful farm corner
             { col: 10, row: 14, kind: "feeder" }     // Animal Feeding Trough (2x1)
         ],
         // Interactable points sit in front of each building's door and props.
@@ -72,19 +71,15 @@ const MAPS = {
             { col: 5,  row: 5,  action: "enter",   to: "home",     spawn: { col: 5, row: 6 }, label: "Твой дом",         emoji: "🏠" },
             { col: 21, row: 5,  action: "enter",   to: "shop_in",  spawn: { col: 5, row: 7 }, label: "Лавка",            emoji: "🛒" },
             { col: 5,  row: 15, action: "enter",   to: "forge_in", spawn: { col: 5, row: 7 }, label: "Кузница",          emoji: "🔨" },
-            { col: 20, row: 15, action: "dungeon", label: "Врата испытаний", emoji: "🚪" },
             { col: 14, row: 6,  action: "board",   label: "Доска объявлений", emoji: "📜" },
             { col: 11, row: 7,  action: "well",    label: "Деревенский колодец", emoji: "🪣" },
             { col: 5,  row: 8,  action: "fishing", label: "Рыбалка у пруда", emoji: "🎣" },
             { col: 14, row: 10, action: "cat",     label: "Кот Мурзик", emoji: "🐱" },
             { col: 10, row: 14, action: "ranch",   label: "Фермерский загон", emoji: "🐮" }
         ],
-        // The village is a peaceful zone — friendly fauna roams here.
+        // The village is a peaceful zone — friendly town pet roams on the plaza.
         enemies: [
-            { id: "cat1",   kind: "cat",     type: "cat",     emoji: "🐱", col: 14, row: 10, wanderRadius: 32 },
-            { id: "cow1",   kind: "cow",     type: "cow",     emoji: "🐮", col: 11, row: 15, wanderRadius: 16 },
-            { id: "sheep1", kind: "sheep",   type: "sheep",   emoji: "🐑", col: 12, row: 15, wanderRadius: 16 },
-            { id: "hen1",   kind: "chicken", type: "chicken", emoji: "🐔", col: 9,  row: 15, wanderRadius: 16 }
+            { id: "cat1", kind: "cat", type: "cat", emoji: "🐱", col: 14, row: 10, wanderRadius: 32 }
         ],
         // Living townsfolk who walk a daily schedule (minutes since midnight).
         // Talk (E) once a day for friendship; gift items/resources they like.
@@ -164,9 +159,9 @@ const MAPS = {
         ],
         // Gatherable resource nodes (E to harvest; they regrow over time).
         resources: [
-            { type: "apple_tree",  col: 8,  row: 3  },
-            { type: "cherry_tree", col: 9,  row: 3  },
-            { type: "tree", col: 2,  row: 6  },
+            { type: "apple_tree",  col: 14, row: 2  },
+            { type: "cherry_tree", col: 16, row: 2  },
+            { type: "tree", col: 2,  row: 7  },
             { type: "tree", col: 20, row: 7  },
             { type: "tree", col: 3,  row: 10 },
             { type: "tree", col: 22, row: 10 },
@@ -175,12 +170,12 @@ const MAPS = {
             { type: "bush", col: 6,  row: 6  },
             { type: "bush", col: 17, row: 8  },
             { type: "herb", col: 22, row: 13 },
-            { type: "herb", col: 7,  row: 4  }
+            { type: "herb", col: 2,  row: 8  }
         ],
-        // Farm plots (till → plant seed → water daily → harvest) near the forge.
+        // Farm plots in the player's homestead garden yard.
         farm: [
-            { col: 7, row: 13 }, { col: 8, row: 13 }, { col: 9, row: 13 },
-            { col: 7, row: 14 }, { col: 8, row: 14 }, { col: 9, row: 14 }
+            { col: 8, row: 3 }, { col: 9, row: 3 }, { col: 10, row: 3 },
+            { col: 8, row: 4 }, { col: 9, row: 4 }, { col: 10, row: 4 }
         ],
         // Walk onto a portal tile to travel. { col,row, to, spawn, label, emoji }
         portals: [

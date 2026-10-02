@@ -30,6 +30,7 @@ const FILES = [
     "v2/js/world/social.js", "v2/js/world/resources.js", "v2/js/world/farming.js",
     "v2/js/world/fishing.js", "v2/js/world/cooking.js", "v2/js/world/tools.js",
     "v2/js/world/animals.js", "v2/js/world/mines.js", "v2/js/world/decor.js",
+    "v2/js/world/skills.js", "v2/js/world/character_creation.js", "v2/js/world/homestead.js",
     "v2/js/world/requests.js", "v2/js/world/maps.js",
     "v2/js/entities/mover.js", "v2/js/entities/player.js", "v2/js/entities/enemy.js",
     "v2/js/entities/npc.js",
@@ -46,7 +47,9 @@ const EXPORTED = [
     "Requests", "Farm", "NPC2D", "ITEMS", "TILES", "tileInfo", "TileMap",
     "FishingSystem", "CookingSystem", "Tools", "RECIPES", "TOOL_TIERS",
     "ANIMAL_TYPES", "FarmAnimal", "RanchSystem", "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
-    "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem", "WeatherSystem", "Portraits"
+    "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem", "WeatherSystem", "Portraits",
+    "SKILL_DEFS", "SkillsSystem", "ORIGINS", "CharCreation", "CharacterProfile", "WorldSyncPacket",
+    "HOUSE_TIERS", "COMMUNITY_PROJECTS", "HomesteadSystem"
 ];
 
 // Every canvas method becomes a no-op; a few must return usable objects.
@@ -109,7 +112,20 @@ function makeEl(id) {
         style: makeStyle(),
         classList: makeClassList(),
         dataset: {},
-        addEventListener() {}, removeEventListener() {},
+        _listeners: {},
+        addEventListener(evt, fn) {
+            (this._listeners[evt] = this._listeners[evt] || []).push(fn);
+        },
+        removeEventListener(evt, fn) {
+            if (this._listeners[evt]) {
+                this._listeners[evt] = this._listeners[evt].filter(f => f !== fn);
+            }
+        },
+        click() {
+            if (typeof this.onclick === "function") this.onclick({ target: this, closest: (sel) => null });
+            const list = (this._listeners && this._listeners["click"]) || [];
+            for (const fn of list) fn({ target: this, closest: () => null });
+        },
         appendChild(c) { el.children.push(c); return c; },
         querySelectorAll: () => [],
         querySelector: () => null,
