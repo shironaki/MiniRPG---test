@@ -1447,31 +1447,40 @@ describe("Skills & Masteries Progression System", () => {
 // ---------------------------------------------------------------------------
 // Character Creation, Origins & Multiplayer Sync Packet
 // ---------------------------------------------------------------------------
-describe("Character Creation, Origins & Multiplayer Sync Packet", () => {
-    it("defines 5 starter origins with distinct descriptions and starter gear", () => {
-        const { ORIGINS, CharCreation } = loadEngine().exports;
-        const originKeys = Object.keys(ORIGINS);
-        expect(originKeys.length).toBe(5);
-        expect(originKeys.includes("farmer")).toBe(true);
-        expect(originKeys.includes("warrior")).toBe(true);
-        expect(originKeys.includes("mage")).toBe(true);
-        expect(originKeys.includes("smith")).toBe(true);
-        expect(originKeys.includes("wanderer")).toBe(true);
+describe("Character Creation, Emergent Destiny Classes & Multiplayer Sync Packet", () => {
+    it("defines emergent Destiny classes with titles, requirements and descriptions", () => {
+        const { DESTINY_CLASSES, CharCreation } = loadEngine().exports;
+        expect(DESTINY_CLASSES !== undefined).toBe(true);
+        const classKeys = Object.keys(DESTINY_CLASSES);
+        expect(classKeys.length >= 10).toBe(true);
+        expect(classKeys.includes("novice")).toBe(true);
+        expect(classKeys.includes("farmer")).toBe(true);
+        expect(classKeys.includes("miner")).toBe(true);
+        expect(classKeys.includes("forager")).toBe(true);
+        expect(classKeys.includes("fisher")).toBe(true);
+        expect(classKeys.includes("warrior")).toBe(true);
+        expect(classKeys.includes("mage")).toBe(true);
+        expect(classKeys.includes("smith")).toBe(true);
+        expect(classKeys.includes("druid")).toBe(true);
+        expect(classKeys.includes("paladin")).toBe(true);
+        expect(classKeys.includes("ruler")).toBe(true);
 
-        for (const k of originKeys) {
-            const org = ORIGINS[k];
-            expect(typeof org.name).toBe("string");
-            expect(typeof org.desc).toBe("string");
-            expect(Array.isArray(org.starterItems)).toBe(true);
+        for (const k of classKeys) {
+            const cls = DESTINY_CLASSES[k];
+            expect(typeof cls.name).toBe("string");
+            expect(typeof cls.desc).toBe("string");
+            expect(typeof cls.title).toBe("string");
+            expect(typeof cls.bonusText).toBe("string");
+            expect(typeof cls.reqs).toBe("object");
         }
     });
 
-    it("creates custom character profile and applies origin bonuses", () => {
+    it("creates custom character profile and applies name to player", () => {
         const { CharCreation, CharacterProfile } = loadEngine().exports;
         const profile = CharCreation.createProfile({
             name: "Радомир",
             gender: "masculine",
-            origin: "farmer",
+            origin: "novice",
             hairStyle: "crop",
             hairColor: "#5c3317",
             shirtColor: "#2e5c8a",
@@ -1480,15 +1489,46 @@ describe("Character Creation, Origins & Multiplayer Sync Packet", () => {
 
         expect(profile instanceof CharacterProfile).toBe(true);
         expect(profile.name).toBe("Радомир");
-        expect(profile.origin).toBe("farmer");
+        expect(profile.gender).toBe("masculine");
+
+        const look = profile.getLook();
+        expect(look.shirt).toBe("#2e5c8a");
+        expect(look.pants).toBe("#2c3e50");
+        expect(look.hair).toBe("#5c3317");
 
         // Mock hero and bag
-        const mockHero = { maxHealth: 100, health: 100, maxEnergy: 100, energy: 100, gold: 50 };
-        const mockBag = { items: {}, add(k, n) { this.items[k] = (this.items[k] || 0) + n; } };
-        CharCreation.applyOrigin(profile, mockHero, mockBag);
+        const mockHero = { name: "Герой", maxHealth: 100, health: 100, maxEnergy: 100, energy: 100, gold: 50 };
+        CharCreation.applyOrigin(profile, mockHero);
 
-        expect(mockHero.maxEnergy).toBe(120);
-        expect(mockBag.items["seeds"]).toBe(8);
+        expect(mockHero.name).toBe("Радомир");
+    });
+
+    it("dynamically unlocks emergent classes as skills level up (Albion Online Destiny Board)", () => {
+        const { CharCreation, CharacterProfile, SkillsSystem } = loadEngine().exports;
+        const profile = CharCreation.createProfile({ name: "Ярослав" });
+        const skills = new SkillsSystem();
+
+        // Initially novice
+        expect(profile.getActiveTitle(skills)).toBe("Новичок");
+        let unlocked = profile.getUnlockedClasses(skills);
+        expect(unlocked.some(c => c.id === "novice")).toBe(true);
+        expect(unlocked.some(c => c.id === "farmer")).toBe(false);
+
+        // Level up farming to level 3
+        skills.addXp("farming", 650); // Level 3 reached
+        expect(skills.getLevel("farming") >= 3).toBe(true);
+        unlocked = profile.getUnlockedClasses(skills);
+        expect(unlocked.some(c => c.id === "farmer")).toBe(true);
+        expect(profile.getActiveTitle(skills)).toBe("Агроном");
+
+        // Level up combat and magic to unlock Paladin
+        skills.addXp("combat", 1500); // Level 4
+        skills.addXp("magic", 650);   // Level 3
+        expect(skills.getLevel("combat") >= 4).toBe(true);
+        expect(skills.getLevel("magic") >= 3).toBe(true);
+        unlocked = profile.getUnlockedClasses(skills);
+        expect(unlocked.some(c => c.id === "paladin")).toBe(true);
+        expect(skills.getActiveTitle()).toBe("Паладин");
     });
 
     it("serializes and deserializes multiplayer world sync packets", () => {

@@ -22,10 +22,10 @@ const MAPS = {
             "T....wwwp..PPppppP......,T",
             "T,.t.wwwp..PPppppP..,..t.p",
             "T.,.....p..PPPPPPP...,...T",
-            "T..,.....wwwbbww...HHH...T",
-            "T..HHHH..wwwbbww...HHH...T",
-            "T.tHHHH.....pp.....HHH.t.T",
-            "T..HHHH.....pp,....HHH,..T",
+            "T..,.....wwwbbww.........T",
+            "T..HHHH..wwwbbww.........T",
+            "T.tHHHH.....pp.........t.T",
+            "T..HHHH.....pp,........,.T",
             "T....ppppppppppppppppp.,.T",
             "T.......,...pp..,.......,T",
             "TTTTTTTTTTTTppTTTTTTTTTTTT"
@@ -63,7 +63,7 @@ const MAPS = {
             { col: 7,  row: 12, kind: "barrel" },    // Barrel near forge (1x1)
 
             // Farm pasture & animal feeder in peaceful farm corner
-            { col: 10, row: 14, kind: "feeder" }     // Animal Feeding Trough (2x1)
+            { col: 20, row: 11, kind: "feeder" }     // Animal Feeding Trough (2x1)
         ],
         // Interactable points sit in front of each building's door and props.
         // `enter` walks the hero into a real interior zone.
@@ -75,11 +75,15 @@ const MAPS = {
             { col: 11, row: 7,  action: "well",    label: "Деревенский колодец", emoji: "🪣" },
             { col: 5,  row: 8,  action: "fishing", label: "Рыбалка у пруда", emoji: "🎣" },
             { col: 14, row: 10, action: "cat",     label: "Кот Мурзик", emoji: "🐱" },
-            { col: 10, row: 14, action: "ranch",   label: "Фермерский загон", emoji: "🐮" }
+            { col: 20, row: 11, action: "ranch",   label: "Фермерский загон", emoji: "🐮" }
         ],
-        // The village is a peaceful zone — friendly town pet roams on the plaza.
+        // Peaceful village fauna living and roaming freely on the map
         enemies: [
-            { id: "cat1", kind: "cat", type: "cat", emoji: "🐱", col: 14, row: 10, wanderRadius: 32 }
+            { id: "cat1", kind: "cat", type: "cat", name: "Кот Мурзик", emoji: "🐱", col: 14, row: 10, wanderRadius: 32 },
+            { id: "cow1", kind: "cow", type: "cow", name: "Корова Бурёнка", emoji: "🐮", col: 19, row: 12, wanderRadius: 35 },
+            { id: "sheep1", kind: "sheep", type: "sheep", name: "Овечка Кудряш", emoji: "🐑", col: 21, row: 13, wanderRadius: 35 },
+            { id: "hen1", kind: "chicken", type: "chicken", name: "Курочка Ряба", emoji: "🐔", col: 18, row: 14, wanderRadius: 28 },
+            { id: "hen2", kind: "chicken", type: "chicken", name: "Курочка Белянка", emoji: "🐔", col: 22, row: 12, wanderRadius: 28 }
         ],
         // Living townsfolk who walk a daily schedule (minutes since midnight).
         // Talk (E) once a day for friendship; gift items/resources they like.

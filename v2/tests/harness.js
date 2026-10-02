@@ -61,7 +61,7 @@ const EXPORTED = [
     "SMELTING_RECIPES", "SmeltingSystem", "MinesSystem",
     "FLOOR_STYLES", "WALL_STYLES", "DECOR_CATALOG", "DecorSystem",
     "SKILL_DEFS", "SkillsSystem",
-    "ORIGINS", "CharCreation", "CharacterProfile", "WorldSyncPacket",
+    "DESTINY_CLASSES", "ORIGINS", "CharCreation", "CharacterProfile", "WorldSyncPacket",
     "HOUSE_TIERS", "COMMUNITY_PROJECTS", "HomesteadSystem",
     "Requests", "REQUEST_POOL", "REQUEST_MIN_POINTS", "REQUEST_FRIENDSHIP",
     "Furniture", "MobRig", "TileArt", "BuildingArt", "Portraits"

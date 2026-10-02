@@ -472,6 +472,69 @@ describe("v2 smoke › playing", () => {
         expect(overlay.includes("Создание героя") || overlay.includes("призвание") || overlay.includes("Земледелец")).toBe(true);
     });
 
+    it("interacts with roaming pasture fauna (cow, sheep, chicken) in the village ranch", () => {
+        const g = boot();
+        g.tick(16.7);
+
+        // Find the roaming cow in village pasture
+        const cow = (g.v2.enemies || []).find(e => e.type === "cow" || e.kind === "cow");
+        expect(cow !== undefined).toBe(true);
+        expect(cow.friendly).toBe(true);
+
+        // Pet the cow
+        const petRes = g.v2.interactFauna(cow);
+        expect(petRes.ok).toBe(true);
+        expect(petRes.action).toBe("pet");
+        expect(g.v2.emotes[g.v2.emotes.length - 1].icon).toBe("❤️");
+
+        // Give hay to feed the cow
+        g.v2.bag.add("hay", 5);
+        const feedRes = g.v2.interactFauna(cow);
+        expect(feedRes.ok).toBe(true);
+        expect(feedRes.action).toBe("feed");
+
+        // Harvest milk from the cow
+        if (petRes.animal) petRes.animal.hasProduct = true;
+        const milkRes = g.v2.interactFauna(cow);
+        expect(milkRes.ok).toBe(true);
+        expect(milkRes.action).toBe("harvest");
+        expect(g.v2.bag.count("milk")).toBeGreaterThan(0);
+    });
+
+    it("renders clear day lighting without white wash overlay and deep night overlay", () => {
+        const g = boot();
+        g.tick(16.7);
+
+        // Midday lighting (12:00 = 720 min) must have 0 alpha tint (no blinding white fog)
+        const noonLight = g.v2.lightingFor(12 * 60);
+        expect(noonLight.alpha).toBe(0);
+
+        // Morning (10:00 = 600 min)
+        const mornLight = g.v2.lightingFor(10 * 60);
+        expect(mornLight.alpha).toBe(0);
+
+        // Deep midnight lighting (00:00 = 0 min) must have dark indigo tint and high alpha
+        const nightLight = g.v2.lightingFor(0);
+        expect(nightLight.color).toBe("#080a1c");
+        expect(nightLight.alpha).toBeGreaterThan(0.6);
+    });
+
+    it("displays active Destiny class title badge in the player card stats", () => {
+        const g = boot();
+        g.tick(16.7);
+
+        const statsText = g.html("stats");
+        expect(statsText.includes("statClassBadge")).toBe(true);
+        expect(statsText.includes("Новичок")).toBe(true);
+
+        // Advance farming skills to unlock Agronomist
+        g.v2.skills.addXp("farming", 700);
+        g.v2.refreshStats();
+        g.tick(16.7);
+        const updatedStats = g.html("stats");
+        expect(updatedStats.includes("Агроном") || updatedStats.includes("Земледелец")).toBe(true);
+    });
+
     it("survives a long session: 400 frames across the day/night cycle", () => {
         const g = boot();
         for (let i = 0; i < 400; i++) g.tick(50);    // ~20s → clock advances

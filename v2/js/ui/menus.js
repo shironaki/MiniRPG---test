@@ -1025,14 +1025,22 @@
         render();
     }
 
-    // ---- Skills & Mastery Tree (Навыки и мастерство) --------------------
+    // ---- Skills & Mastery Tree (Навыки и мастерство в стиле Albion / Stardew) --------------------
     function skills(ctx) {
         const sSys = ctx.skills || (typeof SkillsSystem !== "undefined" ? new SkillsSystem() : null);
+        const dClasses = (typeof DESTINY_CLASSES !== "undefined") ? DESTINY_CLASSES : {};
+
         function render() {
             if (!sSys) {
                 paint(`<h2>⭐ Навыки и мастерство</h2><p class="hint">Система навыков пока недоступна.</p>`);
                 return;
             }
+
+            const activeTitle = (typeof CharacterProfile !== "undefined" && ctx.charProfile)
+                ? ctx.charProfile.getActiveTitle(sSys)
+                : (sSys.hasPerk && sSys.hasPerk("ruler") ? "Царь долины" : "Вольный путник");
+
+            // 1. Mastery Cards
             const list = sSys.allList();
             const cards = list.map(sk => {
                 const perksList = Object.keys(sk.perks || {}).map(plv => {
@@ -1060,9 +1068,41 @@
                     </div>`;
             }).join("");
 
-            paint(`<h2>⭐ Навыки и мастерство героя</h2>
-                <p class="hint">Каждое действие в мире (земледелие, добыча руды, собирательство, рыбалка, бой, магия) совершенствует ваше мастерство и открывает уникальные таланты.</p>
-                <div class="list">${cards}</div>`, () => {});
+            // 2. Emergent Destiny Classes (Доска достижений и открытые пути)
+            const classCards = Object.keys(dClasses).map(k => {
+                const cls = dClasses[k];
+                let unlocked = true;
+                const reqParts = [];
+                for (const sk of Object.keys(cls.reqs || {})) {
+                    const reqLv = cls.reqs[sk];
+                    const curLv = sSys.getLevel(sk);
+                    const skDef = sSys.def(sk) || { name: sk };
+                    if (curLv < reqLv) unlocked = false;
+                    reqParts.push(`${skDef.name} ${curLv}/${reqLv}`);
+                }
+                const reqText = reqParts.length ? reqParts.join(", ") : "Стартовый статус";
+
+                return `
+                    <div style="background:${unlocked ? "rgba(234,179,8,0.10)" : "rgba(0,0,0,0.3)"};border:1px solid ${unlocked ? "#eab308" : "#3a2a1a"};border-radius:8px;padding:8px 10px;margin-bottom:6px;opacity:${unlocked ? 1 : 0.6};">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <strong>${cls.emoji} ${esc(cls.name)} (${esc(cls.title)})</strong>
+                            <span style="font-size:12px;color:${unlocked ? "#4ade80" : "#94a3b8"};">${unlocked ? "✨ Открыт" : "🔒 Скрыто"}</span>
+                        </div>
+                        <small style="color:#cbd5e1;display:block;margin:3px 0;">${esc(cls.desc)} — <em>${esc(cls.bonusText || "")}</em></small>
+                        <div style="font-size:11px;color:${unlocked ? "#ffd88a" : "#78716c"};">Требования: ${esc(reqText)}</div>
+                    </div>`;
+            }).join("");
+
+            paint(`<h2>⭐ Навыки, мастерство и путь судьбы</h2>
+                <div style="background:rgba(234,179,8,0.15);border:1px solid #ca8a04;border-radius:8px;padding:10px;margin-bottom:12px;">
+                    <span style="font-size:13px;color:#fef08a;">Текущее призвание героя:</span>
+                    <h3 style="margin:2px 0 0 0;color:#facc15;">👑 ${esc(activeTitle)}</h3>
+                </div>
+                <p class="hint">В долине нет предопределённых классов. Ваш путь определяют ваши дела: рубите дубы, вспахивайте целину, добывайте самоцветы и варите эликсиры, открывая высшие призвания мастера и царя долины!</p>
+                <h4 class="mGroup">Дисциплины мастерства</h4>
+                <div class="list">${cards}</div>
+                <h4 class="mGroup" style="margin-top:16px;">Доска судеб и призвания (Albion & Stardew)</h4>
+                <div class="list">${classCards}</div>`, () => {});
         }
         render();
     }
@@ -1137,49 +1177,98 @@
     // ---- Character Creation Modal (Создание персонажа) -------------------
     function charCreation(ctx, onComplete) {
         let name = (ctx.hero && ctx.hero.name) || "Любомир";
-        let origin = "wanderer";
-        let hairColor = "#4a321e";
-        let shirtColor = "#3a6080";
+        let gender = "masculine";
+        let hairStyle = "short";
+        let hairColor = "#5c3317";
+        let shirtColor = "#2e5c8a";
+        let pantsColor = "#2c3e50";
+        let skinTone = "#ffdcb4";
 
-        const origins = (typeof ORIGINS !== "undefined") ? ORIGINS : {
-            farmer: { name: "Земледелец", emoji: "🌾", bonusText: "+20 Энергии, мотыга, лейка, семена." },
-            warrior: { name: "Воин", emoji: "⚔️", bonusText: "+25 Здоровья, меч, топор, кирка." },
-            mage: { name: "Чародей", emoji: "🔮", bonusText: "+30 Маны, удочка, целебный чай." },
-            smith: { name: "Кузнец", emoji: "🔨", bonusText: "Медная кирка, топор, руда и уголь." },
-            wanderer: { name: "Путник", emoji: "🧭", bonusText: "+15% скорости, все 5 инструментов." }
-        };
+        const HAIR_S = [
+            { id: "short", name: "Короткая" },
+            { id: "crop", name: "Под горшок" },
+            { id: "long", name: "Длинные косы" },
+            { id: "curly", name: "Кудри" }
+        ];
+
+        const HAIR_C = [
+            { color: "#5c3317", name: "Каштановый" },
+            { color: "#e8c374", name: "Пшеничный" },
+            { color: "#221c16", name: "Тёмный" },
+            { color: "#c85a2b", name: "Рыжий" },
+            { color: "#dcdfe6", name: "Седой" }
+        ];
+
+        const SHIRT_C = [
+            { color: "#2e5c8a", name: "Васильковая" },
+            { color: "#a83232", name: "Кумачовая" },
+            { color: "#3a7d44", name: "Изумрудная" },
+            { color: "#e3dac9", name: "Льняная" },
+            { color: "#6a3b7b", name: "Пурпурная" }
+        ];
 
         function render() {
-            const originCards = Object.keys(origins).map(k => {
-                const o = origins[k];
-                const active = origin === k;
-                return `
-                    <div style="background:${active ? "rgba(234,179,8,0.15)" : "rgba(255,255,255,0.03)"};border:2px solid ${active ? "#eab308" : "#4a3828"};border-radius:8px;padding:8px 10px;cursor:pointer;margin-bottom:8px;" data-pick-origin="${k}">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <strong>${o.emoji} ${esc(o.name)}</strong>
-                            <span>${active ? "✅" : "⚪"}</span>
-                        </div>
-                        <small style="color:#cbd5e1;display:block;margin-top:2px;">${esc(o.bonusText || o.desc || "")}</small>
-                    </div>`;
-            }).join("");
+            const hairStyleButtons = HAIR_S.map(hs => `
+                <button class="mBtn ${hairStyle === hs.id ? "primary" : "ghost"}" data-set-hs="${hs.id}" style="padding:4px 8px;font-size:12px;margin:2px;">
+                    ${esc(hs.name)}
+                </button>`).join("");
 
-            paint(`<h2>✨ Создание героя и выбор пути</h2>
-                <p class="hint">Добро пожаловать в долину! Выберите имя и стартовое призвание вашего персонажа.</p>
+            const hairColorSwatches = HAIR_C.map(hc => `
+                <span data-set-hc="${hc.color}" style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${hc.color};border:2px solid ${hairColor === hc.color ? "#eab308" : "#222"};margin:2px 4px;cursor:pointer;vertical-align:middle;" title="${esc(hc.name)}"></span>
+            `).join("");
+
+            const shirtColorSwatches = SHIRT_C.map(sc => `
+                <span data-set-sc="${sc.color}" style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${sc.color};border:2px solid ${shirtColor === sc.color ? "#eab308" : "#222"};margin:2px 4px;cursor:pointer;vertical-align:middle;" title="${esc(sc.name)}"></span>
+            `).join("");
+
+            paint(`<h2>✨ Создание героя долины</h2>
+                <p class="hint">Добро пожаловать в долину! Настройте имя и внешний вид персонажа. В нашем мире нет предопределённых классов — кем стать (пахарем, рудознатцем, чародеем или царём) определят ваши поступки и труд!</p>
+                
                 <div style="margin-bottom:12px;">
-                    <label style="display:block;font-size:13px;margin-bottom:4px;">Имя героя:</label>
+                    <label style="display:block;font-size:13px;margin-bottom:4px;color:#ffd88a;">Имя персонажа:</label>
                     <input type="text" id="ccNameInput" value="${esc(name)}" maxlength="16" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:6px;border:1px solid #785a30;background:#18181f;color:#ffd88a;font-size:14px;">
                 </div>
-                <h4 class="mGroup">Стартовое призвание</h4>
-                ${originCards}
+
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:13px;margin-bottom:4px;color:#cbd5e1;">Причёска:</label>
+                    <div>${hairStyleButtons}</div>
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:13px;margin-bottom:4px;color:#cbd5e1;">Цвет волос:</label>
+                    <div>${hairColorSwatches}</div>
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:13px;margin-bottom:4px;color:#cbd5e1;">Цвет рубахи:</label>
+                    <div>${shirtColorSwatches}</div>
+                </div>
+
+                <div style="background:rgba(234,179,8,0.10);border:1px dashed #ca8a04;border-radius:8px;padding:8px 10px;margin:12px 0;font-size:12px;color:#fef08a;">
+                    🌱 <strong>Стартовый статус:</strong> Новичок долины. Осваивайте земледелие, горное дело, ремёсла и ратные подвиги для открытия скрытых призваний!
+                </div>
+
                 <div style="margin-top:16px;text-align:center;">
-                    <button class="mBtn primary" id="ccStartBtn" style="padding:10px 24px;font-size:15px;">Начать приключение 🌟</button>
+                    <button class="mBtn primary" id="ccStartBtn" style="padding:10px 24px;font-size:15px;">Начать путь в долине! 🌟</button>
                 </div>`, onClick);
         }
 
         function onClick(e) {
-            const pick = e.target.closest("[data-pick-origin]");
-            if (pick) {
-                origin = pick.dataset.pickOrigin;
+            const hs = e.target.closest("[data-set-hs]");
+            if (hs) {
+                hairStyle = hs.dataset.setHs;
+                render();
+                return;
+            }
+            const hc = e.target.closest("[data-set-hc]");
+            if (hc) {
+                hairColor = hc.dataset.setHc;
+                render();
+                return;
+            }
+            const sc = e.target.closest("[data-set-sc]");
+            if (sc) {
+                shirtColor = sc.dataset.setSc;
                 render();
                 return;
             }
@@ -1188,12 +1277,26 @@
                 if (inp && inp.value.trim()) name = inp.value.trim();
 
                 const profile = (typeof CharacterProfile !== "undefined")
-                    ? new CharacterProfile({ name, origin, hairColor, shirtColor })
-                    : { name, origin };
+                    ? new CharacterProfile({ name, gender, hairStyle, hairColor, shirtColor, pantsColor, skinTone, origin: "novice" })
+                    : { name, gender, origin: "novice" };
+
+                try {
+                    localStorage.setItem("v2_char_profile", JSON.stringify(profile.toJSON ? profile.toJSON() : profile));
+                } catch (err) { /* ignore */ }
+
+                if (ctx.hero) {
+                    ctx.hero.name = name;
+                }
+                if (ctx.player && typeof ctx.player.look === "object") {
+                    ctx.player.look = profile.getLook ? profile.getLook() : ctx.player.look;
+                }
 
                 if (typeof onComplete === "function") {
                     onComplete(profile);
+                } else if (typeof ctx.closeInteraction === "function") {
+                    ctx.closeInteraction();
                 }
+                if (ctx.refresh) ctx.refresh();
             }
         }
         render();

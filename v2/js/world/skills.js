@@ -198,6 +198,28 @@
             return b;
         }
 
+        getActiveTitle() {
+            if (typeof CharCreation !== "undefined" && typeof CharacterProfile !== "undefined") {
+                const dummyProf = new CharacterProfile();
+                return dummyProf.getActiveTitle(this);
+            }
+            if (this.level("farming") >= 3) return "Агроном";
+            if (this.level("mining") >= 3) return "Геолог";
+            if (this.level("foraging") >= 3) return "Лесничий";
+            if (this.level("fishing") >= 3) return "Мастер глубин";
+            if (this.level("combat") >= 3) return "Берсерк";
+            if (this.level("magic") >= 3) return "Алхимик";
+            return "Новичок долины";
+        }
+
+        getUnlockedClasses() {
+            if (typeof CharCreation !== "undefined" && typeof CharacterProfile !== "undefined") {
+                const dummyProf = new CharacterProfile();
+                return dummyProf.getUnlockedClasses(this);
+            }
+            return [{ id: "novice", name: "Новичок долины", title: "Новичок" }];
+        }
+
         serialize() {
             return this.toJSON();
         }

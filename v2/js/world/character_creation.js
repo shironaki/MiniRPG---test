@@ -1,167 +1,214 @@
 /**
- * v2 world — Character Customization, Life Origins & Multiplayer Data Contract.
+ * v2 world — Character Customization, Emergent Destiny Paths & Multiplayer Data Contract.
  * 
- * Provides:
- * 1. Character Identity & Palette Customization (Name, Gender, Hair, Outfit, Skin)
- * 2. 5 Distinct Life Origins / Starting Callings (Farmer, Warrior, Mage, Smith, Wanderer)
- * 3. Serializable Action/State Packets for Co-op / Multiplayer readiness
+ * Inspired by Albion Online's Destiny Board and Stardew Valley:
+ * 1. Players begin without pre-selected classes as a humble "Новичок долины" (Valley Novice).
+ * 2. Classes and Archetypes are emergent, discovered naturally through what the player does
+ *    (farming, mining, foraging, fishing, combat, magic, crafting).
+ * 3. Character Customization (Name, Pronoun/Gender, Hairstyle, Palette, Outfits).
+ * 4. Serializable Action/State Packets for Co-op / Multiplayer readiness.
  * 
  * Pure logic, unit-testable without DOM.
  */
 (function (global) {
     "use strict";
 
-    const ORIGINS = {
+    // Emergent Destiny Classes (Unlocked naturally through gameplay masteries)
+    const DESTINY_CLASSES = {
+        novice: {
+            id: "novice",
+            name: "Новичок долины",
+            emoji: "🌱",
+            desc: "Первые шаги в долине. Путь открыт во всех направлениях.",
+            reqs: {},
+            title: "Новичок",
+            bonusText: "Сбалансированные начальные силы."
+        },
         farmer: {
             id: "farmer",
             name: "Земледелец",
             emoji: "🌾",
-            desc: "Дитя плодородных лугов. Знает толк в земледелии, заботе о ростках и сезонных всходах.",
-            bonuses: { energy: 20, health: 0, speed: 0 },
-            starterTools: ["hoe", "can", "axe"],
-            starterItems: [
-                { id: "seeds", count: 8 },
-                { id: "wheat", count: 4 }
-            ],
-            bonusText: "+20 Энергии, стартовая мотыга, лейка, топор и запас семян."
+            desc: "Мастер вспашки, ухода за ростками и сбора щедрых урожаев.",
+            reqs: { farming: 3 },
+            title: "Агроном",
+            bonusText: "+1 к сбору урожая, ускоренный рост культур."
+        },
+        miner: {
+            id: "miner",
+            name: "Рудознатец",
+            emoji: "⛏️",
+            desc: "Знаток недр, способный отыскать богатейшие рудные жилы и самоцветы.",
+            reqs: { mining: 3 },
+            title: "Геолог",
+            bonusText: "Шанс добычи двойной руды и редких самоцветов."
+        },
+        forager: {
+            id: "forager",
+            name: "Следопыт",
+            emoji: "🌲",
+            desc: "Хозяин лесных троп, искусный дровосек и знаток целебных трав.",
+            reqs: { foraging: 3 },
+            title: "Лесничий",
+            bonusText: "+1 к выходу древесины, частые находки диких ягод."
+        },
+        fisher: {
+            id: "fisher",
+            name: "Мореход",
+            emoji: "🎣",
+            desc: "Повелитель рек и океанских глубин. Чувствует любую поклёвку.",
+            reqs: { fishing: 3 },
+            title: "Мастер глубин",
+            bonusText: "Быстрая подсечка, шанс выловить сундук сокровищ."
         },
         warrior: {
             id: "warrior",
-            name: "Странствующий Воин",
+            name: "Ратник",
             emoji: "⚔️",
-            desc: "Закалённый в битвах мечник. Сильный духом, стойкий в бою и готовый защищать долину.",
-            bonuses: { energy: 0, health: 25, speed: 0 },
-            starterTools: ["axe", "pickaxe"],
-            starterItems: [
-                { id: "potion", count: 2 },
-                { id: "wood", count: 10 }
-            ],
-            bonusText: "+25 Здоровья, стартовый меч, топор, кирка и лечебные эликсиры."
+            desc: "Закалённый боец, мастер клинка и несокрушимый защитник жителей.",
+            reqs: { combat: 3 },
+            title: "Берсерк",
+            bonusText: "+2 к атаке в бою, устойчивость к урону."
         },
         mage: {
             id: "mage",
-            name: "Ученик Чародея",
+            name: "Чародей",
             emoji: "🔮",
-            desc: "Искатель тайных знаний. Слышит шёпот древних камней и постигает алхимию стихий.",
-            bonuses: { energy: 30, health: 0, speed: 0 },
-            starterTools: ["rod", "can"],
-            starterItems: [
-                { id: "herb", count: 6 },
-                { id: "dish_tea", count: 2 }
-            ],
-            bonusText: "+30 Маны/Энергии, стартовая удочка, лейка и запас целебного чая."
+            desc: "Искатель тайных знаний, мастер стихийных эликсиров и алхимии.",
+            reqs: { magic: 3 },
+            title: "Алхимик",
+            bonusText: "+25 к запасу маны/энергии, усиление зелий."
         },
         smith: {
             id: "smith",
-            name: "Подмастерье Кузнеца",
+            name: "Кузнечный мастер",
             emoji: "🔨",
-            desc: "Мастер молота и наковальни. Не боится жара горна и видит рудную жилу сквозь скалу.",
-            bonuses: { energy: 10, health: 10, speed: 0 },
-            starterTools: ["pickaxe", "axe"],
-            starterItems: [
-                { id: "ore_copper", count: 6 },
-                { id: "coal", count: 3 }
-            ],
-            bonusText: "Медная кирка, топор, запас медной руды и каменного угля."
+            desc: "Великий ремесленник, соединяющий мощь горна и силу металла.",
+            reqs: { mining: 4, foraging: 3 },
+            title: "Кузнец-творец",
+            bonusText: "Сниженная стоимость ковки, улучшенная прочность."
         },
-        wanderer: {
-            id: "wanderer",
-            name: "Вольный Путник",
-            emoji: "🧭",
-            desc: "Свободный исследователь без предвзятого пути. Быстр на шаг и готов к любым открытиям.",
-            bonuses: { energy: 10, health: 10, speed: 15 },
-            starterTools: ["axe", "pickaxe", "hoe", "can", "rod"],
-            starterItems: [
-                { id: "seeds", count: 4 },
-                { id: "apple", count: 3 }
-            ],
-            bonusText: "+15% к скорости бега, полный базовый набор всех 5 инструментов."
+        druid: {
+            id: "druid",
+            name: "Друид долины",
+            emoji: "🌿",
+            desc: "Хранитель гармонии природы, повелевающий погодой и цветением.",
+            reqs: { farming: 4, magic: 3 },
+            title: "Друид",
+            bonusText: "Аура ускорения роста всех растений вокруг усадьбы."
+        },
+        paladin: {
+            id: "paladin",
+            name: "Паладин Света",
+            emoji: "🛡️",
+            desc: "Рыцарь, соединяющий воинское искусство и святую магию исцеления.",
+            reqs: { combat: 4, magic: 3 },
+            title: "Паладин",
+            bonusText: "Регенерация здоровья в бою и святой щит."
+        },
+        ruler: {
+            id: "ruler",
+            name: "Владыка долины",
+            emoji: "👑",
+            desc: "Мудрый правитель и созидатель, возродивший все земли долины.",
+            reqs: { farming: 5, mining: 5, foraging: 5, fishing: 5, combat: 5, magic: 5 },
+            title: "Царь долины",
+            bonusText: "Абсолютное почтение всех жителей, удвоенный доход."
         }
     };
 
+    // Backward-compatible origin aliases
+    const ORIGINS = {
+        farmer: DESTINY_CLASSES.farmer,
+        warrior: DESTINY_CLASSES.warrior,
+        mage: DESTINY_CLASSES.mage,
+        smith: DESTINY_CLASSES.smith,
+        wanderer: DESTINY_CLASSES.novice,
+        novice: DESTINY_CLASSES.novice
+    };
+
     const HAIR_STYLES = [
-        { id: "short", name: "Короткая стрижка" },
-        { id: "braids", name: "Плетёные косы" },
-        { id: "long", name: "Длинные локоны" },
-        { id: "warrior", name: "Стрижка витязя" }
+        { id: "short", name: "Короткая" },
+        { id: "crop", name: "Под горшок" },
+        { id: "long", name: "Длинные косы" },
+        { id: "curly", name: "Кудри" },
+        { id: "braid", name: "Славянская коса" }
     ];
 
     const HAIR_COLORS = [
-        { id: "#4a321e", name: "Каштановый" },
-        { id: "#d4883a", name: "Рыжий" },
-        { id: "#ffd572", name: "Пшеничный блонд" },
-        { id: "#1e1e24", name: "Смоляной чёрный" },
-        { id: "#b84232", name: "Медно-красный" },
-        { id: "#d4d4d4", name: "Пепельно-седой" }
+        { id: "brown", color: "#5c3317", name: "Каштановый" },
+        { id: "blonde", color: "#e8c374", name: "Пшеничный" },
+        { id: "dark", color: "#221c16", name: "Тёмный" },
+        { id: "ginger", color: "#c85a2b", name: "Рыжий" },
+        { id: "silver", color: "#dcdfe6", name: "Седой" }
     ];
 
     const SHIRT_COLORS = [
-        { id: "#3a6080", name: "Васильковая туника" },
-        { id: "#8b3a3a", name: "Бордовый кафтан" },
-        { id: "#2d6a4f", name: "Лесной изумрудный" },
-        { id: "#6a3a8a", name: "Сумеречный фиолетовый" },
-        { id: "#b48c36", name: "Янтарный золотой" },
-        { id: "#403d39", name: "Простой льняной" }
+        { id: "blue", color: "#2e5c8a", name: "Васильковая" },
+        { id: "red", color: "#a83232", name: "Кумачовая" },
+        { id: "green", color: "#3a7d44", name: "Изумрудная" },
+        { id: "linen", color: "#e3dac9", name: "Льняная" },
+        { id: "purple", color: "#6a3b7b", name: "Пурпурная" }
     ];
 
     const PANTS_COLORS = [
-        { id: "#284560", name: "Тёмно-синие штаны" },
-        { id: "#423d38", name: "Кожаные тёмные" },
-        { id: "#5c4033", name: "Коричневые суконные" },
-        { id: "#1e293b", name: "Сланцево-чёрные" }
+        { id: "navy", color: "#2c3e50", name: "Тёмно-синие" },
+        { id: "brown", color: "#5d4037", name: "Коричневые" },
+        { id: "charcoal", color: "#37474f", name: "Серые" },
+        { id: "earth", color: "#4e3629", name: "Суконные" }
     ];
 
     const SKIN_TONES = [
-        { id: "#ffdcb4", name: "Светлая кожа" },
-        { id: "#f0caa0", name: "Естественный тон" },
-        { id: "#e0b080", name: "Тёплый загар" },
-        { id: "#a87850", name: "Смуглый южный" }
+        { id: "fair", color: "#ffdcb4", name: "Светлый" },
+        { id: "warm", color: "#f2c69d", name: "Тёплый" },
+        { id: "tan", color: "#d8a070", name: "Загорелый" },
+        { id: "deep", color: "#a56840", name: "Смуглый" }
     ];
 
     class CharacterProfile {
         constructor(init = {}) {
             this.name = String(init.name || "Любомир").trim().slice(0, 16) || "Любомир";
-            this.gender = init.gender || "male";
-            this.origin = ORIGINS[init.origin] ? init.origin : "wanderer";
+            this.gender = init.gender || "masculine";
+            this.origin = init.origin || "novice";
             this.hairStyle = init.hairStyle || "short";
-            this.hairColor = init.hairColor || "#4a321e";
+            this.hairColor = init.hairColor || "#5c3317";
             this.skinTone = init.skinTone || "#ffdcb4";
-            this.shirtColor = init.shirtColor || "#3a6080";
-            this.pantsColor = init.pantsColor || "#284560";
+            this.shirtColor = init.shirtColor || "#2e5c8a";
+            this.pantsColor = init.pantsColor || "#2c3e50";
         }
 
         get originDef() {
-            return ORIGINS[this.origin] || ORIGINS.wanderer;
+            return DESTINY_CLASSES[this.origin] || DESTINY_CLASSES.novice;
+        }
+
+        getActiveTitle(skills) {
+            if (!skills || typeof skills.getLevel !== "function") {
+                return this.originDef.title || "Новичок";
+            }
+            // Check highest unlocked destiny class
+            const unlocked = this.getUnlockedClasses(skills);
+            return unlocked.length ? unlocked[unlocked.length - 1].title : "Новичок долины";
+        }
+
+        getUnlockedClasses(skills) {
+            if (!skills) return [DESTINY_CLASSES.novice];
+            const result = [];
+            for (const key of Object.keys(DESTINY_CLASSES)) {
+                const cls = DESTINY_CLASSES[key];
+                let met = true;
+                for (const sk of Object.keys(cls.reqs || {})) {
+                    if (skills.getLevel(sk) < cls.reqs[sk]) {
+                        met = false;
+                        break;
+                    }
+                }
+                if (met) result.push(cls);
+            }
+            return result.length ? result : [DESTINY_CLASSES.novice];
         }
 
         applyToPlayer(player, tools, resources) {
             if (!player) return;
             player.name = this.name;
-            const od = this.originDef;
-
-            // Apply stat bonuses
-            if (od.bonuses.health) {
-                player.maxHealth = (player.maxHealth || 100) + od.bonuses.health;
-                player.health = player.maxHealth;
-            }
-            if (od.bonuses.energy) {
-                player.maxEnergy = (player.maxEnergy || 100) + od.bonuses.energy;
-                player.energy = player.maxEnergy;
-            }
-
-            // Apply starting tools
-            if (tools && od.starterTools) {
-                for (const t of od.starterTools) {
-                    if (tools.levels) tools.levels[t] = Math.max(1, tools.levels[t] || 1);
-                }
-            }
-
-            // Apply starting bag resources
-            if (resources && od.starterItems) {
-                for (const it of od.starterItems) {
-                    resources.add(it.id, it.count);
-                }
-            }
         }
 
         getLook() {
@@ -231,6 +278,7 @@
     };
 
     const CharCreation = {
+        DESTINY_CLASSES,
         ORIGINS,
         HAIR_STYLES,
         HAIR_COLORS,
@@ -249,12 +297,13 @@
         }
     };
 
+    global.DESTINY_CLASSES = DESTINY_CLASSES;
     global.ORIGINS = ORIGINS;
     global.CharCreation = CharCreation;
     global.CharacterProfile = CharacterProfile;
     global.WorldSyncPacket = WorldSyncPacket;
 
     if (typeof module !== "undefined" && module.exports) {
-        module.exports = { ORIGINS, CharCreation, CharacterProfile, WorldSyncPacket };
+        module.exports = { DESTINY_CLASSES, ORIGINS, CharCreation, CharacterProfile, WorldSyncPacket };
     }
 })(typeof window !== "undefined" ? window : globalThis);

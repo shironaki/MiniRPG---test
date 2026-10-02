@@ -52,7 +52,9 @@
     // Hero stats & character profile
     const hero = new Player("Любомир");
     const journal = new QuestJournal();
-    let charProfile = null;
+    let charProfile = (typeof CharacterProfile !== "undefined")
+        ? new CharacterProfile({ name: "Любомир" })
+        : null;
 
     // Try to load saved profile
     try {
@@ -103,7 +105,7 @@
         }));
         enemies = (mapData.enemies || []).map(e => new Enemy2D(
             e.col * ts + 6, e.row * ts + 6,
-            { w: 20, h: 20, kind: e.kind || e.type, emoji: e.emoji, wanderRadius: e.wanderRadius }
+            { w: 20, h: 20, kind: e.kind || e.type, type: e.type || e.kind, emoji: e.emoji, wanderRadius: e.wanderRadius, friendly: e.friendly }
         ));
         portals = (mapData.portals || []).map(p => ({
             ...p, px: p.col * ts + ts / 2, py: p.row * ts + ts / 2
@@ -152,6 +154,9 @@
         hero, journal, host, refresh: refreshStats, social, resources,
         requests, storage, tools, cooking, fishing, weather,
         ranch, smelting, decor, mines, skills, homestead,
+        get charProfile() { return charProfile; },
+        set charProfile(p) { charProfile = p; },
+        closeInteraction,
         addEmote: (icon, x, y, life, offY) => addEmote(icon, x !== undefined ? x : player.centerX, y !== undefined ? y : player.centerY, life, offY),
         addFloatingText: (text, x, y, col, sz, maxT) => addFloatingText(text, x !== undefined ? x : player.centerX, y !== undefined ? y : player.centerY - 16, col, sz, maxT),
         enterMines: (fl) => {
@@ -166,6 +171,10 @@
         if (!statsEl) return;
         const hpPct = Math.max(0, Math.min(100, Math.round((hero.health / hero.maxHealth) * 100)));
         const enPct = Math.max(0, Math.min(100, Math.round((hero.energy / hero.maxEnergy) * 100)));
+
+        const activeClassTitle = (charProfile && typeof charProfile.getActiveTitle === "function")
+            ? charProfile.getActiveTitle(skills)
+            : "Новичок долины";
 
         const hotbarHtml = (tools && typeof tools.getHotbar === "function")
             ? tools.getHotbar().map((s, idx) => `
@@ -182,6 +191,7 @@
                     <div class="avatarCircle">🧑</div>
                     <div class="nameWrap">
                         <strong class="heroName">${hero.name || "Любомир"}</strong>
+                        <span class="statClassBadge">👑 ${activeClassTitle}</span>
                         <span class="statLevelBadge">⭐ Ур. ${hero.level}</span>
                     </div>
                 </div>
@@ -346,12 +356,12 @@
         }
         for (const n of npcs) {
             const d = Math.hypot(n.centerX - player.centerX, n.centerY - player.centerY);
-            if (d <= bestD) { bestD = d; best = { kind: "npc", target: n, emoji: n.emoji, label: n.name }; }
+            if (d < bestD) { bestD = d; best = { kind: "npc", target: n, emoji: n.emoji, label: n.name }; }
         }
         for (const r of resourceNodes) {
             if (r.depleted) continue;
             const d = Math.hypot(r.centerX - player.centerX, r.centerY - player.centerY);
-            if (d <= bestD) {
+            if (d < bestD) {
                 bestD = d;
                 const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[r.res] : null;
                 const emoji = (meta && meta.emoji) || "📦";
@@ -361,7 +371,7 @@
         }
         for (const f of farmPlots) {
             const d = Math.hypot(f.px - player.centerX, f.py - player.centerY);
-            if (d <= bestD) {
+            if (d < bestD) {
                 bestD = d;
                 const act = farm.actionFor(f.col, f.row);
                 const labels = {
@@ -373,7 +383,91 @@
                 best = { kind: "farm", target: f, emoji: "🌱", label: labels[act] || "Грядка" };
             }
         }
+        for (const e of enemies) {
+            if (!e.alive) continue;
+            const isFauna = e.kind === "cat" || e.kind === "cow" || e.kind === "sheep" || e.kind === "chicken" || e.kind === "duck";
+            if (!isFauna) continue;
+            const ex = e.x + (e.w || 20) / 2;
+            const ey = e.y + (e.h || 20) / 2;
+            const d = Math.hypot(ex - player.centerX, ey - player.centerY);
+            if (d < bestD) {
+                bestD = d;
+                const emoji = e.emoji || (e.kind === "cow" ? "🐮" : e.kind === "sheep" ? "🐑" : e.kind === "chicken" ? "🐔" : "🐱");
+                const name = e.name || (e.kind === "cow" ? "Корова Бурёнка" : e.kind === "sheep" ? "Овечка Кудряш" : e.kind === "chicken" ? "Курочка" : "Кот Мурзик");
+                best = { kind: "fauna", target: e, emoji, label: name, px: ex, py: ey };
+            }
+        }
         return best;
+    }
+
+    // Direct physical interaction with friendly animals in the pasture
+    function interactFauna(animal) {
+        if (!animal) return { ok: false };
+        const kind = animal.kind || animal.type || "";
+        const ax = animal.x + (animal.w || 20) / 2;
+        const ay = animal.y + (animal.h || 20) / 2;
+
+        if (kind === "cat" || kind === "fauna_cat") {
+            hero.health = Math.min(hero.maxHealth, hero.health + 10);
+            hero.energy = Math.min(hero.maxEnergy, hero.energy + 15);
+            addEmote("❤️", ax, ay - 18, 1.8);
+            addFloatingText("Мур-р-р... +15⚡", ax, ay - 24, "rgba(244, 114, 182, ALPHA)", 13);
+            showFlash("🐱 Кот Мурзик довольно мурлычет и трётся о твои ноги.", 1.5);
+            if (skills) skills.addXp("foraging", 2);
+            refreshStats();
+            return { ok: true, action: "pet", kind: "cat" };
+        }
+
+        // Farm livestock (cow, sheep, chicken) linked to RanchSystem
+        if (ranch) {
+            const rAnimal = ranch.list.find(a => a.type === kind || a.id === animal.id || (kind && kind.includes(a.type))) || ranch.list[0];
+            if (rAnimal) {
+                // If not petted today, pet first
+                if (!rAnimal.petted) {
+                    const pRes = rAnimal.pet();
+                    if (pRes.ok) {
+                        addEmote("❤️", ax, ay - 18, 1.8);
+                        addFloatingText(`${rAnimal.name} ❤️`, ax, ay - 24, "rgba(244, 114, 182, ALPHA)", 13);
+                        showFlash(pRes.msg, 1.5);
+                        if (skills) skills.addXp("farming", 4);
+                        refreshStats();
+                        return { ok: true, action: "pet", animal: rAnimal };
+                    }
+                }
+                // If has wheat/hay in bag and not fed, feed
+                if (!rAnimal.fed && (resources.count("wheat") > 0 || resources.count("hay") > 0)) {
+                    const fRes = rAnimal.feed(resources);
+                    if (fRes.ok) {
+                        addEmote("🌾", ax, ay - 18, 1.8);
+                        addFloatingText(`Покормлено 🌾`, ax, ay - 24, "rgba(74, 222, 128, ALPHA)", 13);
+                        showFlash(fRes.msg, 1.5);
+                        if (skills) skills.addXp("farming", 6);
+                        refreshStats();
+                        return { ok: true, action: "feed", animal: rAnimal };
+                    }
+                }
+                // If has ready product, harvest it directly
+                if (rAnimal.hasProduct) {
+                    const hRes = rAnimal.harvest(resources, dayCount);
+                    if (hRes.ok) {
+                        const meta = (typeof RESOURCES !== "undefined") ? RESOURCES[hRes.res] : null;
+                        const em = meta ? meta.emoji : "📦";
+                        addEmote(em, ax, ay - 18, 2.0);
+                        addFloatingText(`+1 ${meta ? meta.name : hRes.res}`, ax, ay - 26, "rgba(255, 215, 0, ALPHA)", 14);
+                        showFlash(`🎉 Собрана свежая продукция: ${meta ? meta.name : hRes.res}!`, 1.8);
+                        if (skills) skills.addXp("farming", 10);
+                        refreshStats();
+                        return { ok: true, action: "harvest", res: hRes.res, animal: rAnimal };
+                    }
+                }
+            }
+        }
+
+        // Friendly idle reaction
+        addEmote("❤️", ax, ay - 18, 1.5);
+        addFloatingText("Довольное животное ✨", ax, ay - 24, "rgba(250, 204, 21, ALPHA)", 12);
+        showFlash(`Животное довольно жуёт траву на пастбище.`, 1.3);
+        return { ok: true, action: "idle" };
     }
 
     // Daily dawn: skip to 08:00
@@ -635,22 +729,32 @@
     }
 
     function lightingFor(min) {
-        const dawn = 6 * 60, noon = 12 * 60, dusk = 19 * 60, night = 22 * 60;
-        let r = 255, g = 255, b = 255, a = 0, nightRatio = 0;
+        const dawn = 5.5 * 60, dayStart = 6.5 * 60, dusk = 19.5 * 60, night = 22 * 60;
+        let r = 12, g = 18, b = 45, a = 0, nightRatio = 0;
+
         if (min >= night || min < dawn) {
-            r = 15; g = 20; b = 50; a = 0.58; nightRatio = 1.0;
-        } else if (min >= dawn && min < noon) {
-            const t = (min - dawn) / (noon - dawn);
-            r = 255; g = Math.round(200 + 55 * t); b = Math.round(160 + 95 * t); a = 0.28 * (1 - t);
-            nightRatio = 0.4 * (1 - t);
-        } else if (min >= noon && min < dusk) {
+            // Deep night: dark indigo wash
+            r = 8; g = 10; b = 28; a = 0.65; nightRatio = 1.0;
+        } else if (min >= dawn && min < dayStart) {
+            // Dawn transition: night fades away to clear day
+            const t = (min - dawn) / (dayStart - dawn);
+            r = 15; g = 20; b = 50; a = 0.65 * (1 - t);
+            nightRatio = 1 - t;
+        } else if (min >= dayStart && min < dusk) {
+            // Clear, vibrant daytime: ZERO darkness overlay
             a = 0; nightRatio = 0;
         } else {
+            // Dusk transition: evening falls
             const t = (min - dusk) / (night - dusk);
-            r = Math.round(255 - 240 * t); g = Math.round(180 - 160 * t); b = Math.round(140 - 90 * t); a = 0.58 * t;
+            r = 12; g = 18; b = 45; a = 0.65 * t;
             nightRatio = t;
         }
-        return { r, g, b, a, night: nightRatio };
+        return {
+            r, g, b, a,
+            alpha: a,
+            night: nightRatio,
+            color: a === 0 ? "transparent" : "#080a1c"
+        };
     }
 
     function clockLabel(min) {
@@ -715,11 +819,13 @@
                 gatherFrom(sel.target);
             } else if (sel.kind === "farm") {
                 workPlot(sel.target);
+            } else if (sel.kind === "fauna") {
+                interactFauna(sel.target);
             } else {
                 openInteraction(sel);
             }
             input.consumePressed();
-            if (sel.kind !== "resource" && sel.kind !== "farm") return;
+            if (sel.kind !== "resource" && sel.kind !== "farm" && sel.kind !== "fauna") return;
         }
         input.consumePressed();
 
@@ -840,7 +946,7 @@
         player, camera, input, loop,
         get tilemap() { return tilemap; },
         get mapData() { return mapData; },
-        social, resources, farm, weather,
+        social, resources, bag: resources, farm, weather,
         get npcs() { return npcs; },
         get nodes() { return resourceNodes; },
         get enemies() { return enemies; },
@@ -851,6 +957,7 @@
         addFloatingText, addEmote,
         requests, storage, tools, cooking, fishing,
         ranch, smelting, decor, mines, skills, homestead,
+        lightingFor, interactFauna, refreshStats,
         sleepUntilMorning, fishAtPond, closeInteraction,
         get zone() { return zoneName; },
         get clock() { return clockMin; },

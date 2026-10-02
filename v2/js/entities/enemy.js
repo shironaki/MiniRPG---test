@@ -5,6 +5,8 @@
  * encounter can spawn the matching foe in battle. Pure logic; rng is injectable
  * for deterministic tests.
  */
+const HOSTILE_MOBS = new Set(["goblin", "skeleton", "wolf"]);
+
 class Enemy2D {
     constructor(x, y, opts = {}) {
         this.x = x;
@@ -14,8 +16,10 @@ class Enemy2D {
         this.w = opts.w || 20;
         this.h = opts.h || 20;
         this.speed = opts.speed || 55;
-        this.kind = opts.kind || "goblin";
+        this.kind = opts.kind || opts.type || "goblin";
+        this.type = opts.type || opts.kind || "goblin";
         this.emoji = opts.emoji || "👹";
+        this.friendly = opts.friendly !== undefined ? opts.friendly : (!HOSTILE_MOBS.has(this.kind));
         this.wanderRadius = opts.wanderRadius || 96;
         this.rng = opts.rng || Math.random;
         this.dir = { x: 0, y: 0 };
@@ -64,8 +68,6 @@ class Enemy2D {
         }
     }
 }
-
-const HOSTILE_MOBS = new Set(["goblin", "skeleton", "wolf"]);
 
 // Returns the first enemy whose box overlaps `heroBox`, or null. Pure.
 function detectEncounter(heroBox, enemies) {

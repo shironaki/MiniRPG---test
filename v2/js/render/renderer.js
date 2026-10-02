@@ -406,7 +406,7 @@ class Renderer {
 
     // Full-screen day/night tint with dynamic light sources (lamps, windows, player lantern).
     drawNightOverlay(light, camera, sources) {
-        if (!light || light.a <= 0.002) return;
+        if (!light || light.a <= 0.04 || !light.night || light.night <= 0.01) return;
         const ctx = this.ctx;
         const W = camera.viewW, H = camera.viewH;
 
