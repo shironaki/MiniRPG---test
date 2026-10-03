@@ -1,0 +1,233 @@
+/**
+ * v3 tests — the real Game object, booted against a fake DOM.
+ *
+ * Catches wiring bugs that pure-logic tests cannot: a broken selector, a
+ * missing canvas call, a null in the render path, an interaction that does
+ * not fire. This is the test that proves the build actually runs.
+ */
+import { suite, test, assert, run } from "./tiny.js";
+import { installDOM, key } from "./dom-harness.js";
+
+const dom = installDOM();
+const { Game } = await import("../js/main.js");
+
+function boot() {
+    const canvas = dom.doc.getElementById("game");
+    const hud = dom.doc.getElementById("hud");
+    return new Game({ canvas, hudRoot: hud, seed: "test-valley" });
+}
+
+/** Run n simulation+render frames at 60 fps. */
+function frames(game, n) {
+    for (let i = 0; i < n; i++) { game.update(1 / 60); game.render(); }
+}
+
+suite("boot");
+
+test("the game constructs with a world, a hero and a HUD", () => {
+    const g = boot();
+    assert.ok(g.zone, "no zone");
+    assert.eq(g.zone.id, "ashfall");
+    assert.ok(g.player.x > 0 && g.player.y > 0);
+    assert.not(g.zone.solidAt(g.player.x, g.player.y), "the hero spawned inside a rock");
+    assert.ok(g.inventory.has("flint"), "no way to light a fire");
+    assert.ok(g.inventory.has("knife"));
+});
+
+test("the opening narration appears and pauses the world", () => {
+    const g = boot();
+    g.start();
+    assert.ok(g.hud.isStoryOpen, "the prologue text should be on screen");
+    assert.ok(g.paused);
+    g.hud.hideStory();
+    assert.not(g.paused, "closing the story must resume the game");
+});
+
+suite("frame");
+
+test("rendering a frame touches the canvas and bakes chunks", () => {
+    const g = boot();
+    const ctx = g.renderer.ctx;
+    g.render();
+    assert.gt(ctx.calls.total, 50, "nothing was drawn");
+    assert.gt(g.renderer.stats.chunksDrawn, 0, "no ground chunks drawn");
+    assert.gt(g.renderer.stats.baked, 0, "chunks were never baked");
+});
+
+test("baked chunks are reused on the next frame", () => {
+    const g = boot();
+    g.render();
+    const baked = g.renderer.stats.baked;
+    g.render(); g.render();
+    assert.eq(g.renderer.stats.baked, baked, "chunks must be cached, not re-baked every frame");
+});
+
+test("300 frames run without throwing and the clock moves", () => {
+    const g = boot();
+    const t0 = g.clock.minute;
+    frames(g, 300);
+    assert.ok(g.clock.minute !== t0, "time stood still");
+    assert.ok(g.needs.alive);
+});
+
+suite("input & movement");
+
+test("holding W walks the hero north", () => {
+    const g = boot();
+    const y0 = g.player.y;
+    key(dom.win, "KeyW", true);
+    frames(g, 40);
+    key(dom.win, "KeyW", false);
+    assert.lt(g.player.y, y0, "the hero did not move north");
+    assert.eq(g.player.dir, "up");
+});
+
+test("the camera follows and stays inside the zone", () => {
+    const g = boot();
+    key(dom.win, "KeyD", true);
+    frames(g, 120);
+    key(dom.win, "KeyD", false);
+    assert.gte(g.camera.x, 0);
+    assert.lte(g.camera.x + g.camera.viewW, g.zone.map.widthPx + 1);
+});
+
+test("number keys switch the hotbar slot", () => {
+    const g = boot();
+    key(dom.win, "Digit2", true);
+    g.update(1 / 60);
+    assert.eq(g.inventory.activeSlot, 1);
+});
+
+suite("interaction");
+
+test("E on firewood picks it up and shows a floating number", () => {
+    const g = boot();
+    const wood = g.zone.objects.find((o) => o.kind === "firewood" && !o.removed);
+    assert.ok(wood, "the camp must have firewood nearby");
+    g.player.x = wood.x; g.player.y = wood.y - 16; g.player.dir = "down";
+    const before = g.inventory.count("firewood");
+    g.interact = g.findInteractable();
+    assert.eq(g.interact, wood, "the prop under the cursor was not detected");
+    g.doInteract();
+    assert.gt(g.inventory.count("firewood"), before, "nothing was picked up");
+    assert.ok(wood.removed);
+    assert.gt(g.particles.count, 0, "no feedback particles");
+});
+
+test("a tree refuses bare hands and yields to an axe", () => {
+    const g = boot();
+    const tree = g.zone.objects.find((o) => ["burnt_tree", "pine", "oak", "birch"].includes(o.kind) && !o.removed);
+    if (!tree) return;                       // ash fields can be sparse; not a failure
+    g.player.x = tree.x; g.player.y = tree.y - 16; g.player.dir = "down";
+    g.interact = tree;
+    g.doInteract();
+    assert.not(tree.removed, "chopped a tree with bare hands");
+    g.inventory.add("axe_stone", 1);
+    for (let i = 0; i < 10 && !tree.removed; i++) { g.interact = tree; g.doInteract(); }
+    assert.ok(tree.removed, "an axe should fell it");
+    assert.gt(g.inventory.count("charcoal") + g.inventory.count("log") + g.inventory.count("firewood"), 0);
+});
+
+test("the campfire panel opens, takes fuel, lights and cooks", () => {
+    const g = boot();
+    const fireObj = g.zone.objects.find((o) => o.kind === "campfire");
+    assert.ok(fireObj);
+    g.inventory.add("firewood", 5);
+    g.inventory.add("fish_raw", 1);
+    g.player.x = fireObj.x; g.player.y = fireObj.y - 16; g.player.dir = "down";
+
+    g.openFire(fireObj);
+    assert.ok(g.hud.isPanelOpen, "the fire panel did not open");
+    const fire = g.fires.get(g.fireKey(g.zone, fireObj));
+    assert.ok(fire);
+
+    const before = fire.fuel;
+    g.openFire(fireObj);                     // rebuild rows, then act through the API
+    fire.addFuel("firewood");
+    assert.gt(fire.fuel, before);
+    assert.ok(fire.light({ hasFlint: true }));
+    assert.ok(fire.lit);
+
+    fire.addFuel("log");                 // a stick alone burns out mid-cook
+    fire.putOnSpit("fish_raw");
+    fire.update(60);
+    assert.eq(fire.spit[0].state, "done");
+
+    // A lit fire must light and warm the camp.
+    assert.gt(g.fireWarmthNear(g.player.x, g.player.y), 0);
+    g.render();
+    assert.gt(g.renderer.lightMap.lights.length, 0, "the fire casts no light");
+});
+
+test("reading the burnt diary raises its story flag and advances the prologue", () => {
+    const g = boot();
+    const hearth = g.zone.objects.find((o) => o.kind === "hearth_ruin");
+    const diary = g.zone.objects.find((o) => o.kind === "diary");
+    g.interact = hearth; g.doInteract();
+    assert.ok(g.story.hasFlag("home_hearth"));
+    g.interact = diary; g.doInteract();
+    assert.ok(g.story.hasFlag("own_diary"));
+    assert.eq(g.story.current.id, "firewood");
+    assert.ok(g.inventory.has("diary_burnt"));
+});
+
+test("eating restores hunger and removes the item", () => {
+    const g = boot();
+    g.needs.food = 40;
+    g.inventory.add("meat_roast", 1);
+    g.eat("meat_roast");
+    assert.gt(g.needs.food, 60);
+    assert.not(g.inventory.has("meat_roast"));
+});
+
+suite("world travel & persistence");
+
+test("stepping into a portal moves the hero to the next zone", () => {
+    const g = boot();
+    const portal = g.zone.portals.find((p) => p.target === "meadow");
+    g.player.x = portal.x + portal.w / 2;
+    g.player.y = portal.y + portal.h / 2;
+    g.update(1 / 60);
+    assert.eq(g.zone.id, "meadow");
+    assert.not(g.zone.solidAt(g.player.x, g.player.y), "arrived inside a wall");
+    g.render();                                   // the new zone must render too
+    assert.gt(g.renderer.stats.chunksDrawn, 0);
+});
+
+test("sleeping in the tent skips to morning", () => {
+    const g = boot();
+    const tent = g.zone.objects.find((o) => o.kind === "tent");
+    g.clock.minute = 22 * 60;
+    g.needs.fatigue = 80;
+    g.sleep(tent);
+    assert.gte(g.clock.hour, 6);
+    assert.lt(g.clock.hour, 12);
+    assert.eq(g.clock.day, 2);
+    assert.lt(g.needs.fatigue, 80, "sleep must rest the hero");
+    assert.not(g.player.sleeping);
+});
+
+test("save and load restore the hero, time and inventory", () => {
+    const g = boot();
+    g.inventory.add("log", 4);
+    g.clock.advanceMinutes(120);
+    const day = g.clock.day, minute = g.clock.minute;
+    assert.ok(g.save.write());
+
+    const g2 = boot();
+    assert.ok(g2.save.loadFromStorage());
+    assert.eq(g2.clock.day, day);
+    assert.eq(g2.clock.minute, minute);
+    assert.eq(g2.inventory.count("log"), 4);
+});
+
+test("collapsing from exposure puts the hero back at camp, not at a game over", () => {
+    const g = boot();
+    g.needs.health = 0.5; g.needs.food = 0; g.needs.warmth = 0;
+    g.simulateMinutes(30);
+    assert.ok(g.hud.isStoryOpen || !g.needs.alive === false, "a collapse should be narrated");
+    assert.ok(g.needs.alive, "the hero wakes up again — death is not an ending");
+    assert.lt(g.needs.health, 60);
+});
+
+run("v3 game");

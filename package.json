@@ -1,7 +1,7 @@
 {
   "name": "mini-rpg",
   "version": "9.0.0",
-  "description": "Mini RPG 9.0 — The Lost Kingdom. A dependency-free browser RPG.",
+  "description": "Mini RPG — v1 (RPG), v2 (2D village) и v3 «Пепел и Зерно» (survival sandbox / colony builder). Dependency-free browser game.",
   "private": true,
   "author": "shironaki",
   "license": "MIT",
@@ -10,8 +10,9 @@
     "url": "https://github.com/shironaki/MiniRPG---test.git"
   },
   "scripts": {
-    "test": "node tests/game.test.js && node tests/integration.test.js && node v2/tests/engine.test.js && node v2/tests/battle.test.js && node v2/tests/menus.test.js && node v2/tests/smoke.test.js",
+    "test": "node tests/game.test.js && node tests/integration.test.js && node v2/tests/engine.test.js && node v2/tests/battle.test.js && node v2/tests/menus.test.js && node v2/tests/smoke.test.js && npm run test:v3",
     "serve": "node scripts/serve.js",
-    "check": "for f in js/*.js scripts/*.js tests/*.js v2/js/main.js v2/js/*/*.js v2/tests/*.js; do node --check \"$f\" || exit 1; done && echo 'syntax OK'"
+    "check": "for f in js/*.js scripts/*.js tests/*.js v2/js/main.js v2/js/*/*.js v2/tests/*.js v3/js/main.js v3/js/*/*.js v3/tests/*.js; do node --check \"$f\" || exit 1; done && echo 'syntax OK'",
+    "test:v3": "node v3/tests/core.test.js && node v3/tests/world.test.js && node v3/tests/survival.test.js && node v3/tests/story.test.js && node v3/tests/smoke.test.js && node v3/tests/game.test.js"
   }
 }
