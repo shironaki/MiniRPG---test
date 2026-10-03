@@ -22,8 +22,22 @@ const MIME = {
     ".ico": "image/x-icon"
 };
 
-http.createServer((req, res) => {
+// A tiny inline favicon keeps the browser console clean in the live preview.
+const FAVICON = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
+    '<rect width="32" height="32" fill="#16130f"/>' +
+    '<path d="M16 6c3 5 6 7 6 12a6 6 0 0 1-12 0c0-5 3-7 6-12z" fill="#ff8a3a"/>' +
+    '<path d="M16 14c1.4 2.4 2.6 3.4 2.6 5.6a2.6 2.6 0 0 1-5.2 0c0-2.2 1.2-3.2 2.6-5.6z" fill="#ffe0a0"/>' +
+    "</svg>"
+);
+
+const server = http.createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
+    if (urlPath === "/favicon.ico" || urlPath === "/favicon.svg") {
+        res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=86400" });
+        res.end(FAVICON);
+        return;
+    }
     const rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");
     const filePath = path.join(ROOT, rel);
     if (!filePath.startsWith(ROOT)) {
@@ -42,6 +56,14 @@ http.createServer((req, res) => {
         });
         fs.createReadStream(filePath).pipe(res);
     });
-}).listen(PORT, "0.0.0.0", () => {
+});
+
+// A dev server must never die mid-session over a dropped socket.
+server.on("clientError", (err, socket) => {
+    if (socket.writable) socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+});
+process.on("uncaughtException", (err) => console.error("[serve] ", err.message));
+
+server.listen(PORT, "0.0.0.0", () => {
     console.log(`Пепел и Зерно (v3) → http://0.0.0.0:${PORT}`);
 });
