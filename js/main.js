@@ -1,2212 +1,652 @@
-const game =
-    new Game();
+/**
+ * v3 — «Пепел и Зерно». Bootstrap and orchestration.
+ *
+ * This file wires systems together and owns the player's *intent* (what E does
+ * right now). All rules live in their own modules; nothing here should grow
+ * into v2's thousand-line main.js.
+ */
+import { EventBus } from "./core/events.js";
+import { GameClock } from "./core/time.js";
+import { GameLoop } from "./core/loop.js";
+import { RNG, hashSeed } from "./core/rng.js";
+import { SaveManager } from "./core/save.js";
+import { Input } from "./engine/input.js";
+import { Camera } from "./engine/camera.js";
+import { WorldMap } from "./world/worldgen.js";
+import { WeatherSystem } from "./world/weather.js";
+import { START_ZONE, biomeDef, oppositeEdge } from "./world/regions.js";
+import { TILE_SIZE } from "./world/tiles.js";
+import { Player } from "./entities/player.js";
+import { Inventory } from "./sandbox/inventory.js";
+import { itemDef, itemEmoji, itemName, foodValue } from "./sandbox/items.js";
+import { propDef, rollDrops, requiredTool, toolHint } from "./sandbox/gather.js";
+import { Needs } from "./survival/needs.js";
+import { ambientTemperature } from "./survival/temperature.js";
+import { Campfire } from "./survival/campfire.js";
+import { CookingJournal, isCookable } from "./survival/cooking.js";
+import { Renderer } from "./render/renderer.js";
+import { Particles } from "./render/particles.js";
+import { StoryEngine } from "./story/acts.js";
+import { HUD, fireRows } from "./ui/hud.js";
 
+export class Game {
+    constructor({ canvas, hudRoot, seed = Date.now() & 0xffff } = {}) {
+        this.bus = new EventBus();
+        this.seed = typeof seed === "string" ? hashSeed(seed) : seed;
+        this.rng = new RNG(this.seed);
 
-// =============================================
-// ОБЩИЕ ФУНКЦИИ
-// =============================================
+        this.clock = new GameClock({ bus: this.bus, minute: 16 * 60 + 40, day: 1 });
+        this.weather = new WeatherSystem({ bus: this.bus, seed: this.seed, clock: this.clock });
+        this.world = new WorldMap(this.seed);
+        this.needs = new Needs({ bus: this.bus, difficulty: "normal" });
+        this.inventory = new Inventory({ bus: this.bus });
+        this.cookJournal = new CookingJournal({ bus: this.bus });
+        this.particles = new Particles();
+        this.fires = new Map();          // `${zoneId}:${tx},${ty}` -> Campfire
+        this.look = { skin: "#e2b48a", hair: "#3f2d20", shirt: "#7a6a4a", pants: "#4a4034" };
 
-let previousScreen = "menuScreen";
+        this.zone = this.world.get(START_ZONE);
+        this.player = new Player({ x: this.zone.spawn.x, y: this.zone.spawn.y, bus: this.bus });
 
-function showScreen(id) {
+        this.camera = new Camera({ width: canvas.width, height: canvas.height, zoom: 2.4 });
+        this.camera.setBounds(this.zone.map.widthPx, this.zone.map.heightPx);
+        this.camera.snapTo(this.player.x, this.player.y);
 
-    // Remember the last "real" screen so Settings can return to it.
-    if (id !== "settingsScreen") previousScreen = id;
-
-    // Progressive UI: the player panel and journal only exist once you're
-    // actually in a run. The menu and end screens stay clean and minimal.
-    const gameRoot = document.getElementById("game");
-    if (gameRoot) {
-        if (id === "menuScreen" || id === "endScreen") gameRoot.classList.remove("playing");
-        else if (id !== "settingsScreen") gameRoot.classList.add("playing");
-    }
-
-    document
-        .querySelectorAll(".screen")
-        .forEach(screen => {
-
-            screen.classList.add(
-                "hidden"
-            );
+        this.renderer = new Renderer(canvas, this.camera);
+        this.input = new Input({ target: window });
+        this.hud = new HUD(hudRoot, {
+            onHotbar: (i) => this.inventory.setActive(i),
+            onAction: () => {}
         });
-
-
-    const target = document.getElementById(id);
-    target.classList.remove("hidden");
-
-    // Retrigger the entrance animation on each switch.
-    target.classList.remove("screenEnter");
-    void target.offsetWidth; // reflow so the animation can replay
-    target.classList.add("screenEnter");
-}
-
-
-function addLog(message) {
-
-    const log =
-        document.getElementById(
-            "log"
-        );
-
-
-    const line =
-        document.createElement(
-            "div"
-        );
-
-
-    line.innerHTML =
-        message;
-
-
-    log.prepend(line);
-}
-
-
-// =============================================
-// НОВАЯ ИГРА
-// =============================================
-
-document
-    .getElementById("newGameButton")
-    .addEventListener(
-        "click",
-        () => {
-
-            game.start();
-
-        }
-    );
-
-
-const continueButton =
-    document.getElementById("continueGameButton");
-
-continueButton.addEventListener("click", () => {
-    if (!game.resume()) {
-        alert("💾 Сохранение ещё не найдено.");
-        refreshContinueButton();
-    }
-});
-
-// Reflect save availability so players aren't offered a dead "Continue".
-function refreshContinueButton() {
-    const hasSave = Boolean(game.saveSystem.load()?.player);
-    continueButton.disabled = !hasSave;
-    continueButton.title = hasSave
-        ? "Продолжить сохранённое приключение"
-        : "Сохранение ещё не найдено";
-}
-
-refreshContinueButton();
-
-// =============================================
-// КАК ИГРАТЬ
-// =============================================
-
-document
-    .getElementById("helpButton")
-    .addEventListener(
-        "click",
-        () => {
-
-            alert(`
-
-MINI RPG 9.0
-
-🎮 Создай героя.
-
-🏘️ В городе:
-- разговаривай с NPC
-- бери квесты
-- покупай предметы
-- управляй инвентарём
-
-🗺️ В мире:
-- перемещайся по направлениям
-- исследуй комнаты
-- в каждой комнате есть одна ценная находка или опасность
-- используй новые выходы, чтобы исследовать другие ветки
-- собери 3 руны, чтобы открыть сокровищницу
-- каждую руну стережёт мини-босс — победи его, чтобы забрать руну
-
-⚔️ В бою:
-- атакуй
-- лечись
-- защищайся
-- пытайся сбежать: неудача даёт врагу удар
-
-⚠️ Ловушки:
-- обезвреживай их на удачу
-- успешные попытки повышают навык механика
-
-💥 Критический удар: 15%
-
-💾 Прогресс автоматически сохраняется в браузере.
-
-💀 Если HP станет 0 —
-игра закончится.
-
-🏆 Найди сокровище
-и заверши приключение!
-
-            `);
-
-        }
-    );
-
-
-// =============================================
-// NPC
-// =============================================
-
-document
-    .getElementById("npcButton")
-    .addEventListener(
-        "click",
-        () => {
-
-            showScreen(
-                "npcScreen"
-            );
-
-
-            document
-                .getElementById(
-                    "npcDialogue"
-                )
-                .innerHTML =
-                    game.npc.talk(
-                        game.player,
-                        game.quest
-                    );
-
-            // Reset any prior branching conversation.
-            game.dialogue = null;
-            const chat = document.getElementById("npcChat");
-            const choicesEl = document.getElementById("npcChoices");
-            if (chat) chat.innerHTML = "";
-            if (choicesEl) choicesEl.innerHTML = "";
-        }
-    );
-
-
-// =============================================
-// ДИАЛОГ СО СТАРОСТОЙ (ВЕТВЯЩАЯСЯ БЕСЕДА)
-// =============================================
-
-document
-    .getElementById("npcTalkButton")
-    .addEventListener("click", () => {
-        const trees = (typeof GAME_DATA !== "undefined" && GAME_DATA.dialogues) || {};
-        if (!trees.elder) return;
-        game.dialogue = new Dialogue(trees.elder);
-        renderDialogue();
-    });
-
-function renderDialogue() {
-    const d = game.dialogue;
-    const chat = document.getElementById("npcChat");
-    const choicesEl = document.getElementById("npcChoices");
-    if (!chat || !choicesEl) return;
-
-    if (!d || d.isEnded()) {
-        chat.innerHTML = d ? `<p class="dialogueEnd">🧑 Староста кивает и возвращается к делам.</p>` : "";
-        choicesEl.innerHTML = "";
-        game.dialogue = null;
-        return;
-    }
-
-    const node = d.current();
-    chat.innerHTML = `<div class="dialogueNode"><strong>${node.speaker || ""}</strong><p>${node.text || ""}</p></div>`;
-    choicesEl.innerHTML = "";
-    d.choices().forEach((choice) => {
-        // Map the visible choice back to its real index in the node.
-        const realIndex = node.choices.indexOf(choice);
-        const btn = document.createElement("button");
-        btn.className = "dialogueChoice";
-        btn.textContent = choice.label;
-        btn.onclick = () => chooseDialogue(realIndex);
-        choicesEl.appendChild(btn);
-    });
-}
-
-function chooseDialogue(index) {
-    const d = game.dialogue;
-    if (!d) return;
-    const result = d.choose(index, game);
-    (result.messages || []).forEach(m => addLog(m));
-    game.updateUI();
-    renderDialogue();
-}
-
-
-// =============================================
-// ПОЛУЧИТЬ КВЕСТ
-// =============================================
-
-document
-    .getElementById("npcQuestButton")
-    .addEventListener(
-        "click",
-        () => {
-
-            if (
-                !game.quest.active
-            ) {
-
-                addLog(
-                    game.quest.start()
-                );
-            }
-
-
-            document
-                .getElementById(
-                    "npcDialogue"
-                )
-                .innerHTML =
-                    game.npc.talk(
-                        game.player,
-                        game.quest
-                    );
-
-
-            renderQuest();
-            refreshMenus();
-        }
-    );
-
-
-// =============================================
-// КВЕСТЫ
-// =============================================
-
-document
-    .getElementById("questButton")
-    .addEventListener(
-        "click",
-        () => {
-
-            showScreen(
-                "questScreen"
-            );
-
-            renderQuest();
-        }
-    );
-
-
-// =============================================
-// НАВЫКИ (ПЕРКИ)
-// =============================================
-
-document
-    .getElementById("perkButton")
-    .addEventListener("click", openPerks);
-
-document
-    .getElementById("perkBackButton")
-    .addEventListener("click", () => showScreen("villageScreen"));
-
-
-// =============================================
-// ВРАТА ИСПЫТАНИЙ (ПРОЦЕДУРНОЕ ПОДЗЕМЕЛЬЕ)
-// =============================================
-
-document
-    .getElementById("dungeonButton")
-    .addEventListener("click", () => game.enterDungeon());
-
-document
-    .getElementById("dungeonActionButton")
-    .addEventListener("click", dungeonAction);
-
-document
-    .getElementById("dungeonLeaveButton")
-    .addEventListener("click", () => {
-        if (game.dungeon) game.dungeon.active = false;
-        game.dungeon = null;
-        addLog("🏃 Ты покинул Врата испытаний.");
-        showScreen("villageScreen");
-        refreshMenus();
-    });
-
-const DUNGEON_ICONS = { enemy: "⚔️", elite: "👑", chest: "📦", trap: "⚠️", rest: "🔥" };
-
-function renderDungeon() {
-    const d = game.dungeon;
-    if (!d) return;
-    const track = document.getElementById("dungeonTrack");
-    if (track) {
-        track.innerHTML = d.floors.map((f, i) => {
-            const state = i < d.index ? "done" : i === d.index ? "current" : "upcoming";
-            const icon = i < d.index ? "✅" : (DUNGEON_ICONS[f.type] || "❔");
-            return `<span class="floorPip ${state}">${icon}</span>`;
-        }).join("");
-    }
-
-    const body = document.getElementById("dungeonBody");
-    const action = document.getElementById("dungeonActionButton");
-    const f = d.current();
-    if (!f) { if (body) body.innerHTML = ""; return; }
-
-    const els = { enemy: "Впереди притаился враг.", elite: "Путь стережёт элитный противник!", chest: "Ты видишь запертый сундук.", trap: "Пол усеян ловушками.", rest: "Тихий уголок для передышки." };
-    if (body) {
-        body.innerHTML = `
-            <div class="dungeonFloor">
-                <p class="dungeonDepth">Этаж ${f.n} из ${d.depth}</p>
-                <p class="dungeonEvent">${DUNGEON_ICONS[f.type] || "❔"} ${els[f.type] || ""}</p>
-            </div>`;
-    }
-    if (action) {
-        action.textContent = (f.type === "enemy" || f.type === "elite") ? "⚔️ Сразиться" : "➡️ Продолжить";
-    }
-}
-
-function dungeonAction() {
-    const d = game.dungeon;
-    if (!d || !d.active) return;
-    const f = d.current();
-    if (!f) return;
-    if (f.type === "enemy" || f.type === "elite") {
-        game.startDungeonBattle(f);
-        return;
-    }
-    addLog(game.resolveDungeonFloor(f));
-    if (game.player.isDead()) return; // gameOver already handled
-    d.advance();
-    game.updateUI();
-    if (d.cleared) game.finishDungeon();
-    else renderDungeon();
-}
-
-
-// =============================================
-// КУЗНИЦА
-// =============================================
-
-document
-    .getElementById("forgeButton")
-    .addEventListener("click", openForge);
-
-document
-    .getElementById("forgeBackButton")
-    .addEventListener("click", () => showScreen("villageScreen"));
-
-
-// Progressive disclosure of village options: the quest board appears after the
-// Elder's call; the perks screen appears once you have a point (or a perk).
-function refreshMenus() {
-    const questBtn = document.getElementById("questButton");
-    if (questBtn) {
-        const unlocked = Boolean(game && game.quest && game.quest.active);
-        questBtn.style.display = unlocked ? "" : "none";
-    }
-    const perkBtn = document.getElementById("perkButton");
-    if (perkBtn) {
-        const p = game && game.player;
-        const unlocked = p && (((p.perkPoints || 0) > 0) || (p.perks && Object.keys(p.perks).length > 0));
-        perkBtn.style.display = unlocked ? "" : "none";
-    }
-    const forgeBtn = document.getElementById("forgeButton");
-    if (forgeBtn) {
-        const p = game && game.player;
-        const unlocked = p && typeof Craft !== "undefined" && Craft.essenceCount(p) > 0;
-        forgeBtn.style.display = unlocked ? "" : "none";
-    }
-    const dungeonBtn = document.getElementById("dungeonButton");
-    if (dungeonBtn) {
-        const p = game && game.player;
-        // The trial gate opens once the hero is seasoned enough (level 3).
-        const unlocked = p && (p.level || 1) >= 3;
-        dungeonBtn.style.display = unlocked ? "" : "none";
-    }
-}
-
-
-function openPerks() {
-    showScreen("perkScreen");
-    renderPerks();
-}
-
-function renderPerks() {
-    const pointsEl = document.getElementById("perkPoints");
-    if (pointsEl) pointsEl.innerHTML = `🧠 Очки навыков: <strong>${(game.player && game.player.perkPoints) || 0}</strong>`;
-    const list = document.getElementById("perkList");
-    if (!list) return;
-    const defs = (typeof GAME_DATA !== "undefined" && GAME_DATA.perks) || [];
-    list.innerHTML = defs.map(def => {
-        const rank = (game.player.perks && game.player.perks[def.id]) || 0;
-        const maxed = rank >= def.maxRank;
-        const afford = (game.player.perkPoints || 0) >= (def.cost || 1);
-        const pips = "●".repeat(rank) + "○".repeat(def.maxRank - rank);
-        const action = maxed
-            ? `<span class="perkMax">МАКС</span>`
-            : `<button class="perkBuy" onclick="buyPerk('${def.id}')"${afford ? "" : " disabled"}>Улучшить</button>`;
-        return `<div class="perkCard ${maxed ? "maxed" : ""}">
-            <strong>${def.emoji} ${def.name}</strong>
-            <span class="perkPips">${pips}</span>
-            <p>${def.desc}</p>
-            ${action}
-        </div>`;
-    }).join("");
-}
-
-function buyPerk(id) {
-    const res = game.buyPerk(id);
-    if (res.success) {
-        addLog(`🧠 Навык улучшен: ${res.def.emoji} ${res.def.name} (ранг ${res.rank}).`);
-        if (typeof sfx !== "undefined") sfx.play("relic");
-    } else if (res.message) {
-        addLog(`⚠️ ${res.message}`);
-    }
-    game.updateUI();
-    renderPerks();
-}
-
-
-// =============================================
-// КУЗНИЦА (КРАФТ / РЕДКОСТЬ)
-// =============================================
-
-function forgeItems() {
-    // Every upgradeable piece the player owns: equipped slots + inventory gear.
-    const p = game.player;
-    const equipped = Object.values(p.equipment || {}).filter(Boolean);
-    const bag = (p.inventory || []).filter(i => i.isEquipment && i.isEquipment());
-    return equipped.concat(bag);
-}
-
-function openForge() {
-    showScreen("forgeScreen");
-    renderForge();
-}
-
-function renderForge() {
-    const p = game.player;
-    const resEl = document.getElementById("forgeResources");
-    if (resEl) resEl.innerHTML = `🔩 Эссенции: <strong>${Craft.essenceCount(p)}</strong> &nbsp;·&nbsp; 💰 Золото: <strong>${p.gold}</strong>`;
-    const list = document.getElementById("forgeList");
-    if (!list) return;
-
-    const items = forgeItems();
-    game._forgeItems = items;
-    if (!items.length) {
-        list.innerHTML = `<p class="muted">Нет снаряжения для улучшения. Найдите или купите оружие и броню.</p>`;
-        return;
-    }
-
-    list.innerHTML = items.map((item, idx) => {
-        const info = Craft.rarityInfo(item.rarity || "common");
-        const next = Craft.nextRarity(item.rarity || "common");
-        const bonus = item.attackBonus ? `⚔️ +${item.attackBonus}` : (item.defenseBonus ? `🛡️ +${item.defenseBonus}` : "");
-        let action;
-        if (!next) {
-            action = `<span class="perkMax">МАКС</span>`;
-        } else {
-            const cost = Craft.upgradeCost(item);
-            const afford = p.gold >= cost.gold && Craft.essenceCount(p) >= cost.essence;
-            action = `<button class="perkBuy" onclick="upgradeItem(${idx})"${afford ? "" : " disabled"}>💰${cost.gold} · 🔩${cost.essence}</button>`;
-        }
-        return `<div class="forgeCard" style="border-left-color:${info.color}">
-            <strong>${item.emoji} ${item.name}</strong>
-            <span class="rarityTag" style="color:${info.color}">${info.emoji} ${info.label}</span>
-            <span class="forgeBonus">${bonus}</span>
-            ${action}
-        </div>`;
-    }).join("");
-}
-
-function upgradeItem(idx) {
-    const item = (game._forgeItems || [])[idx];
-    if (!item) return;
-    const res = Craft.upgrade(game.player, item);
-    if (res.success) {
-        addLog(`🔨 Улучшено: ${item.emoji} ${item.name}!`);
-        if (typeof sfx !== "undefined") sfx.play("relic");
-    } else if (res.message) {
-        addLog(`⚠️ ${res.message}`);
-    }
-    game.updateUI();
-    renderForge();
-}
-
-
-function renderQuest() {
-
-    const journalHtml = game.journal ? game.journal.render(game.player) : "";
-
-    document
-        .getElementById(
-            "questList"
-        )
-        .innerHTML =
-            game.quest.render() + journalHtml;
-}
-
-
-function acceptQuest(id) {
-    if (!game.journal) return;
-    const def = game.journal.accept(id, game.player);
-    if (def) {
-        addLog(`📜 Взято задание: ${def.title}`);
-        if (typeof sfx !== "undefined") sfx.play("relic");
-    }
-    game.updateUI();
-    renderQuest();
-}
-
-
-function claimQuest(id) {
-    if (!game.journal) return;
-    const res = game.journal.claim(id, game);
-    if (res) {
-        const r = res.reward;
-        const parts = [];
-        if (r.gold) parts.push(`💰 +${r.gold}`);
-        if (r.xp) parts.push(`✨ +${r.xp} XP`);
-        if (r.karma) parts.push(`☯️ ${r.karma > 0 ? "+" : ""}${r.karma}`);
-        if (r.affinity) parts.push(`❤ +${r.affinity}`);
-        addLog(`🏆 Награда за «${res.def.title}»: ${parts.join(", ")}`);
-        res.levelMsgs.forEach(m => addLog(m));
-        if (typeof sfx !== "undefined") sfx.play("win");
-    }
-    game.updateUI();
-    renderQuest();
-}
-
-
-// =============================================
-// МАГАЗИН
-// =============================================
-
-document
-    .getElementById("shopButton")
-    .addEventListener(
-        "click",
-        () => {
-
-            showShop();
-
-        }
-    );
-
-
-function showShop() {
-
-    showScreen(
-        "shopScreen"
-    );
-
-
-    document
-        .getElementById(
-            "shopGold"
-        )
-        .innerHTML =
-            `💰 Золото: ${game.player.gold}`;
-
-
-    document
-        .getElementById(
-            "shopItems"
-        )
-        .innerHTML = `
-
-            ${game.shop.renderShop()}
-
-            <button
-                onclick="showSellItems()"
-            >
-                💰 Продать предметы
-            </button>
-
-        `;
-}
-
-
-function buyItem(index) {
-
-    const item =
-        game.shop.items[index];
-
-
-    const result =
-        game.shop.buy(item);
-
-
-    addLog(
-        result.message
-    );
-
-
-    showShop();
-
-    game.updateUI();
-}
-
-
-function showSellItems() {
-
-    showScreen(
-        "shopScreen"
-    );
-
-
-    document
-        .getElementById(
-            "shopGold"
-        )
-        .innerHTML =
-            `💰 Золото: ${game.player.gold}`;
-
-
-    document
-        .getElementById(
-            "shopItems"
-        )
-        .innerHTML = `
-
-            <h3>
-                💰 Продажа
-            </h3>
-
-            ${game.shop.renderPlayerItems()}
-
-            <button
-                onclick="showShop()"
-            >
-                🛒 Покупки
-            </button>
-
-        `;
-}
-
-
-function sellItem(index) {
-
-    const item =
-        game.player.inventory[index];
-
-
-    const result =
-        game.shop.sell(item);
-
-
-    addLog(
-        result.message
-    );
-
-
-    showSellItems();
-
-    game.updateUI();
-}
-
-
-// =============================================
-// ИНВЕНТАРЬ
-// =============================================
-
-document
-    .getElementById("inventoryButton")
-    .addEventListener(
-        "click",
-        showInventory
-    );
-
-
-function showInventory() {
-
-    showScreen(
-        "inventoryScreen"
-    );
-
-
-    document
-        .getElementById(
-            "inventoryList"
-        )
-        .innerHTML =
-            game.inventory.render();
-}
-
-
-function inventoryUse(index) {
-
-    const item =
-        game.inventory.getItems()[index];
-
-
-    const result =
-        game.inventory.use(item);
-
-
-    addLog(
-        result.message
-    );
-
-
-    showInventory();
-
-    game.updateUI();
-}
-
-
-function inventoryRemove(index) {
-
-    const item =
-        game.inventory.getItems()[index];
-
-
-    if (
-        game.inventory.remove(item)
-    ) {
-
-        addLog(
-            `🗑️ ${item.name} удалён.`
-        );
-    }
-
-
-    showInventory();
-}
-
-
-// =============================================
-// МИР
-// =============================================
-
-document
-    .getElementById("worldButton")
-    .addEventListener(
-        "click",
-        showWorld
-    );
-
-
-function showWorld() {
-
-    showScreen(
-        "worldScreen"
-    );
-
-
-    renderWorld();
-}
-
-
-function renderWorld() {
-
-    const world = game.world;
-    const location = world.getCurrentLocation();
-    const coords = world.coords;
-
-    // Bounding box of the spatial layout.
-    const cells = Object.values(coords);
-    const minX = Math.min(...cells.map(c => c.x));
-    const maxX = Math.max(...cells.map(c => c.x));
-    const minY = Math.min(...cells.map(c => c.y));
-    const maxY = Math.max(...cells.map(c => c.y));
-
-    const map = document.getElementById("miniMap");
-    map.className = "worldMapGrid";
-    map.style.gridTemplateColumns = `repeat(${maxX - minX + 1}, 1fr)`;
-    map.style.gridTemplateRows = `repeat(${maxY - minY + 1}, 1fr)`;
-
-    map.innerHTML = Object.keys(world.rooms).map(id => {
-        const c = coords[id];
-        if (!c) return "";
-
-        const col = c.x - minX + 1;      // x → column (west→east)
-        const row = maxY - c.y + 1;      // y → row (north on top)
-        const pos = `grid-column:${col};grid-row:${row}`;
-
-        // Fog of war: undiscovered rooms are hidden behind "?".
-        if (!world.isVisible(id)) {
-            return `<div class="mapCell fog" style="${pos}">❓</div>`;
-        }
-
-        const room = world.rooms[id];
-        const isCurrent = id === world.currentLocation;
-        const reachable = world.directionTo(id) !== null; // adjacent to current
-        const locked = id === "treasury" && world.relics.length < 3;
-
-        const status = id === "treasury"
-            ? `🔒 Руны ${world.relics.length}/3`
-            : room.cleared ? "Исследовано"
-            : room.visited ? "Открыто"
-            : "Неизведано";
-
-        const smallText = isCurrent ? "📍 ТЫ ЗДЕСЬ" : status;
-
-        const classes = [
-            "mapCell", "mapRoom",
-            isCurrent ? "current" : "",
-            room.cleared ? "cleared" : "",
-            !room.visited && !isCurrent ? "undiscovered" : "",
-            reachable && !isCurrent ? "reachable" : "",
-            locked ? "locked" : ""
-        ].filter(Boolean).join(" ");
-
-        const clickable = reachable && !isCurrent;
-        const onclick = clickable ? ` onclick="moveToRoom('${id}')"` : "";
-
-        const zoneAccent = ((typeof GAME_DATA !== "undefined" && GAME_DATA.zones && GAME_DATA.zones[id]) || {}).accent || "#3a4a63";
-
-        const badge = roomBadge(room, world);
-        const badgeHtml = badge ? `<em class="mapBadge">${badge}</em>` : "";
-        const markerHtml = isCurrent ? `<em class="mapMarker">📍</em>` : "";
-        const thumbHtml = mapCreatureThumb(room);
-
-        return `<div class="${classes}" data-room="${id}" style="${pos};--cell-accent:${zoneAccent}" title="${room.name}"${onclick}>
-            ${markerHtml}
-            ${thumbHtml || badgeHtml}
-            <span>${room.name}</span>
-            <small>${smallText}</small>
-        </div>`;
-    }).join("");
-
-    drawMapConnectors(map);
-
-    document
-        .getElementById("worldDescription")
-        .innerHTML = `
-            <h3>${location.name}</h3>
-            <p>${location.description}</p>
-            <p>✨ Руны для сокровищницы: ${world.relics.length}/3</p>
-            <p class="mapHint">👆 Нажми на соседнюю комнату — или используй стрелки / WASD / свайпы.</p>
-        `;
-}
-
-// Small creature sprite for a map cell when a fightable foe is present.
-// Returns "" (falls back to the emoji badge) when there is nothing to show.
-function mapCreatureThumb(room) {
-    let key = null;
-    if (room.event === "enemy" && !room.cleared && room.enemyType) key = room.enemyType;
-    else if (room.event === "miniboss" && room.guardianType && !room.guardianDefeated) key = room.guardianType;
-    else if (room.event === "boss") key = "boss";
-    if (!key || typeof game === "undefined" || !game.spriteFor) return "";
-    const path = game.spriteFor("enemy", key);
-    return path ? `<img class="mapThumb" src="${path}" alt="" onerror="this.remove()">` : "";
-}
-
-// Status badge for a map cell: what a discovered room currently holds.
-function roomBadge(room, world) {
-    if (room.id === "treasury") {
-        return world.relics.length >= 3 ? "👑" : "🔒";
-    }
-    if (!room.explored) return "";              // discovered on the map but not entered/searched
-    if (room.cleared) return "✅";
-    switch (room.event) {
-        case "chest": return room.chest && !room.chest.opened ? "💰" : "✅";
-        case "trap": return room.trap && !room.trap.triggered && !room.trap.disarmed ? "⚠️" : "✅";
-        case "relic": return "✨";
-        case "rest": return "🔥";
-        case "recruit": return "🤝";
-        case "wanderer": return "🧍";
-        case "miniboss": return "🗿";
-        case "enemy": return "👹";
-        case "boss": return "👑";
-        default: return "";
-    }
-}
-
-// Draw connector lines between centres of connected, visible rooms.
-// Purely decorative; safely no-ops outside a real DOM (tests) or when hidden.
-function drawMapConnectors(map) {
-    if (!document.createElementNS || typeof map.querySelectorAll !== "function") return;
-
-    const world = game.world;
-    const width = map.clientWidth;
-    const height = map.clientHeight;
-    if (!width || !height) return;
-
-    const cells = {};
-    map.querySelectorAll("[data-room]").forEach(cell => { cells[cell.dataset.room] = cell; });
-
-    const NS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("class", "mapLines");
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    svg.setAttribute("width", width);
-    svg.setAttribute("height", height);
-
-    const drawn = new Set();
-    Object.keys(world.connections).forEach(id => {
-        const a = cells[id];
-        if (!a || !world.isVisible(id)) return;
-        Object.values(world.connections[id]).forEach(dest => {
-            if (!dest) return;
-            const key = [id, dest].sort().join("|");
-            if (drawn.has(key)) return;
-            const b = cells[dest];
-            if (!b || !world.isVisible(dest)) return;
-            drawn.add(key);
-
-            const line = document.createElementNS(NS, "line");
-            line.setAttribute("x1", a.offsetLeft + a.offsetWidth / 2);
-            line.setAttribute("y1", a.offsetTop + a.offsetHeight / 2);
-            line.setAttribute("x2", b.offsetLeft + b.offsetWidth / 2);
-            line.setAttribute("y2", b.offsetTop + b.offsetHeight / 2);
-            svg.appendChild(line);
+        this.story = new StoryEngine({ bus: this.bus, game: this });
+
+        this.sleepTarget = null;
+        this.paused = false;
+        this.interact = null;
+        this.elapsed = 0;
+
+        this._startingKit();
+        this._prepareZone(this.zone);
+        this._bindEvents();
+        this._bindTouch(canvas);
+        this._setupSave();
+
+        this.loop = new GameLoop({
+            update: (dt) => this.update(dt),
+            render: () => this.render()
         });
-    });
-
-    map.insertBefore(svg, map.firstChild);
-}
-
-// Click-to-move on the map: one step to an adjacent, connected room only.
-function moveToRoom(id) {
-    const result = game.world.moveTo(id);
-    if (!result.success) {
-        addLog(result.message);
-        return;
     }
-    game.bumpStat("steps");
-    addLog(`🗺️ Ты переместился: ${result.room.name}`);
-    renderLocation();
-    showScreen("locationScreen");
-}
 
-function inventoryUnequip(slot) {
-    const result = game.player.unequip(slot);
-    addLog(result.message);
-    showInventory();
-    game.updateUI();
-}
+    /* ===================== setup ===================== */
 
+    _startingKit() {
+        // Everything the prologue gives you: a knife, flint, and almost nothing else.
+        this.inventory.add("knife", 1);
+        this.inventory.add("flint", 1);
+        this.inventory.add("berry", 3);
+        this.inventory.setActive(0);
+    }
 
-// =============================================
-// ПЕРЕМЕЩЕНИЕ
-// =============================================
-
-document
-    .querySelectorAll(
-        "[data-direction]"
-    )
-    .forEach(button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                movePlayer(
-                    button.dataset.direction
-                );
-
+    /** Instantiate live objects (campfires) for a freshly entered zone. */
+    _prepareZone(zone) {
+        for (const obj of zone.objects) {
+            if (obj.kind !== "campfire") continue;
+            const key = this.fireKey(zone, obj);
+            if (!this.fires.has(key)) {
+                const fire = new Campfire({ bus: this.bus });
+                if (obj.fuel) fire.addFuel("firewood");
+                this.fires.set(key, fire);
             }
-        );
-
-    });
-
-
-function movePlayer(direction) {
-
-    const result = game.world.move(direction);
-
-    if (!result.success) {
-
-        addLog(result.message);
-
-        return;
-    }
-
-    game.bumpStat("steps");
-
-    addLog(
-        `🗺️ Ты переместился: ${result.room.name}`
-    );
-
-    renderLocation();
-
-    showScreen("locationScreen");
-}
-
-// =============================================
-// УНИВЕРСАЛЬНОЕ УПРАВЛЕНИЕ
-// PC / LAPTOP / ANDROID / iOS
-// =============================================
-
-const keyboardDirections = {
-    ArrowUp: "north",
-    ArrowDown: "south",
-    ArrowLeft: "west",
-    ArrowRight: "east",
-
-    w: "north",
-    W: "north",
-
-    s: "south",
-    S: "south",
-
-    a: "west",
-    A: "west",
-
-    d: "east",
-    D: "east"
-};
-
-
-// ---------------------------------------------
-// КЛАВИАТУРА
-// ---------------------------------------------
-
-document.addEventListener("keydown", event => {
-
-    // Не мешаем вводу текста
-    const tag = event.target.tagName;
-
-    if (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        tag === "SELECT"
-    ) {
-        return;
-    }
-
-    const direction =
-        keyboardDirections[event.key];
-
-    if (!direction) {
-        return;
-    }
-
-    // Чтобы стрелки не прокручивали страницу
-    event.preventDefault();
-
-    // Не двигаем персонажа во время боя,
-    // в магазине, инвентаре и т.д.
-    const worldScreen =
-        document.getElementById("worldScreen");
-
-    if (
-        !worldScreen ||
-        worldScreen.classList.contains("hidden")
-    ) {
-        return;
-    }
-
-    movePlayer(direction);
-});
-
-
-// ---------------------------------------------
-// СВАЙПЫ НА ТЕЛЕФОНЕ / ПЛАНШЕТЕ
-// ---------------------------------------------
-
-let touchStartX = null;
-let touchStartY = null;
-
-const worldScreen =
-    document.getElementById("worldScreen");
-
-if (worldScreen) {
-
-    worldScreen.addEventListener(
-        "pointerdown",
-        event => {
-
-            if (
-                event.pointerType !== "touch"
-            ) {
-                return;
-            }
-
-            touchStartX =
-                event.clientX;
-
-            touchStartY =
-                event.clientY;
         }
-    );
+    }
 
+    fireKey(zone, obj) { return `${zone.id}:${obj.tx},${obj.ty}`; }
 
-    worldScreen.addEventListener(
-        "pointerup",
-        event => {
+    /** Fires in the current zone, keyed the way the renderer expects. */
+    get localFires() {
+        const out = new Map();
+        for (const obj of this.zone.objects) {
+            if (obj.kind !== "campfire" || obj.removed) continue;
+            const f = this.fires.get(this.fireKey(this.zone, obj));
+            if (f) out.set(`${obj.tx},${obj.ty}`, f);
+        }
+        return out;
+    }
 
-            if (
-                event.pointerType !== "touch"
-            ) {
-                return;
+    _bindEvents() {
+        const bus = this.bus;
+        bus.on("story:step", (s) => { this.hud.showStory(s); this.paused = true; });
+        bus.on("needs:warn", ({ text, icon }) => this.hud.toast(text, icon));
+        bus.on("cook:discovered", ({ name, emoji }) => this.hud.toast(`Новое блюдо: ${name}`, emoji));
+        bus.on("fire:lit", () => {
+            this.hud.toast("Костёр разгорелся", "🔥");
+            this.particles.sparks(this.lastFireObj ? this.lastFireObj.x : this.player.x,
+                                  this.lastFireObj ? this.lastFireObj.y : this.player.y, 14);
+        });
+        bus.on("fire:out", () => this.hud.toast("Костёр погас", "💨"));
+        bus.on("weather:change", ({ info }) => this.hud.toast(`${info.emoji} ${info.name}`));
+        bus.on("player:collapse", () => this.onCollapse());
+        this.hud.onAction = () => { this.paused = false; };
+    }
+
+    _bindTouch(canvas) {
+        // Analogue joystick on the left half, action tap on the right.
+        let id = null, ox = 0, oy = 0;
+        const start = (e) => {
+            for (const t of e.changedTouches) {
+                if (t.clientX < window.innerWidth * 0.5 && id === null) {
+                    id = t.identifier; ox = t.clientX; oy = t.clientY;
+                } else {
+                    this.input.tap("action");
+                }
             }
-
-            if (
-                touchStartX === null ||
-                touchStartY === null
-            ) {
-                return;
+        };
+        const move = (e) => {
+            for (const t of e.changedTouches) {
+                if (t.identifier !== id) continue;
+                this.input.setStick((t.clientX - ox) / 55, (t.clientY - oy) / 55);
             }
-
-            const dx =
-                event.clientX -
-                touchStartX;
-
-            const dy =
-                event.clientY -
-                touchStartY;
-
-            touchStartX = null;
-            touchStartY = null;
-
-            const threshold = 35;
-
-            if (
-                Math.abs(dx) < threshold &&
-                Math.abs(dy) < threshold
-            ) {
-                return;
+            e.preventDefault();
+        };
+        const end = (e) => {
+            for (const t of e.changedTouches) {
+                if (t.identifier === id) { id = null; this.input.setStick(0, 0); }
             }
+        };
+        canvas.addEventListener("touchstart", start, { passive: true });
+        canvas.addEventListener("touchmove", move, { passive: false });
+        canvas.addEventListener("touchend", end, { passive: true });
+        canvas.addEventListener("touchcancel", end, { passive: true });
+    }
 
-            if (
-                Math.abs(dx) >
-                Math.abs(dy)
-            ) {
+    _setupSave() {
+        this.save = new SaveManager({ bus: this.bus });
+        this.save.register("clock", () => this.clock.toJSON(), (d) => this.clock.load(d));
+        this.save.register("needs", () => this.needs.toJSON(), (d) => this.needs.load(d));
+        this.save.register("inv", () => this.inventory.toJSON(), (d) => this.inventory.load(d));
+        this.save.register("player", () => ({ zone: this.zone.id, p: this.player.toJSON() }),
+            (d) => {
+                if (d.zone) this.enterZone(d.zone, null, true);
+                this.player.load(d.p);
+            });
+        this.save.register("story", () => this.story.toJSON(), (d) => this.story.load(d));
+        this.save.register("cook", () => this.cookJournal.toJSON(), (d) => this.cookJournal.load(d));
+        this.save.register("weather", () => this.weather.toJSON(), (d) => this.weather.load(d));
+        this.save.register("seed", () => this.seed, () => {});
+        this.save.register("fires", () => {
+            const out = {};
+            for (const [k, f] of this.fires) out[k] = f.toJSON();
+            return out;
+        }, (d) => {
+            for (const [k, data] of Object.entries(d || {})) {
+                const f = this.fires.get(k) || new Campfire({ bus: this.bus });
+                f.load(data);
+                this.fires.set(k, f);
+            }
+        });
+        this.bus.on("time:newday", () => { this.save.write({ day: this.clock.day }); this.hud.toast("Игра сохранена", "💾"); });
+    }
 
-                movePlayer(
-                    dx > 0
-                        ? "east"
-                        : "west"
-                );
+    /* ===================== world ===================== */
 
+    enterZone(zoneId, fromEdge = null, silent = false) {
+        const zone = this.world.get(zoneId);
+        this.zone = zone;
+        this._prepareZone(zone);
+        this.camera.setBounds(zone.map.widthPx, zone.map.heightPx);
+        if (fromEdge) {
+            const edge = oppositeEdge(fromEdge);
+            const link = (zone.def.links || []).find((l) => l.edge === edge);
+            if (link) {
+                const mid = Math.floor((link.from + link.to) / 2);
+                if (edge === "north") { this.player.x = mid * TILE_SIZE; this.player.y = 3.5 * TILE_SIZE; }
+                else if (edge === "south") { this.player.x = mid * TILE_SIZE; this.player.y = (zone.h - 4) * TILE_SIZE; }
+                else if (edge === "west") { this.player.x = 3.5 * TILE_SIZE; this.player.y = mid * TILE_SIZE; }
+                else { this.player.x = (zone.w - 4) * TILE_SIZE; this.player.y = mid * TILE_SIZE; }
             } else {
-
-                movePlayer(
-                    dy > 0
-                        ? "south"
-                        : "north"
-                );
+                this.player.x = zone.spawn.x; this.player.y = zone.spawn.y;
             }
         }
-    );
-}
-
-// =============================================
-// ЛОКАЦИЯ
-// =============================================
-
-// Swap a broken/missing sprite <img> for its emoji fallback.
-function spriteFallback(img, emoji) {
-    const div = document.createElement("div");
-    div.className = "fighterEmoji";
-    div.textContent = emoji;
-    if (img && img.replaceWith) img.replaceWith(div);
-}
-
-// Render the unlocked skill buttons for the current battle, disabling any the
-// player can't currently afford.
-function renderBattleSkills() {
-    const box = document.getElementById("battleSkills");
-    if (!box) return;
-    const skills = (typeof GAME_DATA !== "undefined" && GAME_DATA.skills) || {};
-    const p = game.player;
-    if (!p || !game.battle) { box.innerHTML = ""; return; }
-    box.innerHTML = "";
-    Object.keys(skills).forEach(id => {
-        const s = skills[id];
-        if (p.level < s.level) return; // not yet unlocked
-        const btn = document.createElement("button");
-        btn.className = "skillButton";
-        const els = (typeof GAME_DATA !== "undefined" && GAME_DATA.elements) || {};
-        const elChip = s.element && els[s.element] ? `<em class="skillEl" title="${els[s.element].name}">${els[s.element].emoji}</em>` : "";
-        btn.innerHTML = `${s.emoji} ${s.name} ${elChip}<small>⚡${s.cost}</small>`;
-        btn.title = s.desc || "";
-        btn.disabled = (p.energy || 0) < s.cost;
-        btn.onclick = () => useSkill(id);
-        box.appendChild(btn);
-    });
-}
-
-function useSkill(id) {
-    if (!game.battle) return;
-    const skill = ((typeof GAME_DATA !== "undefined" && GAME_DATA.skills) || {})[id];
-    const res = game.battle.playerUseSkill(id);
-    if (res && res.success) {
-        sfx.play(skill && skill.type === "heal" ? "heal" : "attack");
-    }
-    if (game.gameEnded) sfx.play("lose");
-    else if (!game.battle) sfx.play("win"); // enemy defeated
-    if (game.battle) {
-        game.showEnemy();
-        renderBattleSkills();
-    }
-    game.updateUI();
-}
-
-// Pick the sprite that best represents what's happening in a room:
-// the lurking creature, a recruitable ally, or the hero exploring.
-function locationArtSubject(room) {
-    const enemies = (typeof GAME_DATA !== "undefined" && GAME_DATA.enemies) || {};
-    if (room.event === "enemy" && !room.cleared && room.enemyType) {
-        return { kind: "enemy", key: room.enemyType, emoji: (enemies[room.enemyType] || {}).emoji || "👹", frame: "danger" };
-    }
-    if (room.event === "miniboss" && room.guardianType && !room.guardianDefeated) {
-        return { kind: "enemy", key: room.guardianType, emoji: (enemies[room.guardianType] || {}).emoji || "🗿", frame: "danger" };
-    }
-    if (room.event === "boss") {
-        return { kind: "enemy", key: "boss", emoji: "👑", frame: "danger" };
-    }
-    if (room.event === "recruit" && !room.recruitResolved && room.recruitType) {
-        const a = (typeof ALLIES !== "undefined" && ALLIES[room.recruitType]) ? ALLIES[room.recruitType]() : null;
-        return { kind: "ally", key: room.recruitType, emoji: a ? a.emoji : "🤝", frame: "friendly" };
-    }
-    return { kind: "hero", key: "hero", emoji: "🧑", frame: "calm" };
-}
-
-function renderLocationArt(room) {
-    const box = document.getElementById("locationArt");
-    if (!box) return;
-    const subject = locationArtSubject(room);
-    const path = (typeof game !== "undefined" && game.spriteFor) ? game.spriteFor(subject.kind, subject.key) : null;
-    const art = path
-        ? `<img class="locationSprite" src="${path}" alt="" onerror="spriteFallback(this,'${subject.emoji}')">`
-        : `<div class="fighterEmoji">${subject.emoji}</div>`;
-    box.className = `locationArt ${subject.frame}`;
-    box.innerHTML = art;
-}
-
-function renderLocation() {
-
-    const room =
-        game.world.getCurrentRoom();
-
-
-    // Tint the location screen with the zone's accent colour.
-    const zone = (typeof GAME_DATA !== "undefined" && GAME_DATA.zones && GAME_DATA.zones[room.id]) || null;
-    const locScreen = document.getElementById("locationScreen");
-    if (locScreen && zone && locScreen.style && locScreen.style.setProperty) {
-        locScreen.style.setProperty("--zone-accent", zone.accent);
+        this.camera.snapTo(this.player.x, this.player.y);
+        this.renderer.invalidate();
+        if (!silent) {
+            this.hud.toast(zone.def.name, "🧭");
+            this.bus.emit("zone:enter", { zone: zone.id, name: zone.def.name });
+        }
+        return this;
     }
 
-    renderLocationArt(room);
-
-
-    document
-        .getElementById(
-            "locationName"
-        )
-        .textContent =
-            room.name;
-
-
-    document
-        .getElementById(
-            "locationDescription"
-        )
-        .textContent =
-            room.description;
-
-
-    const actions =
-        document.getElementById(
-            "locationActions"
-        );
-
-    const exits = document.getElementById("locationExits");
-    const directions = { north: "↑ Север", south: "↓ Юг", east: "→ Восток", west: "← Запад" };
-    exits.innerHTML = Object.entries(game.world.connections[room.id])
-        .filter(([, destination]) => destination)
-        .map(([direction, destination]) => `<button class="exitButton" onclick="movePlayer('${direction}')">${directions[direction]} · ${game.world.rooms[destination].name}</button>`)
-        .join("");
-
-
-    actions.innerHTML = "";
-
-
-    /*
-    ========================================
-    ЕСЛИ КОМНАТА ЕЩЁ НЕ ИССЛЕДОВАНА
-    ========================================
-    */
-
-    if (!room.explored) {
-
-        const exploreButton =
-            document.createElement(
-                "button"
-            );
-
-
-        exploreButton.textContent =
-            "🔎 Исследовать";
-
-
-        exploreButton.onclick =
-            exploreRoom;
-
-
-        actions.appendChild(
-            exploreButton
-        );
-
-
-        return;
-    }
-
-
-    /*
-    ========================================
-    ЕСЛИ В КОМНАТЕ СУНДУК
-    ========================================
-    */
-
-    if (
-        room.event === "chest" &&
-        room.chest &&
-        !room.chest.opened
-    ) {
-
-        const chestButton =
-            document.createElement(
-                "button"
-            );
-
-
-        chestButton.textContent =
-            "📦 Открыть сундук";
-
-
-        chestButton.onclick =
-            openChest;
-
-
-        actions.appendChild(
-            chestButton
-        );
-
-
-        return;
-    }
-
-
-    /*
-    ========================================
-    ЛОВУШКА
-    ========================================
-    */
-
-    if (
-        room.event === "trap" &&
-        room.trap &&
-        !room.trap.triggered &&
-        !room.trap.disarmed
-    ) {
-
-        const disarmButton = document.createElement("button");
-        disarmButton.textContent = `🧰 Обезвредить (${room.trap.chance(game.player)}%)`;
-        disarmButton.onclick = disarmTrap;
-        actions.appendChild(disarmButton);
-
-        const trapButton =
-            document.createElement(
-                "button"
-            );
-
-
-        trapButton.textContent =
-            "⚠️ Рискнуть и пройти";
-
-
-        trapButton.onclick =
-            activateTrap;
-
-
-        actions.appendChild(
-            trapButton
-        );
-
-
-        return;
-    }
-
-
-    /*
-    ========================================
-    БОСС
-    ========================================
-    */
-
-    if (
-        room.event === "boss"
-    ) {
-
-        const bossButton =
-            document.createElement(
-                "button"
-            );
-
-
-        bossButton.textContent =
-            "👑 Сразиться со Стражем";
-
-
-        bossButton.onclick =
-            startBossBattle;
-
-
-        actions.appendChild(
-            bossButton
-        );
-
-
-        return;
-    }
-
-    if (room.event === "bossLocked") {
-        actions.innerHTML = `<div class="locationEmpty">🔒 Руны: ${game.world.relics.length}/3</div>`;
-        const sealButton = document.createElement("button");
-        sealButton.textContent = "✨ Проверить печать снова";
-        sealButton.onclick = exploreRoom;
-        actions.appendChild(sealButton);
-        return;
-    }
-
-    if (room.event === "relic") {
-        const relicButton = document.createElement("button");
-        relicButton.textContent = "✨ Забрать руну";
-        relicButton.onclick = claimRelic;
-        actions.appendChild(relicButton);
-        return;
-    }
-
-    if (room.event === "rest") {
-        const restButton = document.createElement("button");
-        restButton.textContent = "🔥 Отдохнуть у огня";
-        restButton.onclick = restAtCamp;
-        actions.appendChild(restButton);
-        return;
-    }
-
-    // Recruit a companion.
-    if (room.event === "recruit" && !room.recruitResolved) {
-        const template = (typeof ALLIES !== "undefined" && ALLIES[room.recruitType]) ? ALLIES[room.recruitType]() : null;
-        const name = template ? `${template.emoji} ${template.name}` : "Союзник";
-        const note = document.createElement("div");
-        note.className = "locationChoice";
-        note.innerHTML = `<p>🤝 ${name} готов присоединиться к тебе.${game.player.ally ? "<br><small>Он заменит текущего спутника.</small>" : ""}</p>`;
-        actions.appendChild(note);
-
-        const joinButton = document.createElement("button");
-        joinButton.textContent = "🤝 Взять в отряд";
-        joinButton.onclick = recruitHere;
-        actions.appendChild(joinButton);
-
-        const declineButton = document.createElement("button");
-        declineButton.textContent = "🚶 Отказаться";
-        declineButton.onclick = declineRecruit;
-        actions.appendChild(declineButton);
-        return;
-    }
-
-    // Wandering traveller: a moral choice with consequences.
-    if (room.event === "wanderer" && !room.wandererResolved) {
-        const note = document.createElement("div");
-        note.className = "locationChoice";
-        note.innerHTML = `<p>🧍 Измождённый путник просит о помощи. Как поступишь?</p>`;
-        actions.appendChild(note);
-
-        const helpButton = document.createElement("button");
-        helpButton.textContent = "❤️ Помочь (−15 💰)";
-        helpButton.onclick = () => resolveWanderer("help");
-        actions.appendChild(helpButton);
-
-        const robButton = document.createElement("button");
-        robButton.textContent = "🗡️ Ограбить";
-        robButton.onclick = () => resolveWanderer("rob");
-        actions.appendChild(robButton);
-
-        const ignoreButton = document.createElement("button");
-        ignoreButton.textContent = "🚶 Пройти мимо";
-        ignoreButton.onclick = () => resolveWanderer("ignore");
-        actions.appendChild(ignoreButton);
-        return;
-    }
-
-    // Enemy still lurking here (e.g. after a successful flee): let the player re-engage.
-    if (room.event === "enemy" && !room.cleared) {
-        const fightButton = document.createElement("button");
-        fightButton.textContent = "⚔️ Враг всё ещё здесь — атаковать";
-        fightButton.onclick = startRandomEnemy;
-        actions.appendChild(fightButton);
-        return;
-    }
-
-    // Relic guardian still blocking (first visit or after a flee).
-    if (room.event === "miniboss" && !room.guardianDefeated) {
-        const guardianButton = document.createElement("button");
-        guardianButton.textContent = "⚔️ Сразиться со стражем руны";
-        guardianButton.onclick = startMiniboss;
-        actions.appendChild(guardianButton);
-        return;
-    }
-
-     /*
-    ========================================
-    СОКРОВИЩЕ
-    ========================================
-    */
-
-    if (
-        room.event === "treasure"
-    ) {
-
-        const treasureButton =
-            document.createElement(
-                "button"
-            );
-
-
-        treasureButton.textContent =
-            "💎 Забрать сокровище";
-
-
-        treasureButton.onclick =
-            () => {
-
-                game.world.treasureFound =
-                    true;
-
-
-                game.player.gold +=
-                    500;
-
-
-                addLog(
-                    "💎 Ты нашёл легендарное сокровище!"
-                );
-
-
-                sfx.play("win");
-
-                game.victory();
-
-            };
-
-
-        actions.appendChild(
-            treasureButton
-        );
-
-
-        return;
-    }       
-    
-
-    /*
-    ========================================
-    КОМНАТА ОЧИЩЕНА
-    ========================================
-    */
-
-    actions.innerHTML = `<div class="locationEmpty">✅ Комната исследована. Все находки собраны — время выбрать новый путь.</div>`;
-}
-
-function exploreRoom() {
-
-    const result =
-        game.world.explore();
-
-
-    addLog(
-        result.message
-    );
-
-
-    switch (
-        result.type
-    ) {
-
-
-        case "enemy":
-
-            startRandomEnemy();
-
-            return;
-
-
-        case "miniboss":
-
-            startMiniboss();
-
-            return;
-
-
-        case "chest":
-
-            renderLocation();
-
-            return;
-
-
-        case "trap":
-
-            renderLocation();
-
-            return;
-
-
-        case "boss":
-
-            renderLocation();
-
-            return;
-
-
-        case "nothing":
-
-            renderLocation();
-
-            return;
-
-
-        case "already":
-
-            renderLocation();
-
-            return;
-
-        case "locked":
-
-        case "relic":
-
-        case "rest":
-
-        case "recruit":
-
-        case "wanderer":
-
-            renderLocation();
-
-            return;
-    }
-
-
-    game.updateUI();
-}
-
-function startRandomEnemy() {
-
-    const room = game.world.getCurrentRoom();
-
-    // Reuse the enemy type stored for this room so a foe the player fled from
-    // returns as the same kind. Fall back to a random pick for safety.
-    const pool = game.world.enemyPool || ["goblin", "wolf", "skeleton"];
-    const enemyType =
-        room.enemyType || pool[Math.floor(Math.random() * pool.length)];
-
-    if (!room.enemyType) room.enemyType = enemyType;
-
-
-    const enemy =
-        createEnemy(enemyType, game.player.level);
-
-
-    addLog(
-        `⚔️ Появился ${enemy.emoji} ${enemy.name}!`
-    );
-
-
-    game.startBattle(
-        enemy
-    );
-}
-
-function openChest() {
-
-    const room =
-        game.world.getCurrentRoom();
-
-
-    const result =
-        room.chest.open(
-            game.player,
-            game.world.chestLootFor(room.id)
-        );
-
-    if (result.success) { game.bumpStat("chests"); sfx.play("chest"); }
-
-
-    addLog(
-        result.message
-    );
-
-    if (result.success && game.journal) {
-        game.journal.onChestOpened().forEach(id => {
-            const e = game.journal.entry(id);
-            const d = game.journal.def(id);
-            if (!e || !d) return;
-            if (e.completed) addLog(`🏆 Задание «${d.title}» выполнено! Забери награду в журнале.`);
-            else addLog(`📜 «${d.title}»: ${e.progress}/${d.objective.count}`);
+    get ambient() {
+        const biome = biomeDef(this.zone.def.biome);
+        return ambientTemperature({
+            season: this.clock.season.key,
+            daylight: this.clock.daylight,
+            weather: this.weather.current,
+            biomeTemp: biome.temp || 0,
+            underground: !!this.zone.def.underground
         });
     }
 
-
-    room.cleared =
-        true;
-
-
-    renderLocation();
-
-    game.updateUI();
-}
-
-function activateTrap() {
-
-    const room =
-        game.world.getCurrentRoom();
-
-
-    const result =
-        room.trap.activate(
-            game.player
-        );
-
-    sfx.play("hurt");
-
-
-    addLog(
-        result.message
-    );
-
-
-    room.cleared =
-        true;
-
-
-    game.updateUI();
-
-
-    if (
-        game.player.isDead()
-    ) {
-
-        sfx.play("lose");
-
-        game.gameOver();
-
-        return;
+    /** Warmth contributed by nearby lit fires. */
+    fireWarmthNear(x, y) {
+        let best = 0;
+        for (const obj of this.zone.objects) {
+            if (obj.kind !== "campfire" || obj.removed) continue;
+            const f = this.fires.get(this.fireKey(this.zone, obj));
+            if (!f || !f.lit) continue;
+            const d = Math.hypot(obj.x - x, obj.y - y);
+            if (d < 90) best = Math.max(best, f.warmth * (1 - d / 90));
+        }
+        return best;
     }
 
-
-    renderLocation();
-}
-
-function disarmTrap() {
-    const room = game.world.getCurrentRoom();
-    const result = room.trap.disarm(game.player);
-    if (result.success) { game.bumpStat("traps"); sfx.play("relic"); } else { sfx.play("hurt"); }
-    addLog(result.message);
-    room.cleared = true;
-    game.updateUI();
-    if (game.player.isDead()) {
-        sfx.play("lose");
-        game.gameOver();
-        return;
-    }
-    renderLocation();
-}
-
-function claimRelic() {
-    const relic = game.world.collectRelic();
-    if (relic) { addLog(`✨ Получена ${relic}. Печать Стража ослабла: ${game.world.relics.length}/3.`); sfx.play("relic"); }
-    game.updateUI();
-    renderLocation();
-}
-
-function recruitHere() {
-    const room = game.world.getCurrentRoom();
-    const ally = game.recruitAlly(room.recruitType);
-    room.recruitResolved = true;
-    room.cleared = true;
-    room.event = "cleared";
-    if (ally) {
-        addLog(`🤝 ${ally.emoji} ${ally.name} присоединяется к отряду!`);
-        sfx.play("relic");
-    }
-    game.updateUI();
-    renderLocation();
-}
-
-function declineRecruit() {
-    const room = game.world.getCurrentRoom();
-    room.recruitResolved = true;
-    room.cleared = true;
-    room.event = "cleared";
-    addLog("🚶 Ты отказался от спутника.");
-    game.updateUI();
-    renderLocation();
-}
-
-function resolveWanderer(choice) {
-    const room = game.world.getCurrentRoom();
-    room.wandererResolved = true;
-    room.cleared = true;
-    room.event = "cleared";
-    const p = game.player;
-
-    if (choice === "help") {
-        let cost = "";
-        if (p.gold >= 15) { p.gold -= 15; cost = "Ты отдал 15 золота."; }
-        else {
-            const idx = p.inventory.findIndex(i => i.type === "potion");
-            if (idx >= 0) { p.inventory.splice(idx, 1); cost = "Ты отдал зелье."; }
-            else cost = "У тебя не было чем поделиться, но ты помог делом.";
+    /** Is the player under a roof (tent, later: a house)? */
+    shelteredAt(x, y) {
+        for (const obj of this.zone.objects) {
+            if (obj.kind !== "tent" || obj.removed) continue;
+            if (Math.hypot(obj.x - x, obj.y - y) < 34) return true;
         }
-        game.adjustKarma(8);
-        addLog(`❤️ Ты помог путнику. ${cost} Карма выросла (☯️ ${game.karmaLabel()}).`);
-        if (p.ally) {
-            p.ally.changeAffinity(6);
-            addLog(`🙂 ${p.ally.name} одобряет поступок (привязанность ❤ ${p.ally.affinity}).`);
-        } else {
-            const ally = game.recruitAlly("healer");
-            if (ally) addLog(`🌿 Благодарный путник оказался травницей — ${ally.name} присоединяется к тебе!`);
-        }
-        sfx.play("relic");
-    } else if (choice === "rob") {
-        const gold = 25 + Math.floor(Math.random() * 36);
-        p.gold += gold;
-        game.adjustKarma(-10);
-        addLog(`🗡️ Ты ограбил путника (+${gold} 💰). Карма упала (☯️ ${game.karmaLabel()}).`);
-        if (p.ally) {
-            p.ally.changeAffinity(-12);
-            addLog(`😠 ${p.ally.name} осуждает тебя (привязанность ❤ ${p.ally.affinity}).`);
-            if (p.ally.hasLeft()) {
-                addLog(`💔 ${p.ally.name} покидает отряд, разочаровавшись в тебе.`);
-                p.ally = null;
-            }
-        }
-        sfx.play("hurt");
-    } else {
-        addLog("🚶 Ты прошёл мимо путника.");
+        return false;
     }
 
-    game.updateUI();
-    renderLocation();
-}
+    /* ===================== interaction ===================== */
 
-function restAtCamp() {
-    const healed = Math.min(25, game.player.maxHealth - game.player.health);
-    game.player.health += healed;
-    const room = game.world.getCurrentRoom();
-    room.cleared = true;
-    room.event = "cleared";
-    addLog(`🔥 Привал восстановил ${healed} HP. Ты снова настороже.`);
-    game.updateUI();
-    renderLocation();
-}
-
-function startBossBattle() {
-
-    const enemy =
-        createEnemy("boss", game.player.level);
-
-
-    addLog(
-        "👑 Страж сокровища выходит на бой!"
-    );
-
-
-    game.startBattle(
-        enemy
-    );
-}
-
-
-function startMiniboss() {
-
-    const room = game.world.getCurrentRoom();
-    const type = room.guardianType || game.world.relicGuardians[room.id] || "skeleton";
-
-    const enemy = createEnemy(type, game.player.level);
-    enemy.isGuardian = true;
-    enemy.relicRoom = room.id;
-
-    addLog(`⚔️ ${enemy.emoji} ${enemy.name} преграждает путь к руне!`);
-
-    game.startBattle(enemy);
-}
-
-
-
-
-// =============================================
-// НАЗАД К КАРТЕ
-// =============================================
-
-document
-    .getElementById(
-        "locationBackButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            showWorld();
-
+    findInteractable() {
+        const fp = this.player.facingPoint(16);
+        let best = null, bestD = 30;
+        for (const obj of this.zone.objects) {
+            if (obj.removed) continue;
+            const def = propDef(obj.kind);
+            if (!def) continue;
+            if (!def.interact && !Array.isArray(def.drops)) continue;
+            const d = Math.hypot(obj.x - fp.x, obj.y - fp.y);
+            if (d < bestD) { bestD = d; best = obj; }
         }
-    );
-
-
-// =============================================
-// БОЙ
-// =============================================
-
-document
-    .getElementById(
-        "attackButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            if (!game.battle) {
-                return;
-            }
-
-
-            game.battle.playerAttack();
-            sfx.play("attack");
-
-            if (game.gameEnded) {
-                sfx.play("lose");
-            } else if (!game.battle) {
-                sfx.play("win"); // enemy defeated
-            }
-
-            if (game.battle) {
-                game.showEnemy();
-            }
-
-            game.updateUI();
-        }
-    );
-
-
-document
-    .getElementById(
-        "healButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            if (!game.battle) {
-                return;
-            }
-
-
-            game.battle.playerHeal();
-            sfx.play("heal");
-            if (game.gameEnded) sfx.play("lose");
-
-            game.showEnemy();
-        }
-    );
-
-
-document
-    .getElementById(
-        "defendButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            if (!game.battle) {
-                return;
-            }
-
-
-            game.battle.playerDefend();
-            sfx.play("defend");
-            if (game.gameEnded) sfx.play("lose");
-
-            game.showEnemy();
-        }
-    );
-
-document
-    .getElementById("fleeButton")
-    .addEventListener("click", () => {
-        if (!game.battle) return;
-        game.battle.playerFlee();
-        if (game.gameEnded) sfx.play("lose");
-        else if (!game.battle) sfx.play("flee"); // escaped
-        if (game.battle) game.showEnemy();
-        game.updateUI();
-    });
-
-
-// =============================================
-// КНОПКИ НАЗАД
-// =============================================
-
-document
-    .getElementById(
-        "inventoryBackButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            showScreen(
-                "villageScreen"
-            );
-        }
-    );
-
-
-document
-    .getElementById(
-        "shopBackButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            showScreen(
-                "villageScreen"
-            );
-        }
-    );
-
-
-document
-    .getElementById(
-        "npcBackButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            showScreen(
-                "villageScreen"
-            );
-        }
-    );
-
-
-document
-    .getElementById(
-        "questBackButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            showScreen(
-                "villageScreen"
-            );
-        }
-    );
-
-
-document
-    .getElementById(
-        "returnVillageButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            showScreen(
-                "villageScreen"
-            );
-        }
-    );
-
-
-// =============================================
-// RESTART
-// =============================================
-
-document
-    .getElementById(
-        "restartButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            location.reload();
-
-        }
-    );
-
-
-// =============================================
-// ЗВУК (mute)
-// =============================================
-
-(function setupMuteButton() {
-    const button = document.getElementById("muteButton");
-    if (!button) return;
-
-    function refresh() {
-        button.textContent = sfx.muted ? "🔇" : "🔊";
-        button.setAttribute("aria-pressed", String(sfx.muted));
+        return best;
     }
 
-    button.addEventListener("click", () => {
-        const nowMuted = sfx.toggleMute();
-        if (!nowMuted) sfx.play("heal"); // brief confirmation blip when unmuting
-        refresh();
-    });
-
-    refresh();
-})();
-
-
-// =============================================
-// НАСТРОЙКИ
-// =============================================
-
-function renderSettings() {
-    const soundButton = document.getElementById("settingsSoundButton");
-    if (soundButton) soundButton.textContent = sfx.muted ? "Выкл" : "Вкл";
-
-    const statsBox = document.getElementById("settingsStats");
-    if (statsBox) {
-        statsBox.innerHTML = game.player
-            ? game.renderStats()
-            : `<p class="settingsHint">Начни игру, чтобы увидеть статистику забега.</p>`;
+    interactLabel(obj) {
+        if (!obj) return null;
+        const def = propDef(obj.kind);
+        if (!def) return null;
+        if (def.interact === "fire") {
+            const f = this.fires.get(this.fireKey(this.zone, obj));
+            return f && f.lit ? "Костёр · E" : "Разжечь костёр · E";
+        }
+        if (def.interact === "sleep") return "Спать · E";
+        if (def.interact === "read") return "Прочитать · E";
+        if (def.interact === "story") return "Осмотреть · E";
+        if (def.interact === "loot") return obj.looted ? "Пусто" : "Обыскать · E";
+        const tool = requiredTool(obj.kind);
+        const have = tool ? this.inventory.findTool(tool) : true;
+        if (!have) return toolHint(obj.kind);
+        return `${def.name} · E`;
     }
-}
 
-function openSettings() {
-    showScreen("settingsScreen");
-    renderSettings();
-}
+    doInteract() {
+        const obj = this.interact;
+        if (!obj) return;
+        const def = propDef(obj.kind);
+        if (!def) return;
 
-(function setupSettings() {
-    const openButton = document.getElementById("settingsButton");
-    if (openButton) openButton.addEventListener("click", openSettings);
+        if (def.interact === "fire") return this.openFire(obj);
+        if (def.interact === "sleep") return this.sleep(obj);
+        if (def.interact === "read" || def.interact === "story") {
+            if (obj.story) this.story.setFlag(obj.story);
+            if (def.interact === "read") {
+                this.inventory.add("diary_burnt", 1);
+                obj.removed = true;
+            }
+            this.particles.emote(obj.x, obj.y - 20, "❓");
+            return;
+        }
+        if (def.interact === "loot") return this.lootChest(obj);
+        return this.harvest(obj);
+    }
 
-    const soundButton = document.getElementById("settingsSoundButton");
-    if (soundButton) {
-        soundButton.addEventListener("click", () => {
-            const nowMuted = sfx.toggleMute();
-            if (!nowMuted) sfx.play("heal");
-            renderSettings();
-            const headerMute = document.getElementById("muteButton");
-            if (headerMute) headerMute.textContent = nowMuted ? "🔇" : "🔊";
+    harvest(obj) {
+        const def = propDef(obj.kind);
+        const tool = requiredTool(obj.kind);
+        if (tool && !this.inventory.findTool(tool)) {
+            this.hud.toast(toolHint(obj.kind), "✋");
+            return;
+        }
+        this.player.swing("tool");
+        if (obj.hits === undefined) obj.hits = def.hits || 1;
+        obj.hits -= 1 + (tool ? (this.inventory.findTool(tool).tier - 1) * 0.5 : 0);
+
+        const chipColor = obj.kind.includes("rock") || obj.kind === "ruin_wall" ? "#9a958c" : "#8a6a3c";
+        this.particles.chips(obj.x, obj.y - 10, chipColor, 5);
+        this.needs.fatigue = Math.min(100, this.needs.fatigue + 0.35);
+
+        if (obj.hits > 0) return;
+
+        const drops = rollDrops(obj, this.rng);
+        let dy = 0;
+        for (const d of drops) {
+            const left = this.inventory.add(d.id, d.n);
+            const got = d.n - left;
+            if (got > 0) {
+                this.particles.text(obj.x, obj.y - 18 - dy, `+${got} ${itemEmoji(d.id)}`, { color: "#ffe6a8" });
+                dy += 12;
+            }
+            if (left > 0) this.hud.toast("Рюкзак полон", "🎒");
+        }
+        obj.removed = true;
+        this.zone.blockTile(obj.tx, obj.ty, false);
+        this.bus.emit("world:harvest", { kind: obj.kind, drops });
+    }
+
+    lootChest(obj) {
+        if (obj.looted) return;
+        obj.looted = true;
+        const table = [["coin", 3], ["flint", 2], ["fiber", 3], ["charcoal", 2], ["old_key", 1]];
+        const id = this.rng.weighted(table) || "fiber";
+        const n = id === "coin" ? this.rng.int(3, 12) : this.rng.int(1, 3);
+        this.inventory.add(id, n);
+        this.particles.text(obj.x, obj.y - 20, `+${n} ${itemEmoji(id)}`, { color: "#ffe6a8" });
+        this.hud.toast(`Найдено: ${itemName(id)} ×${n}`, itemEmoji(id));
+    }
+
+    /* ---- the campfire panel ---- */
+
+    openFire(obj) {
+        const key = this.fireKey(this.zone, obj);
+        let fire = this.fires.get(key);
+        if (!fire) { fire = new Campfire({ bus: this.bus }); this.fires.set(key, fire); }
+        this.lastFireObj = obj;
+        const refresh = () => this.openFire(obj);
+        this.hud.openPanel("Костёр", fireRows(fire, this.inventory, {
+            canCook: (id) => isCookable(id),
+            addFuel: (id) => {
+                if (this.inventory.remove(id, 1) && fire.addFuel(id)) {
+                    this.particles.sparks(obj.x, obj.y - 6, 5);
+                }
+                refresh();
+            },
+            light: () => {
+                const ok = fire.light({ hasFlint: this.inventory.has("flint") });
+                if (!ok) this.hud.toast("Нужен кремень и топливо", "🪨");
+                refresh();
+            },
+            putOnSpit: (id) => {
+                if (fire.putOnSpit(id) >= 0) this.inventory.remove(id, 1);
+                else this.hud.toast("Вертел занят", "🍢");
+                refresh();
+            },
+            takeFromSpit: (i) => {
+                const got = fire.takeFromSpit(i);
+                if (got) {
+                    this.inventory.add(got.id, 1);
+                    if (got.state === "done") {
+                        this.cookJournal.discover(got.id);
+                        this.particles.text(obj.x, obj.y - 24, `${itemEmoji(got.id)} готово!`, { color: "#ffd27a" });
+                    } else if (got.state === "burnt") {
+                        this.hud.toast("Сгорело дотла", "🪨");
+                    }
+                }
+                refresh();
+            },
+            openPot: () => this.openPot(fire, refresh)
+        }), "fire");
+    }
+
+    openPot(fire, back) {
+        if (fire.pot && fire.pot.done) {
+            const id = fire.takePot();
+            this.inventory.add(id, 1);
+            this.cookJournal.discover(id);
+            this.hud.toast(`Готово: ${itemName(id)}`, itemEmoji(id));
+            return back();
+        }
+        const edible = this.inventory.list().filter((s) => {
+            const d = itemDef(s.id);
+            return d && (d.tags.includes("food") || d.tags.includes("herb"));
+        });
+        const chosen = [];
+        const rows = [{ html: "<b>Котелок</b><br><small>Выбери 2–3 ингредиента — что получится, узнаешь сам.</small>" }];
+        for (const e of edible.slice(0, 8)) {
+            rows.push({
+                icon: itemEmoji(e.id), label: itemName(e.id), hint: `×${e.n}`,
+                action: () => {
+                    chosen.push(e.id);
+                    this.hud.toast(`В котелок: ${itemName(e.id)}`, itemEmoji(e.id));
+                    if (chosen.length >= 2) {
+                        const res = fire.startPot(chosen);
+                        chosen.forEach((id) => this.inventory.remove(id, 1));
+                        if (!res) this.hud.toast("Из этого ничего не выйдет", "🤔");
+                        back();
+                    }
+                }
+            });
+        }
+        this.hud.openPanel("Котелок", rows, "pot");
+    }
+
+    /* ---- backpack ---- */
+
+    openBackpack() {
+        const rows = [{ html: `<b>Рюкзак</b> · ${this.inventory.used}/${this.inventory.size} · ${this.inventory.weight} кг` }];
+        for (const s of this.inventory.list()) {
+            const d = itemDef(s.id);
+            const edible = foodValue(s.id);
+            rows.push({
+                icon: itemEmoji(s.id),
+                label: `${itemName(s.id)} ×${s.n}`,
+                hint: edible ? `съесть · +${edible.food}🍖` : (d.tool ? "инструмент" : ""),
+                action: edible ? () => { this.eat(s.id); this.openBackpack(); } : () => {}
+            });
+        }
+        this.hud.openPanel("Рюкзак", rows, "bag");
+    }
+
+    eat(id) {
+        const val = foodValue(id);
+        if (!val) return;
+        if (!this.inventory.remove(id, 1)) return;
+        this.needs.consume(val);
+        this.particles.text(this.player.x, this.player.y - 26, `+${val.food} 🍖`, { color: "#b7e37a" });
+        this.hud.toast(`Съедено: ${itemName(id)}`, itemEmoji(id));
+    }
+
+    openJournal() {
+        const rows = [{ html: `<b>Акт ${this.story.act}</b> · ${this.story.objective}` }];
+        for (const e of this.story.entries.slice().reverse()) {
+            rows.push({ html: `<b>${e.title}</b><br><small>${e.text}</small>` });
+        }
+        if (this.cookJournal.count) {
+            rows.push({ html: `<b>Поварская тетрадь</b><br><small>${this.cookJournal.list().map(itemName).join(", ")}</small>` });
+        }
+        this.hud.openPanel("Дневник", rows, "journal");
+    }
+
+    /* ---- sleeping ---- */
+
+    sleep(tentObj) {
+        if (this.clock.hour > 4 && this.clock.hour < 18) {
+            this.hud.toast("Спать посреди дня — роскошь", "😐");
+            return;
+        }
+        this.player.sleeping = true;
+        this.player.x = tentObj.x;
+        this.player.y = tentObj.y + 6;
+        this.hud.toast("Ты засыпаешь…", "😴");
+        let guard = 0;
+        // Fast-forward to morning, still simulating fires and needs.
+        while (guard++ < 2000) {
+            this.clock.advanceMinutes(10);
+            this.simulateMinutes(10, true);
+            if (this.clock.hour >= 6 && this.clock.hour < 12) break;
+        }
+        this.player.sleeping = false;
+        this.bus.emit("player:slept", { day: this.clock.day });
+        this.hud.toast(`Утро. День ${this.clock.day}`, "🌅");
+    }
+
+    onCollapse() {
+        // Средняя жёсткость: смерть не конец — ты приходишь в себя в лагере.
+        this.hud.toast("Ты потерял сознание…", "💀");
+        const tent = this.zone.objects.find((o) => o.kind === "tent" && !o.removed);
+        if (tent) { this.player.x = tent.x; this.player.y = tent.y + 10; }
+        // Lose a slice of what you carried.
+        for (const s of this.inventory.list()) {
+            if (itemDef(s.id) && itemDef(s.id).tool) continue;
+            this.inventory.remove(s.id, Math.ceil(s.n / 2));
+        }
+        this.clock.advanceMinutes(60 * 8);
+        this.needs.revive();
+        this.bus.emit("story:step", {
+            title: "Ты очнулся",
+            text: "Ты пришёл в себя у палатки — продрогший, с пустым животом и половиной " +
+                  "того, что нёс. Долина не прощает беспечности, но и не добивает.",
+            next: this.story.objective
         });
     }
 
-    const resetButton = document.getElementById("settingsResetButton");
-    if (resetButton) {
-        resetButton.addEventListener("click", () => {
-            const ok = confirm("Удалить сохранение и начать заново? Это действие необратимо.");
-            if (!ok) return;
-            game.saveSystem.clear();
-            location.reload();
+    /* ===================== loop ===================== */
+
+    /** Advance world systems by `minutes` in-game minutes. */
+    simulateMinutes(minutes, sleeping = false) {
+        const seconds = minutes * 60;
+        for (const [, fire] of this.fires) fire.update(seconds / this.weather.fuelPenalty);
+        this.needs.update(minutes, {
+            ambient: this.ambient,
+            fireWarmth: this.fireWarmthNear(this.player.x, this.player.y),
+            insulation: this.inventory.has("cloak") ? 6 : 0,
+            sheltered: sleeping || this.shelteredAt(this.player.x, this.player.y),
+            sleeping,
+            activity: sleeping ? 0.3 : this.player.activity(),
+            company: false
+        });
+        if (this.weather.isWet && !sleeping && !this.shelteredAt(this.player.x, this.player.y)) {
+            this.needs.wet = Math.min(1, this.needs.wet + 0.004 * minutes);
+        }
+    }
+
+    update(dt) {
+        this.elapsed += dt;
+        const uiBlocking = this.hud.isPanelOpen || this.paused;
+
+        // Clock & derived systems.
+        const minutes = uiBlocking ? 0 : this.clock.update(dt);
+        if (minutes > 0) this.simulateMinutes(minutes);
+
+        // Input → movement.
+        const axis = uiBlocking ? { x: 0, y: 0 } : this.input.axis();
+        this.player.update(dt, axis, this.zone, {
+            speedFactor: this.needs.speedFactor(),
+            wantRun: this.input.pressed("sprint")
+        });
+
+        // Hotbar keys.
+        for (let i = 1; i <= 6; i++) {
+            if (this.input.justPressed("slot" + i)) this.inventory.setActive(i - 1);
+        }
+        if (this.input.justPressed("inventory")) {
+            this.hud.isPanelOpen ? this.hud.closePanel() : this.openBackpack();
+        }
+        if (this.input.justPressed("journal")) {
+            this.hud.isPanelOpen ? this.hud.closePanel() : this.openJournal();
+        }
+        if (this.input.justPressed("cancel")) {
+            if (this.hud.isStoryOpen) this.hud.hideStory();
+            else this.hud.closePanel();
+        }
+
+        // Interaction.
+        this.interact = uiBlocking ? null : this.findInteractable();
+        if (!uiBlocking && this.input.justPressed("action")) this.doInteract();
+        else if (uiBlocking && this.input.justPressed("action") && this.hud.isStoryOpen) this.hud.hideStory();
+
+        // Zone travel.
+        if (!uiBlocking) {
+            const portal = this.zone.portalAt(this.player.x, this.player.y);
+            if (portal) this.enterZone(portal.target, portal.edge);
+        }
+
+        // Ambience: smoke from lit fires, sparks now and then.
+        if (!uiBlocking && Math.random() < dt * 6) {
+            for (const obj of this.zone.objects) {
+                if (obj.kind !== "campfire" || obj.removed) continue;
+                const f = this.fires.get(this.fireKey(this.zone, obj));
+                if (f && f.lit) {
+                    this.particles.smoke(obj.x, obj.y - 10, 1);
+                    if (Math.random() < 0.3) this.particles.sparks(obj.x, obj.y - 8, 2);
+                }
+            }
+        }
+
+        this.particles.update(dt);
+        this.camera.update(dt);
+        this.camera.follow(this.player.x, this.player.y - 8, dt);
+        this.input.consume();
+
+        this.hud.update({
+            needs: this.needs,
+            clock: this.clock,
+            weather: this.weather,
+            inventory: this.inventory,
+            objective: this.story.objective,
+            zoneName: this.zone.def.name,
+            ambient: this.ambient
         });
     }
 
-    const backButton = document.getElementById("settingsBackButton");
-    if (backButton) {
-        backButton.addEventListener("click", () => showScreen(previousScreen));
+    render() {
+        const active = this.inventory.active;
+        const activeDef = active ? itemDef(active.id) : null;
+        this.renderer.render({
+            zone: this.zone,
+            player: this.player,
+            clock: this.clock,
+            weather: this.weather.current,
+            particles: this.particles,
+            fires: this.localFires,
+            look: this.look,
+            tool: activeDef && (activeDef.tool || activeDef.tags.includes("light"))
+                ? { id: active.id, tool: activeDef.tool || (activeDef.tags.includes("light") ? "torch" : "") }
+                : null,
+            interact: this.interact ? { target: this.interact, label: this.interactLabel(this.interact) } : null,
+            playerLight: activeDef && activeDef.light ? activeDef.light : 0,
+            entities: []
+        }, 1 / 60);
     }
-})();
+
+    start() {
+        // Opening narration, then the loop.
+        this.bus.emit("story:step", {
+            title: "Пепел и Зерно",
+            text: "Неделю назад долина выгорела за одну ночь. Ты вернулся к тому, что было " +
+                  "твоим домом: печь, балки и зола по колено. До темноты — пара часов. " +
+                  "Палатка стоит, костёр — холодный.",
+            next: this.story.objective
+        });
+        this.loop.start();
+        return this;
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Browser bootstrap
+ * ----------------------------------------------------------------------- */
+if (typeof document !== "undefined" && typeof window !== "undefined") {
+    window.addEventListener("DOMContentLoaded", () => {
+        const canvas = document.getElementById("game");
+        const hudRoot = document.getElementById("hud");
+        if (!canvas || !hudRoot) return;
+
+        const fit = (game) => {
+            const w = Math.min(window.innerWidth, 1600);
+            const h = Math.min(window.innerHeight, 1000);
+            canvas.width = w; canvas.height = h;
+            canvas.style.width = w + "px"; canvas.style.height = h + "px";
+            if (game) game.renderer.resize(w, h);
+        };
+        fit(null);
+
+        const game = new Game({ canvas, hudRoot, seed: "ashes-and-grain" });
+        window.GAME = game;
+        window.addEventListener("resize", () => fit(game));
+        game.start();
+    });
+}

@@ -1,8 +1,9 @@
 {
-  "name": "mini-rpg",
-  "version": "9.0.0",
-  "description": "Mini RPG — v1 (RPG), v2 (2D village) и v3 «Пепел и Зерно» (survival sandbox / colony builder). Dependency-free browser game.",
+  "name": "ashes-and-grain",
+  "version": "3.0.0-alpha.2",
+  "description": "«Пепел и Зерно» — survival-песочница с колонией и сюжетом. Чистый JS без зависимостей.",
   "private": true,
+  "type": "module",
   "author": "shironaki",
   "license": "MIT",
   "repository": {
@@ -10,9 +11,10 @@
     "url": "https://github.com/shironaki/MiniRPG---test.git"
   },
   "scripts": {
-    "test": "node tests/game.test.js && node tests/integration.test.js && node v2/tests/engine.test.js && node v2/tests/battle.test.js && node v2/tests/menus.test.js && node v2/tests/smoke.test.js && npm run test:v3",
-    "serve": "node scripts/serve.js",
-    "check": "for f in js/*.js scripts/*.js tests/*.js v2/js/main.js v2/js/*/*.js v2/tests/*.js v3/js/main.js v3/js/*/*.js v3/tests/*.js; do node --check \"$f\" || exit 1; done && echo 'syntax OK'",
-    "test:v3": "node v3/tests/core.test.js && node v3/tests/world.test.js && node v3/tests/survival.test.js && node v3/tests/story.test.js && node v3/tests/smoke.test.js && node v3/tests/game.test.js"
+    "start": "node serve.js 3000",
+    "serve": "node serve.js 3000",
+    "test": "node tests/core.test.js && node tests/world.test.js && node tests/survival.test.js && node tests/story.test.js && node tests/smoke.test.js && node tests/game.test.js",
+    "shot": "node tools/screenshot.js",
+    "check": "for f in js/main.js js/*/*.js tests/*.js tools/*.js; do node --check \"$f\" || exit 1; done && echo 'syntax OK'"
   }
 }

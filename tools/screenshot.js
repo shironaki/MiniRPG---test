@@ -1,0 +1,146 @@
+/**
+ * tools/screenshot.js — render the real game headlessly and save PNGs.
+ *
+ *   npm run shot            all scenes
+ *   npm run shot -- night   only scenes whose name contains "night"
+ *
+ * Uses tools/canvas-shim.js (software Canvas 2D) so graphics work can be
+ * reviewed without a browser. Output goes to .artifacts/ (git-ignored).
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { ShimCanvas, encodePNG } from "./canvas-shim.js";
+import { installDOM } from "../tests/dom-harness.js";
+
+const OUT = path.resolve(".artifacts");
+fs.mkdirSync(OUT, { recursive: true });
+
+// A DOM whose canvases are real (software) pixel buffers.
+const dom = installDOM();
+const baseCreate = globalThis.document.createElement;
+globalThis.document.createElement = (tag) =>
+    (tag === "canvas" ? new ShimCanvas(300, 150) : baseCreate(tag));
+
+const screen = new ShimCanvas(960, 560);
+// The game attaches touch listeners to the canvas; a no-op is enough here.
+screen.addEventListener = () => {};
+screen.style = {};
+const hudRoot = globalThis.document.getElementById("hud");
+globalThis.document.getElementById = (id) => (id === "game" ? screen : hudRoot);
+
+const { Game } = await import("../js/main.js");
+
+function frames(game, n, dt = 1 / 60) {
+    for (let i = 0; i < n; i++) { game.update(dt); game.render(); }
+}
+
+/** Put the hero next to the first object of a kind, facing it. */
+function standAt(game, kind, dx = 0, dy = 26) {
+    const obj = game.zone.objects.find((o) => o.kind === kind && !o.removed);
+    if (!obj) return null;
+    game.player.x = obj.x + dx;
+    game.player.y = obj.y + dy;
+    game.player.dir = dy > 0 ? "up" : "down";
+    game.camera.snapTo(game.player.x, game.player.y - 10);
+    return obj;
+}
+
+const scenes = [
+    {
+        name: "01-camp-midday",
+        about: "Лагерь на пепелище, полдень",
+        setup(g) {
+            g.clock.minute = 12 * 60;
+            standAt(g, "campfire", -6, 30);
+        }
+    },
+    {
+        name: "02-camp-dusk-fire",
+        about: "Сумерки, костёр горит, еда на вертеле",
+        setup(g) {
+            g.clock.minute = 20 * 60 + 20;
+            const obj = standAt(g, "campfire", -10, 28);
+            const fire = g.fires.get(g.fireKey(g.zone, obj));
+            fire.addFuel("log"); fire.addFuel("log");
+            fire.light({ hasFlint: true });
+            fire.putOnSpit("fish_raw");
+            fire.update(20);
+            g.inventory.add("axe_stone", 1);
+            g.inventory.setActive(g.inventory.list().findIndex((s) => s.id === "axe_stone"));
+        }
+    },
+    {
+        name: "03-camp-night",
+        about: "Глубокая ночь у огня",
+        setup(g) {
+            g.clock.minute = 1 * 60;
+            const obj = standAt(g, "campfire", -14, 24);
+            const fire = g.fires.get(g.fireKey(g.zone, obj));
+            fire.addFuel("coal"); fire.light({ hasFlint: true });
+            fire.update(5);
+        }
+    },
+    {
+        name: "04-hero-closeup",
+        about: "Герой крупно: нож в руке, не у лица",
+        setup(g) {
+            g.clock.minute = 11 * 60;
+            standAt(g, "tent", 46, 18);
+            g.player.dir = "right";
+            g.camera.zoom = 6;
+            g.camera.snapTo(g.player.x, g.player.y - 6);
+        }
+    },
+    {
+        name: "05-ruins-house",
+        about: "Сгоревший дом героя",
+        setup(g) {
+            g.clock.minute = 9 * 60;
+            standAt(g, "hearth_ruin", 0, 60);
+            g.camera.zoom = 2.1;
+            g.camera.snapTo(g.player.x, g.player.y - 40);
+        }
+    },
+    {
+        name: "06-forest-noon",
+        about: "Старый бор, полдень",
+        setup(g) {
+            g.enterZone("forest", null, true);
+            g.clock.minute = 13 * 60;
+        }
+    },
+    {
+        name: "07-meadow-dawn",
+        about: "Тихая низина на рассвете",
+        setup(g) {
+            g.enterZone("meadow", null, true);
+            g.clock.minute = 6 * 60;
+        }
+    },
+    {
+        name: "08-shore-afternoon",
+        about: "Лазурный берег",
+        setup(g) {
+            g.enterZone("shore", null, true);
+            g.clock.minute = 16 * 60;
+        }
+    }
+];
+
+const filter = process.argv[2] || "";
+let made = 0;
+for (const scene of scenes) {
+    if (filter && !scene.name.includes(filter)) continue;
+    const game = new Game({ canvas: screen, hudRoot, seed: "ashes-and-grain" });
+    game.hud.hideStory();
+    game.paused = false;
+    scene.setup(game);
+    frames(game, 8);                      // settle particles, bake chunks
+    game.render();
+    const png = encodePNG(screen);
+    const file = path.join(OUT, scene.name + ".png");
+    fs.writeFileSync(file, png);
+    made++;
+    console.log(`📸 ${scene.name.padEnd(22)} ${scene.about}  → ${path.relative(process.cwd(), file)}`);
+}
+console.log(`\nГотово: ${made} кадр(ов) в ${path.relative(process.cwd(), OUT)}/`);

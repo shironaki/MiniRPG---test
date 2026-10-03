@@ -1,7 +1,0 @@
-{
-  "name": "ashes-and-grain-v3",
-  "version": "3.0.0-alpha.1",
-  "description": "Mini RPG 3.0 — Пепел и Зерно. Survival sandbox / colony builder. Dependency-free ES modules.",
-  "private": true,
-  "type": "module"
-}

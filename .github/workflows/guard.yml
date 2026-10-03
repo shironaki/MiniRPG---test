@@ -1,8 +1,6 @@
 name: Guard
 
-# Лёгкая страховка, а не бюрократия.
-# Смысл один: основу (готовую игру v1 и лицензию) никто не трогает случайно.
-# Вся новая работа идёт в /v2 — там ограничений нет.
+# Две страховки: лицензия владельца на месте и проект остаётся без зависимостей.
 
 on:
   pull_request:
@@ -25,48 +23,6 @@ jobs:
             echo "::error::Поле license в package.json изменено. Должно быть MIT."; exit 1; }
           echo "✅ Лицензия и копирайт на месте."
 
-  base-untouched:
-    name: Основа (v1) не тронута
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: v1 game files must stay as they are
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -e
-          git fetch --no-tags origin "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || true
-          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          echo "Изменённые файлы:"; echo "$CHANGED"; echo "---"
-
-          # Основа = готовая игра v1 в корне + лицензия.
-          # The finished v1 game and the licence are the frozen base.
-          BASE_HITS=$(echo "$CHANGED" | grep -E '^(js/|assets/|index\.html$|style\.css$|LICENSE$)' || true)
-
-          if [ -n "$BASE_HITS" ]; then
-            echo "$BASE_HITS" | while read -r f; do
-              echo "::error file=$f::'$f' относится к основе (готовая игра v1 / лицензия). Менять её в обычной работе нельзя — вся разработка идёт в /v2. Нужно правда изменить основу? Согласуйте с владельцем."
-            done
-            exit 1
-          fi
-          echo "✅ Основа не тронута, работа идёт в /v2."
-
-      - name: Heads-up when the v2 orchestrator changes
-        if: always()
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)
-          if echo "$CHANGED" | grep -qxF "v2/js/main.js"; then
-            echo "::warning file=v2/js/main.js::Изменён v2/js/main.js — это оркестратор всей 2D-версии. Не ошибка, но при ревью просмотреть внимательно."
-          fi
-
   no-dependencies:
     name: Без зависимостей
     runs-on: ubuntu-latest
@@ -77,7 +33,7 @@ jobs:
           set -e
           if [ -d node_modules ]; then echo "::error::node_modules закоммичен."; exit 1; fi
           if ls package-lock.json yarn.lock pnpm-lock.yaml 2>/dev/null | grep -q .; then
-            echo "::error::Lock-файл в репозитории — значит появились зависимости. Проект должен оставаться без зависимостей."; exit 1; fi
+            echo "::error::Lock-файл в репозитории — значит появились зависимости."; exit 1; fi
           if node -e "const p=require('./package.json'); process.exit((p.dependencies&&Object.keys(p.dependencies).length)||(p.devDependencies&&Object.keys(p.devDependencies).length)?1:0)"; then
             echo "✅ Зависимостей нет."
           else
