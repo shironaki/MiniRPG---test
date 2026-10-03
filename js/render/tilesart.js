@@ -655,26 +655,78 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
             broadleaf(ctx, obj, season); break;
 
         case "palm": {
-            shadowEllipse(ctx, 11 * s, 4 * s, 0.28);
-            ctx.strokeStyle = "#8a6a3c"; ctx.lineWidth = 4.5 * s; ctx.lineCap = "round";
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(6 * s, -20 * s, 3 * s, -34 * s); ctx.stroke();
-            ctx.strokeStyle = "#6f5430"; ctx.lineWidth = 1.6 * s;
-            for (let i = 0; i < 4; i++) {
+            // A real palm: a thick curved trunk that reaches the crown, big
+            // drooping fronds that fall below the growing point, coconuts.
+            shadowEllipse(ctx, 14 * s, 4.6 * s, 0.3);
+            const bend = (h(obj.tx, obj.ty, 11) - 0.5) * 12 * s;
+            const topX = 3 * s + bend, topY = -46 * s;
+            const trunk = (w, col, off) => {
+                ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round";
                 ctx.beginPath();
-                ctx.moveTo(1 * s + i * 0.6, -6 * s - i * 7 * s);
-                ctx.lineTo(4 * s + i * 0.6, -7 * s - i * 7 * s);
+                ctx.moveTo(off, 0);
+                ctx.quadraticCurveTo(topX * 0.25 + off, -26 * s, topX + off * 0.4, topY);
+                ctx.stroke();
+            };
+            trunk(8.5 * s, "#6b5130", 0);
+            trunk(5.5 * s, "#8a6b3f", -1.2 * s);
+            trunk(2 * s, "#a4834f", -2.6 * s);
+            ctx.strokeStyle = "rgba(70,50,28,0.55)"; ctx.lineWidth = 1 * s;   // ring scars
+            for (let i = 1; i <= 6; i++) {
+                const f = i / 7;
+                const cx2 = topX * 0.25 * 2 * f * (1 - f) + topX * f * f;
+                const cy2 = topY * f;
+                ctx.beginPath();
+                ctx.moveTo(cx2 - 3.6 * s, cy2 + 0.8 * s);
+                ctx.quadraticCurveTo(cx2, cy2 + 2 * s, cx2 + 3.6 * s, cy2 + 0.6 * s);
                 ctx.stroke();
             }
-            for (let i = 0; i < 7; i++) {
-                const a = (i / 7) * Math.PI * 2 + Math.sin(time * 0.6) * 0.06;
-                ctx.fillStyle = i % 2 ? "#3f8450" : "#326a41";
+            // Fronds, drawn from the back row forward.
+            const fronds = [
+                [-2.95, 1.0], [-2.2, 1.12], [-0.95, 1.12], [-0.2, 1.0],
+                [-2.6, 0.78], [-0.55, 0.78], [-1.57, 0.7]
+            ];
+            fronds.forEach(([a0, scale], i) => {
+                const sway = Math.sin(time * 0.8 + i * 1.3) * 0.06;
+                const ang = a0 + sway;
+                const len = (26 + h(obj.tx, obj.ty, i * 3) * 7) * s * scale;
+                const dirX = Math.cos(ang), dirY = Math.sin(ang) * 0.5;
+                // Midrib arcs up then droops down past the tip.
+                const midX = topX + dirX * len * 0.5, midY = topY + dirY * len * 0.5 - 7 * s;
+                const tipX = topX + dirX * len, tipY = topY + dirY * len + 10 * s * scale;
+                const dark = i < 4;
+                ctx.strokeStyle = dark ? "#2d6239" : "#3c8049";
+                ctx.lineWidth = 2.2 * s; ctx.lineCap = "round";
                 ctx.beginPath();
-                ctx.ellipse(3 * s + Math.cos(a) * 12 * s, -34 * s + Math.sin(a) * 6 * s,
-                            11 * s, 3.4 * s, a, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.fillStyle = "#8a5f2c";
-            ctx.beginPath(); ctx.arc(3 * s, -33 * s, 2.4 * s, 0, Math.PI * 2); ctx.fill();
+                ctx.moveTo(topX, topY);
+                ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+                ctx.stroke();
+                ctx.strokeStyle = dark ? "#357040" : "#4a9456";
+                ctx.lineWidth = 1.2 * s;
+                for (let k = 1; k <= 7; k++) {
+                    const f = k / 8;
+                    const u = 1 - f;
+                    const bx = u * u * topX + 2 * u * f * midX + f * f * tipX;
+                    const by = u * u * topY + 2 * u * f * midY + f * f * tipY;
+                    const tx2 = 2 * (u * (midX - topX) + f * (tipX - midX));
+                    const ty2 = 2 * (u * (midY - topY) + f * (tipY - midY));
+                    const nl = Math.hypot(tx2, ty2) || 1;
+                    const nx = -ty2 / nl, ny = tx2 / nl;
+                    const ll = (6.5 - f * 3) * s * scale;
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by);
+                    ctx.quadraticCurveTo(bx + nx * ll * 0.7, by + ny * ll * 0.7 + 1.5 * s,
+                                         bx + nx * ll * 0.5, by + ny * ll + 3 * s);
+                    ctx.moveTo(bx, by);
+                    ctx.quadraticCurveTo(bx - nx * ll * 0.7, by - ny * ll * 0.7 + 1.5 * s,
+                                         bx - nx * ll * 0.5, by - ny * ll + 3 * s);
+                    ctx.stroke();
+                }
+            });
+            ctx.fillStyle = "#5c4327";                                   // coconuts
+            ctx.beginPath(); ctx.arc(topX - 3 * s, topY + 3.5 * s, 2.4 * s, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(topX + 2.2 * s, topY + 4.5 * s, 2.1 * s, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(255,240,210,0.28)";
+            ctx.beginPath(); ctx.ellipse(topX - 3.8 * s, topY + 2.6 * s, 1 * s, 0.7 * s, -0.5, 0, Math.PI * 2); ctx.fill();
             break;
         }
 
@@ -778,30 +830,47 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
         }
 
         case "burnt_stump": {
-            shadowEllipse(ctx, 9, 3.4, 0.34);
-            ctx.fillStyle = "#241f1c";                 // charred body
+            // A sawn-off trunk the fire ate into: solid charred body, hollow
+            // burnt-out heart, ash gathered around the roots.
+            shadowEllipse(ctx, 10, 3.6, 0.34);
+            ctx.fillStyle = "rgba(120,112,102,0.22)";      // ash collar
+            ctx.beginPath(); ctx.ellipse(0, 1, 11, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = "#282220";                      // body
             ctx.beginPath();
-            ctx.moveTo(-8, 0); ctx.lineTo(-6.5, -10); ctx.lineTo(-2, -12);
-            ctx.lineTo(4, -11); ctx.lineTo(7.5, 0);
+            ctx.moveTo(-8.5, 1);
+            ctx.quadraticCurveTo(-7, -6, -6.2, -11);
+            ctx.lineTo(6.2, -11);
+            ctx.quadraticCurveTo(7, -6, 8.5, 1);
             ctx.closePath(); ctx.fill();
-            ctx.fillStyle = "#3b332e";                 // weak light, left side
+            // Root flares.
+            ctx.beginPath(); ctx.ellipse(-7.5, 0.5, 3.6, 1.8, -0.3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(7.5, 0.5, 3.2, 1.6, 0.3, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = "#3e3632";                      // lit left flank
             ctx.beginPath();
-            ctx.moveTo(-8, 0); ctx.lineTo(-6.5, -10); ctx.lineTo(-3.5, -11.4); ctx.lineTo(-4, 0);
+            ctx.moveTo(-8.5, 1);
+            ctx.quadraticCurveTo(-7, -6, -6.2, -11);
+            ctx.lineTo(-3.4, -11);
+            ctx.quadraticCurveTo(-4.4, -6, -5, 1);
             ctx.closePath(); ctx.fill();
-            ctx.fillStyle = "#4a423c";                 // broken top face
-            ctx.beginPath(); ctx.ellipse(-1, -11.4, 5.4, 2.2, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#17120f";                 // hollow, burnt out
-            ctx.beginPath(); ctx.ellipse(-1, -11.2, 3, 1.3, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = "#2e2724"; ctx.lineWidth = 1.2;   // splinters
-            for (let i = 0; i < 3; i++) {
-                const k = h(obj.tx, obj.ty, i * 7);
-                ctx.beginPath();
-                ctx.moveTo(-4 + i * 3.5, -11);
-                ctx.lineTo(-5 + i * 4 + k * 2, -15 - k * 3);
-                ctx.stroke();
+            ctx.fillStyle = "rgba(0,0,0,0.3)";              // shaded right flank
+            ctx.beginPath();
+            ctx.moveTo(4, -11); ctx.quadraticCurveTo(6, -6, 8.5, 1);
+            ctx.lineTo(5, 1); ctx.quadraticCurveTo(3.4, -6, 2.6, -11);
+            ctx.closePath(); ctx.fill();
+
+            ctx.fillStyle = "#4e453f";                      // ragged top rim
+            ctx.beginPath(); ctx.ellipse(0, -11, 6.4, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#171210";                      // burnt-out heart
+            ctx.beginPath(); ctx.ellipse(-0.4, -11.2, 3.8, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(150,140,130,0.3)";        // ash dust on the rim
+            ctx.fillRect(-5.5, -12, 3.5, 1);
+            ctx.fillStyle = "#1d1816";                      // bark cracks
+            for (let i = 0; i < 4; i++) {
+                const k = h(obj.tx, obj.ty, i * 5);
+                ctx.fillRect(-5 + i * 3 + k, -10 + k * 2, 1, 7 - k * 2);
             }
-            ctx.fillStyle = "rgba(160,150,140,0.25)";  // ash collar
-            ctx.beginPath(); ctx.ellipse(0, 1, 10, 2.6, 0, 0, Math.PI * 2); ctx.fill();
             break;
         }
 
@@ -929,19 +998,62 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
         }
 
         case "herb": {
-            ctx.strokeStyle = "#5f8a3f"; ctx.lineWidth = 1.4;
-            for (let i = -1; i <= 1; i++) {
+            // A low leafy plant: broad basal leaves, a few stems, a cluster
+            // of small flowers on top — different per herb type.
+            const type = obj.herbType || "mint";
+            const leaf = type === "sage" ? "#7e9474" : type === "yarrow" ? "#6a8a52" : "#4f8a45";
+            const leafDark = type === "sage" ? "#62775a" : type === "yarrow" ? "#526c3e" : "#3b6b33";
+            ctx.fillStyle = "rgba(10,14,8,0.18)";
+            ctx.beginPath(); ctx.ellipse(0, 0.5, 8, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+
+            // Basal rosette.
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 + h(obj.tx, obj.ty, i) * 0.4;
+                const len = 6 + h(obj.tx, obj.ty, i + 3) * 3;
+                ctx.fillStyle = i % 2 ? leaf : leafDark;
                 ctx.beginPath();
-                ctx.moveTo(i * 2.5, 0);
-                ctx.quadraticCurveTo(i * 6, -7, i * 4.5, -13);
-                ctx.stroke();
+                ctx.ellipse(Math.cos(a) * len * 0.55, -1.5 + Math.sin(a) * len * 0.3,
+                            len * 0.55, 2.1, a * 0.4, 0, Math.PI * 2);
+                ctx.fill();
             }
-            const head = obj.herbType === "yarrow" ? "#f2efe0"
-                : obj.herbType === "sage" ? "#b9c9a0" : "#a7da7c";
-            ctx.fillStyle = head;
-            ctx.beginPath(); ctx.ellipse(0, -14, 3.6, 2.4, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "rgba(255,255,255,0.5)";
-            ctx.fillRect(-2, -15, 1.5, 1);
+            // Stems with leaf pairs.
+            for (let i = -1; i <= 1; i++) {
+                const bend = Math.sin(time * 1.1 + i + obj.tx * 0.4) * 1.1;
+                const topY = -13 - Math.abs(i) * -2;
+                ctx.strokeStyle = leafDark; ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(i * 2, -2);
+                ctx.quadraticCurveTo(i * 3 + bend, topY * 0.55, i * 3.4 + bend, topY);
+                ctx.stroke();
+                ctx.fillStyle = leaf;
+                ctx.beginPath();
+                ctx.ellipse(i * 3 + bend - 2, topY * 0.6, 2.2, 1.1, -0.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(i * 3 + bend + 2, topY * 0.75, 2, 1, 0.5, 0, Math.PI * 2); ctx.fill();
+
+                // Flower head.
+                const headX = i * 3.4 + bend, headY = topY - 1;
+                if (type === "yarrow") {
+                    ctx.fillStyle = "#f2efe0";
+                    for (let k = 0; k < 5; k++) {
+                        ctx.beginPath();
+                        ctx.arc(headX - 2 + k, headY - (k % 2) * 1.2, 1.1, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else if (type === "sage") {
+                    ctx.fillStyle = "#8f87c4";
+                    for (let k = 0; k < 3; k++) {
+                        ctx.beginPath();
+                        ctx.ellipse(headX, headY + k * 2.2, 1.6, 1.1, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    ctx.fillStyle = "#a7da7c";
+                    ctx.beginPath(); ctx.ellipse(headX, headY, 2.4, 2, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "rgba(255,255,255,0.35)";
+                    ctx.fillRect(headX - 1.6, headY - 1.4, 1.4, 0.9);
+                }
+            }
             break;
         }
 
@@ -963,32 +1075,85 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
         }
 
         case "reed": {
-            ctx.strokeStyle = "#6f8a3f"; ctx.lineWidth = 1.5;
-            for (let i = -2; i <= 2; i++) {
-                const bend = Math.sin(time * 1.2 + i + obj.tx) * 2;
+            // Reeds in the shallows: a ripple at the waterline, tall leaves
+            // and a few brown cattail heads.
+            ctx.fillStyle = "rgba(255,255,255,0.18)";
+            ctx.beginPath(); ctx.ellipse(0, 0, 8, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(20,50,60,0.22)";
+            ctx.beginPath(); ctx.ellipse(0, 0.8, 6, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+
+            const stalks = 7;
+            for (let i = 0; i < stalks; i++) {
+                const n = h(obj.tx, obj.ty, i * 11);
+                const x0 = (i / (stalks - 1) - 0.5) * 12;
+                const len = 14 + n * 11;
+                const bend = Math.sin(time * 1.3 + i * 0.7 + obj.tx * 0.5) * (1.5 + len * 0.08);
+                ctx.strokeStyle = i % 2 ? "#5f8a3f" : "#4e7434";
+                ctx.lineWidth = 1.3;
+                ctx.lineCap = "round";
                 ctx.beginPath();
-                ctx.moveTo(i * 3, 0);
-                ctx.quadraticCurveTo(i * 4 + bend, -9, i * 4.5 + bend * 1.6, -17);
+                ctx.moveTo(x0 * 0.6, 0);
+                ctx.quadraticCurveTo(x0 * 0.9 + bend * 0.4, -len * 0.55, x0 + bend, -len);
                 ctx.stroke();
-                if (i % 2 === 0) {
-                    ctx.fillStyle = "#8a6a3a";
-                    ctx.fillRect(i * 4.5 + bend * 1.6 - 1, -20, 2, 4);
+                // A leaf peeling off the stalk.
+                if (i % 3 === 0) {
+                    ctx.strokeStyle = "#6f9a4a"; ctx.lineWidth = 1.6;
+                    ctx.beginPath();
+                    ctx.moveTo(x0 * 0.7, -len * 0.25);
+                    ctx.quadraticCurveTo(x0 + 5, -len * 0.5, x0 + 2 + bend, -len * 0.85);
+                    ctx.stroke();
+                }
+                // Cattail.
+                if (i % 2 === 0 && n > 0.35) {
+                    ctx.fillStyle = "#6d4a24";
+                    ctx.beginPath();
+                    ctx.ellipse(x0 + bend, -len - 2.5, 1.5, 3.6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = "rgba(255,230,190,0.2)";
+                    ctx.fillRect(x0 + bend - 1.3, -len - 4.5, 1, 3);
+                    ctx.strokeStyle = "#5f8a3f"; ctx.lineWidth = 0.9;
+                    ctx.beginPath();
+                    ctx.moveTo(x0 + bend, -len - 6);
+                    ctx.lineTo(x0 + bend + 0.6, -len - 9);
+                    ctx.stroke();
                 }
             }
             break;
         }
 
         case "grass_tuft": {
-            const colors = season === "winter" ? ["#b9c6d0", "#9fb0ba"]
-                : season === "autumn" ? ["#b59a4e", "#977f3c"] : ["#6f9a4a", "#5a7f3b"];
-            for (let i = -2; i <= 2; i++) {
-                const bend = Math.sin(time * 1.1 + i * 0.6 + obj.tx * 0.5) * 1.6;
-                ctx.strokeStyle = i % 2 ? colors[0] : colors[1];
-                ctx.lineWidth = 1.3;
+            // A dense clump: a dark mass at the base, a dozen blades of two
+            // lengths, lighter tips catching the light.
+            const winter = season === "winter", autumn = season === "autumn";
+            const base = winter ? "#9fb0ba" : autumn ? "#8d7638" : "#4e7236";
+            const mid = winter ? "#bccbd6" : autumn ? "#b59a4e" : "#6f9a4a";
+            const tip = winter ? "#e3edf4" : autumn ? "#d2b86a" : "#8fba60";
+            ctx.fillStyle = "rgba(10,16,8,0.22)";
+            ctx.beginPath(); ctx.ellipse(0, 0.5, 8, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = base;
+            ctx.beginPath(); ctx.ellipse(0, -2, 6.5, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+            const blades = 13;
+            for (let i = 0; i < blades; i++) {
+                const n = h(obj.tx, obj.ty, i * 7);
+                const x0 = (i / (blades - 1) - 0.5) * 11;
+                const dir = x0 >= 0 ? 1 : -1;
+                const len = 7 + n * 9;
+                const bend = Math.sin(time * 1.2 + i * 0.5 + obj.tx * 0.3) * (1 + len * 0.1);
+                ctx.strokeStyle = i % 3 === 0 ? tip : (i % 3 === 1 ? mid : base);
+                ctx.lineWidth = 1.1 + n * 0.5;
+                ctx.lineCap = "round";
                 ctx.beginPath();
-                ctx.moveTo(i * 2.4, 0);
-                ctx.quadraticCurveTo(i * 3.6 + bend, -5, i * 5 + bend * 1.4, -10);
+                ctx.moveTo(x0 * 0.5, -1);
+                ctx.quadraticCurveTo(x0 * 0.8 + bend * 0.5, -len * 0.6,
+                                     x0 + dir * 3 + bend, -len);
                 ctx.stroke();
+            }
+            // Seed heads on a couple of the tallest blades.
+            if (!winter) {
+                ctx.fillStyle = autumn ? "#c9ab5e" : "#9db86a";
+                ctx.beginPath(); ctx.ellipse(3.5, -15, 1.1, 2.4, 0.3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(-4, -13, 1, 2.1, -0.3, 0, Math.PI * 2); ctx.fill();
             }
             break;
         }

@@ -11,6 +11,7 @@ import { RNG, mixSeeds, hashSeed, fbm2D } from "../core/rng.js";
 import { T, TILE_SIZE } from "./tiles.js";
 import { TileMap } from "./tilemap.js";
 import { ZONES, BIOMES, biomeDef, zoneDef } from "./regions.js";
+import { propDef } from "../sandbox/gather.js";
 
 const BORDER = 2;
 
@@ -47,8 +48,12 @@ export class Zone {
         this.id = def.id;
         this.def = def;
         this.map = map;
-        this.blocked = new Uint8Array(map.w * map.h); // props that block movement
+        this.blocked = new Uint8Array(map.w * map.h); // terrain-level blocking (rare)
         this.objects = [];
+        // Props block with a circular footprint around their base, not with a
+        // whole 32×32 tile — otherwise you cannot squeeze between two rocks
+        // and every twig gets an invisible wall. Keyed by tile for lookup.
+        this.solidIndex = new Map();
         this.portals = [];
         this.spawn = { x: map.widthPx / 2, y: map.heightPx / 2 };
         this.generated = true;
@@ -68,10 +73,51 @@ export class Zone {
         return this.blocked[ty * this.map.w + tx] === 1;
     }
 
+    /* ---- prop footprints ---------------------------------------------- */
+
+    /** Register a prop's circular footprint (world units). r <= 0 = walk over it. */
+    addSolid(obj, r) {
+        if (!(r > 0)) return this;
+        obj.block = r;
+        const key = `${obj.tx},${obj.ty}`;
+        const list = this.solidIndex.get(key);
+        if (list) list.push(obj); else this.solidIndex.set(key, [obj]);
+        return this;
+    }
+
+    /** Drop a prop out of the collision index (chopped down, picked up). */
+    removeSolid(obj) {
+        const key = `${obj.tx},${obj.ty}`;
+        const list = this.solidIndex.get(key);
+        if (!list) return this;
+        const i = list.indexOf(obj);
+        if (i >= 0) list.splice(i, 1);
+        if (!list.length) this.solidIndex.delete(key);
+        return this;
+    }
+
+    /** Does any prop footprint cover this world point? */
+    propSolidAt(wx, wy) {
+        const tx = Math.floor(wx / TILE_SIZE), ty = Math.floor(wy / TILE_SIZE);
+        for (let oy = -1; oy <= 1; oy++) {
+            for (let ox = -1; ox <= 1; ox++) {
+                const list = this.solidIndex.get(`${tx + ox},${ty + oy}`);
+                if (!list) continue;
+                for (const o of list) {
+                    if (o.removed) continue;
+                    const dx = wx - o.x, dy = wy - o.y;
+                    if (dx * dx + dy * dy <= o.block * o.block) return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** Combined solidity test in world units: terrain + props. */
     solidAt(wx, wy) {
         if (this.map.solidAt(wx, wy)) return true;
-        return this.isBlockedTile(Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE));
+        if (this.isBlockedTile(Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE))) return true;
+        return this.propSolidAt(wx, wy);
     }
 
     /** Is a tile free for walking / building / placing a prop? */
@@ -79,7 +125,8 @@ export class Zone {
         if (tx < BORDER || ty < BORDER || tx >= this.map.w - BORDER || ty >= this.map.h - BORDER) return false;
         if (this.isBlockedTile(tx, ty)) return false;
         const info = this.map.get(tx, ty);
-        return info !== T.DEEP && info !== T.CLIFF && info !== T.VOID;
+        if (info === T.DEEP || info === T.CLIFF || info === T.VOID || info === T.WATER) return false;
+        return !this.propSolidAt(tx * TILE_SIZE + TILE_SIZE / 2, ty * TILE_SIZE + TILE_SIZE / 2);
     }
 
     portalAt(wx, wy) {
@@ -222,7 +269,12 @@ function addProp(zone, kind, tx, ty, extra = {}) {
         variant: 0
     }, extra);
     zone.objects.push(obj);
-    if (extra.solid !== false) zone.blockTile(tx, ty, true);
+    // Footprint: the catalogue decides, scaled by how big this instance grew.
+    const def = propDef(kind);
+    let r = def && def.block !== undefined ? def.block : (extra.solid === false ? 0 : 10);
+    if (extra.solid === false && (!def || def.block === undefined)) r = 0;
+    if (obj.size) r *= Math.min(1.35, obj.size);
+    zone.addSolid(obj, r);
     return obj;
 }
 
@@ -251,9 +303,14 @@ function scatterProps(zone, rng, biome) {
                 });
                 continue;
             }
-            // Rocks and ore.
+            // Rocks, and — only in the mountains and underground — ore veins.
+            // Ore does not lie around in meadows: that is what mines are for.
             if (tile !== T.WATER && jitter > 1 - biome.rocks * (0.4 + (1 - forest) * 1.2)) {
-                const ore = rng.chance(0.18) ? rng.weighted([["copper", 5], ["iron", 3], ["coal", 4], ["gem", 1]]) : null;
+                const oreCountry = !!def.underground || def.id === "highland" ||
+                                   def.id === "pass" || def.id === "mine";
+                const ore = (oreCountry && rng.chance(def.underground ? 0.42 : 0.22))
+                    ? rng.weighted([["copper", 5], ["iron", 3], ["coal", 4], ["gem", 1]])
+                    : null;
                 addProp(zone, ore ? "ore_rock" : "rock", x, y, {
                     variant: rng.int(0, 2), ore, hp: ore ? 5 : 3, yields: ore || "stone"
                 });
@@ -262,7 +319,12 @@ function scatterProps(zone, rng, biome) {
             // Low clutter — walkable, pickable.
             const roll = rng.next();
             if (tile === T.WATER) {
-                if (roll < 0.12) addProp(zone, "reed", x, y, { solid: false, variant: rng.int(0, 1) });
+                // Reeds only in the shallows you can actually reach from land.
+                const nearLand = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+                    const t = map.get(x + dx, y + dy);
+                    return t !== T.WATER && t !== T.DEEP && t !== T.VOID;
+                });
+                if (nearLand && roll < 0.3) addProp(zone, "reed", x, y, { solid: false, variant: rng.int(0, 1) });
                 continue;
             }
             if (roll < biome.bushes * 0.5) {

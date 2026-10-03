@@ -46,7 +46,9 @@ export const TILES = {
     [T.ASH]:        { key: "ash",       name: "Пепел",      solid: false, speed: 0.96, colors: ["#786d60", "#5c544b", "#9c9183"], step: "ash" },
     [T.SOOT]:       { key: "soot",      name: "Гарь",       solid: false, speed: 0.94, colors: ["#4a423c", "#332c28", "#665a50"], step: "ash" },
     [T.SAND]:       { key: "sand",      name: "Песок",      solid: false, speed: 0.9,  colors: ["#d8c48c", "#c3ae77", "#e8d8a6"], step: "sand" },
-    [T.WATER]:      { key: "water",     name: "Отмель",     solid: false, speed: 0.55, colors: ["#4f8fa8", "#417a91", "#6fa9bd"], step: "water", liquid: true },
+    // You cannot swim yet: open water stops you at the shoreline. Shallow
+    // water stays visually distinct and is where fish and reeds live.
+    [T.WATER]:      { key: "water",     name: "Отмель",     solid: true,  speed: 0,    colors: ["#4f8fa8", "#417a91", "#6fa9bd"], step: "water", liquid: true },
     [T.DEEP]:       { key: "deep",      name: "Глубина",    solid: true,  speed: 0,    colors: ["#2d5f7a", "#244e64", "#3a7390"], step: "water", liquid: true },
     [T.STONE]:      { key: "stone",     name: "Камень",     solid: false, speed: 1.05, colors: ["#7b7a78", "#656462", "#918f8c"], step: "stone" },
     [T.CLIFF]:      { key: "cliff",     name: "Скала",      solid: true,  speed: 0,    colors: ["#56544f", "#413f3b", "#6b6862"], step: "stone" },

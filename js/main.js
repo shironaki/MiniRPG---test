@@ -370,7 +370,7 @@ export class Game {
             if (left > 0) this.hud.toast("Рюкзак полон", "🎒");
         }
         obj.removed = true;
-        this.zone.blockTile(obj.tx, obj.ty, false);
+        this.zone.removeSolid(obj);              // its footprint goes with it
         this.bus.emit("world:harvest", { kind: obj.kind, drops });
     }
 

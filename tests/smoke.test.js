@@ -75,7 +75,7 @@ function bootstrap(seed = "ashes-and-grain") {
         const drops = rollDrops(obj, rng);
         for (const d of drops) inventory.add(d.id, d.n);
         obj.removed = true;
-        zone.blockTile(obj.tx, obj.ty, false);
+        zone.removeSolid(obj);
         bus.emit("world:harvest", { kind: obj.kind, drops });
         return true;
     };

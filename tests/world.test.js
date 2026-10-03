@@ -19,8 +19,8 @@ test("every tile has a complete definition", () => {
     }
 });
 
-test("water blocks only at depth; paths are faster than mud", () => {
-    assert.not(isSolidTile(T.WATER));
+test("water stops you at the shoreline; paths are faster than mud", () => {
+    assert.ok(isSolidTile(T.WATER), "no swimming yet — the shallows stop you");
     assert.ok(isSolidTile(T.DEEP));
     assert.ok(isSolidTile(T.CLIFF));
     assert.gt(tileInfo(T.PATH).speed, tileInfo(T.MUD).speed);
@@ -151,9 +151,12 @@ test("the prologue zone contains the camp: tent, fire and the hearth", () => {
     assert.ok(kinds.includes("hearth_ruin"), "no burnt hearth");
     assert.ok(kinds.includes("diary"), "no diary");
     assert.ok(z.campSite, "camp site not recorded");
-    // The fire must be reachable, not buried in a tree.
+    // You cannot stand *in* the fire, but you must be able to walk up to it.
     const fire = z.objects.find((o) => o.kind === "campfire");
-    assert.not(z.solidAt(fire.x, fire.y));
+    assert.ok(z.solidAt(fire.x, fire.y), "standing inside the flames is not a feature");
+    const approaches = [[0, 26], [0, -26], [26, 0], [-26, 0]]
+        .filter(([dx, dy]) => !z.solidAt(fire.x + dx, fire.y + dy));
+    assert.gte(approaches.length, 3, "the fire must be approachable from most sides");
 });
 
 test("forest really is denser than the meadow", () => {
@@ -163,12 +166,35 @@ test("forest really is denser than the meadow", () => {
     assert.gt(dens(forest), dens(meadow));
 });
 
-test("solid props block movement, low clutter does not", () => {
+test("solid props block at their trunk, low clutter does not block at all", () => {
     const z = generateZone("forest", 4);
     const tree = z.objects.find((o) => o.kind === "pine");
-    if (tree) assert.ok(z.isBlockedTile(tree.tx, tree.ty));
+    if (tree) {
+        assert.ok(z.propSolidAt(tree.x, tree.y), "the trunk itself is solid");
+        assert.not(z.propSolidAt(tree.x + 15, tree.y), "but not the whole tile around it");
+    }
     const herb = z.objects.find((o) => o.kind === "herb");
-    if (herb) assert.not(z.isBlockedTile(herb.tx, herb.ty));
+    if (herb) assert.not(z.propSolidAt(herb.x, herb.y), "you can walk through herbs");
+});
+
+test("you can squeeze between two props that are a tile apart", () => {
+    const z = generateZone("forest", 4);
+    // Any two solid props sitting in neighbouring tiles must leave a gap
+    // somewhere on the line between them — no invisible walls.
+    const solids = z.objects.filter((o) => o.block > 0);
+    let pairs = 0, passable = 0;
+    for (let i = 0; i < solids.length && pairs < 40; i++) {
+        for (let j = i + 1; j < solids.length; j++) {
+            const a = solids[i], b = solids[j];
+            const d = Math.hypot(a.x - b.x, a.y - b.y);
+            if (d < 48 || d > 72) continue;
+            pairs++;
+            const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+            if (!z.propSolidAt(mx, my)) passable++;
+            break;
+        }
+    }
+    if (pairs) assert.gt(passable / pairs, 0.5, "most gaps of ~2 tiles must be walkable");
 });
 
 test("WorldMap caches zones lazily", () => {

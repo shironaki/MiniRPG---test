@@ -10,39 +10,39 @@
 
 export const PROPS = {
     /* ---- trees -------------------------------------------------------- */
-    pine:        { name: "Сосна",        tool: "axe", hits: 4, drops: [["log", 2], ["resin", 1, 0.4]], solid: true, regrow: 0, xp: 4, shade: true },
-    spruce:      { name: "Ель",          tool: "axe", hits: 4, drops: [["log", 2], ["resin", 1, 0.3]], solid: true, xp: 4, shade: true },
-    oak:         { name: "Дуб",          tool: "axe", hits: 5, drops: [["log", 3], ["firewood", 2]], solid: true, xp: 5, shade: true },
-    ancient_oak: { name: "Древний дуб",  tool: "axe", hits: 9, drops: [["log", 6], ["resin", 2]], solid: true, xp: 14, shade: true, sacred: true },
-    birch:       { name: "Берёза",       tool: "axe", hits: 3, drops: [["log", 2], ["fiber", 1, 0.5]], solid: true, xp: 3, shade: true },
-    willow:      { name: "Ива",          tool: "axe", hits: 3, drops: [["log", 1], ["fiber", 2]], solid: true, xp: 3, shade: true },
-    palm:        { name: "Пальма",       tool: "axe", hits: 3, drops: [["log", 1], ["fiber", 2]], solid: true, xp: 3, shade: true },
-    dead_tree:   { name: "Сухое дерево", tool: "axe", hits: 2, drops: [["firewood", 3], ["log", 1, 0.5]], solid: true, xp: 2 },
-    burnt_tree:  { name: "Обгоревшее дерево", tool: "axe", hits: 2, drops: [["charcoal", 2], ["firewood", 2]], solid: true, xp: 2 },
-    burnt_stump: { name: "Обугленный пень", tool: null, hits: 2, drops: [["charcoal", 1], ["ash_dust", 1]], solid: false, xp: 1 },
-    driftwood:   { name: "Плавник",      tool: null, hits: 1, drops: [["firewood", 2]], solid: false, xp: 1 },
+    pine:        { name: "Сосна",        tool: "axe", hits: 4, drops: [["log", 2], ["resin", 1, 0.4]], solid: true, regrow: 0, xp: 4, shade: true, block: 7 },
+    spruce:      { name: "Ель",          tool: "axe", hits: 4, drops: [["log", 2], ["resin", 1, 0.3]], solid: true, xp: 4, shade: true, block: 7 },
+    oak:         { name: "Дуб",          tool: "axe", hits: 5, drops: [["log", 3], ["firewood", 2]], solid: true, xp: 5, shade: true, block: 8 },
+    ancient_oak: { name: "Древний дуб",  tool: "axe", hits: 9, drops: [["log", 6], ["resin", 2]], solid: true, xp: 14, shade: true, sacred: true, block: 11 },
+    birch:       { name: "Берёза",       tool: "axe", hits: 3, drops: [["log", 2], ["fiber", 1, 0.5]], solid: true, xp: 3, shade: true, block: 6 },
+    willow:      { name: "Ива",          tool: "axe", hits: 3, drops: [["log", 1], ["fiber", 2]], solid: true, xp: 3, shade: true, block: 7 },
+    palm:        { name: "Пальма",       tool: "axe", hits: 3, drops: [["log", 1], ["fiber", 2]], solid: true, xp: 3, shade: true, block: 6 },
+    dead_tree:   { name: "Сухое дерево", tool: "axe", hits: 2, drops: [["firewood", 3], ["log", 1, 0.5]], solid: true, xp: 2, block: 6 },
+    burnt_tree:  { name: "Обгоревшее дерево", tool: "axe", hits: 2, drops: [["charcoal", 2], ["firewood", 2]], solid: true, xp: 2, block: 7 },
+    burnt_stump: { name: "Обугленный пень", tool: null, hits: 2, drops: [["charcoal", 1], ["ash_dust", 1]], solid: false, xp: 1, block: 7 },
+    driftwood:   { name: "Плавник",      tool: null, hits: 1, drops: [["firewood", 2]], solid: false, xp: 1, block: 0 },
 
     /* ---- stone & ore --------------------------------------------------- */
-    rock:        { name: "Камень",       tool: "pick", hits: 3, drops: [["stone", 2], ["flint", 1, 0.3]], solid: true, xp: 3 },
-    ore_rock:    { name: "Рудная жила",  tool: "pick", hits: 5, drops: [["stone", 1]], solid: true, xp: 7, oreDrop: true },
-    ruin_wall:   { name: "Обломок стены",tool: "pick", hits: 4, drops: [["stone", 3]], solid: true, xp: 3 },
+    rock:        { name: "Камень",       tool: "pick", hits: 3, drops: [["stone", 2], ["flint", 1, 0.3]], solid: true, xp: 3, block: 10 },
+    ore_rock:    { name: "Рудная жила",  tool: "pick", hits: 5, drops: [["stone", 1]], solid: true, xp: 7, oreDrop: true, block: 11 },
+    ruin_wall:   { name: "Обломок стены",tool: "pick", hits: 4, drops: [["stone", 3]], solid: true, xp: 3, block: 13 },
 
     /* ---- forage (no tool needed) --------------------------------------- */
-    bush:        { name: "Куст",         tool: null, hits: 1, drops: [["fiber", 1]], berriesDrop: [["berry", 2]], solid: false, regrow: 2, xp: 1 },
-    herb:        { name: "Травы",        tool: null, hits: 1, drops: [], herbDrop: true, solid: false, regrow: 3, xp: 2 },
-    firewood:    { name: "Хворост",      tool: null, hits: 1, drops: [["firewood", 2]], solid: false, xp: 1, instant: true },
-    reed:        { name: "Камыш",        tool: null, hits: 1, drops: [["fiber", 2]], solid: false, regrow: 2, xp: 1 },
-    grass_tuft:  { name: "Пучок травы",  tool: null, hits: 1, drops: [["hay", 1], ["fiber", 1, 0.4]], solid: false, regrow: 2, xp: 1 },
-    flower:      { name: "Цветок",       tool: null, hits: 1, drops: [["fiber", 1]], solid: false, regrow: 3, xp: 1 },
-    mushroom_patch: { name: "Грибница",  tool: null, hits: 1, drops: [["mushroom", 2]], solid: false, regrow: 3, xp: 2 },
+    bush:        { name: "Куст",         tool: null, hits: 1, drops: [["fiber", 1]], berriesDrop: [["berry", 2]], solid: false, regrow: 2, xp: 1, block: 0 },
+    herb:        { name: "Травы",        tool: null, hits: 1, drops: [], herbDrop: true, solid: false, regrow: 3, xp: 2, block: 0 },
+    firewood:    { name: "Хворост",      tool: null, hits: 1, drops: [["firewood", 2]], solid: false, xp: 1, instant: true, block: 0 },
+    reed:        { name: "Камыш",        tool: null, hits: 1, drops: [["fiber", 2]], solid: false, regrow: 2, xp: 1, block: 0 },
+    grass_tuft:  { name: "Пучок травы",  tool: null, hits: 1, drops: [["hay", 1], ["fiber", 1, 0.4]], solid: false, regrow: 2, xp: 1, block: 0 },
+    flower:      { name: "Цветок",       tool: null, hits: 1, drops: [["fiber", 1]], solid: false, regrow: 3, xp: 1, block: 0 },
+    mushroom_patch: { name: "Грибница",  tool: null, hits: 1, drops: [["mushroom", 2]], solid: false, regrow: 3, xp: 2, block: 0 },
 
     /* ---- story / camp objects (interact, never harvest) ---------------- */
-    tent:        { name: "Палатка",      interact: "sleep", solid: true },
-    campfire:    { name: "Костёр",       interact: "fire",  solid: false },
-    hearth_ruin: { name: "Обгоревшая печь", interact: "story", solid: true },
-    burnt_beam:  { name: "Обгоревшая балка", tool: "axe", hits: 2, drops: [["charcoal", 1], ["firewood", 1]], solid: true, xp: 1 },
-    diary:       { name: "Обгоревший дневник", interact: "read", solid: false, story: true },
-    chest_old:   { name: "Старый сундук", interact: "loot", solid: true }
+    tent:        { name: "Палатка",      interact: "sleep", solid: true, block: 15 },
+    campfire:    { name: "Костёр",       interact: "fire",  solid: false, block: 9 },
+    hearth_ruin: { name: "Обгоревшая печь", interact: "story", solid: true, block: 14 },
+    burnt_beam:  { name: "Обгоревшая балка", tool: "axe", hits: 2, drops: [["charcoal", 1], ["firewood", 1]], solid: true, xp: 1, block: 11 },
+    diary:       { name: "Обгоревший дневник", interact: "read", solid: false, story: true, block: 0 },
+    chest_old:   { name: "Старый сундук", interact: "loot", solid: true, block: 11 }
 };
 
 export function propDef(kind) { return PROPS[kind] || null; }

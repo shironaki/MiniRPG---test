@@ -79,7 +79,8 @@ export class Player {
 
         if (zone) {
             const res = moveAndCollide(zone.map, this.x, this.y, dx, dy, this.radius,
-                (wx, wy) => zone.isBlockedTile(Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE)));
+                (wx, wy) => zone.isBlockedTile(Math.floor(wx / TILE_SIZE), Math.floor(wy / TILE_SIZE)) ||
+                            zone.propSolidAt(wx, wy));
             this.x = res.x; this.y = res.y;
         } else {
             this.x += dx; this.y += dy;
