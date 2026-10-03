@@ -217,9 +217,9 @@ test("fuel burns down and the fire goes out", () => {
     let out = 0;
     bus.on("fire:out", () => out++);
     const f = new Campfire({ bus });
-    f.addFuel("hay");                 // 12 seconds
+    f.addFuel("hay");                 // kindling: 4 in-game minutes
     f.light();
-    f.update(20);
+    f.update(300);
     assert.not(f.lit);
     assert.eq(out, 1);
     assert.eq(f.lightRadius, 0);
@@ -230,15 +230,58 @@ test("food goes raw → cooking → done → burnt if you forget it", () => {
     f.addFuel("coal"); f.light();
     const i = f.putOnSpit("meat_raw");
     assert.gte(i, 0);
-    f.update(10);
-    assert.eq(f.spit[0].state, COOK_STATE.COOKING);
     f.update(60);
+    assert.eq(f.spit[0].state, COOK_STATE.COOKING);
+    f.update(700);
     assert.eq(f.spit[0].state, COOK_STATE.DONE);
     const taken = new Campfire();
     taken.addFuel("coal"); taken.light(); taken.putOnSpit("fish_raw");
-    for (let s = 0; s < 40; s++) taken.update(5);   // walked away for three minutes
+    for (let s = 0; s < 400; s++) taken.update(5);  // walked away for half an hour
     assert.eq(taken.spit[0].state, COOK_STATE.BURNT);
     assert.eq(taken.takeFromSpit(0).id, "food_burnt");
+});
+
+test("the pit shows what you threw in, and it chars as it burns", () => {
+    const f = new Campfire();
+    f.addFuel("log");
+    f.addFuel("firewood");
+    assert.eq(f.stack.length, 2);
+    assert.eq(f.stack[0].id, "log");
+    assert.eq(f.stack[1].burn, 1, "fresh fuel is untouched");
+
+    f.light();
+    f.update(2000);                         // the log is partly gone
+    assert.lt(f.stack[0].burn, 1);
+    assert.gt(f.stack[0].burn, 0);
+    assert.eq(f.stack[1].burn, 1, "the piece underneath has not caught yet");
+    assert.ok(f.lit);
+});
+
+test("one log burns for over an hour, and a night needs several", () => {
+    const f = new Campfire();
+    f.addFuel("log");
+    f.light();
+    f.update(60 * 60);                      // one in-game hour
+    assert.ok(f.lit, "a log must survive a whole in-game hour");
+    f.update(60 * 30);                      // and a half
+    assert.not(f.lit, "but not two");
+
+    const night = new Campfire();
+    for (let i = 0; i < 8; i++) night.addFuel("log");
+    night.light();
+    night.update(60 * 60 * 8);              // dusk to dawn
+    assert.ok(night.fuel >= 0);
+    assert.gt(night.ashes, 0, "burnt fuel leaves ash behind");
+});
+
+test("the fire sinks to embers before it dies", () => {
+    const f = new Campfire();
+    f.addFuel("firewood");
+    f.light();
+    f.update(1000);                         // 200 s of fuel left
+    assert.ok(f.lit);
+    assert.lt(f.intensity, 1, "it should be dying down, not at full blaze");
+    assert.gt(f.intensity, 0.2);
 });
 
 test("an unlit fire cooks nothing", () => {
@@ -252,7 +295,7 @@ test("an unlit fire cooks nothing", () => {
 test("embers are slower but more forgiving than the spit", () => {
     const a = new Campfire(); a.addFuel("coal"); a.light(); a.putOnSpit("root");
     const b = new Campfire(); b.addFuel("coal"); b.light(); b.putInEmbers("root");
-    a.update(55); b.update(55);
+    a.update(550); b.update(550);
     assert.eq(a.spit[0].state, COOK_STATE.DONE);
     assert.eq(b.embers[0].state, COOK_STATE.COOKING);
 });
@@ -271,7 +314,7 @@ test("the pot needs to be installed, then cooks a discovered dish", () => {
     f.addFuel("coal"); f.light();
     const pot = f.startPot(["meat_raw", "root"]);
     assert.eq(pot.result, "stew_meat");
-    f.update(200);
+    f.update(1600);
     assert.ok(f.pot.done);
     assert.eq(f.takePot(), "stew_meat");
 });
@@ -280,7 +323,7 @@ test("collectReady picks up everything finished in one go", () => {
     const f = new Campfire();
     f.addFuel("coal"); f.light();
     f.putOnSpit("meat_raw"); f.putInEmbers("root");
-    f.update(200);
+    f.update(1200);
     const got = f.collectReady();
     assert.gte(got.length, 1);
 });
@@ -288,11 +331,11 @@ test("collectReady picks up everything finished in one go", () => {
 test("a campfire survives a save round-trip mid-cook", () => {
     const f = new Campfire();
     f.addFuel("log"); f.light(); f.putOnSpit("fish_raw");
-    f.update(20);
+    f.update(60);
     const copy = new Campfire().load(JSON.parse(JSON.stringify(f.toJSON())));
     assert.ok(copy.lit);
     assert.eq(copy.spit[0].itemId, "fish_raw");
-    copy.update(40);
+    copy.update(600);
     assert.eq(copy.spit[0].state, COOK_STATE.DONE);
 });
 

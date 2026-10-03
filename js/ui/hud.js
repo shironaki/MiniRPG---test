@@ -194,12 +194,21 @@ export function fireRows(fire, inventory, actions) {
     rows.push({ html: `<b>${fire.lit ? "🔥 Костёр горит" : "🪵 Кострище"}</b><br>
         <small>${fire.status()}</small>` });
 
+    // What is physically in the pit, newest on top, with how much is left.
+    if (fire.stack && fire.stack.length) {
+        const pile = fire.stack.slice().reverse().slice(0, 4).map((p) => {
+            const pct = Math.round(p.burn * 100);
+            return `${itemEmoji(p.id)} ${itemName(p.id).toLowerCase()} — ${pct}%`;
+        }).join("<br>");
+        rows.push({ html: `<small>В костре:<br>${pile}</small>` });
+    }
+
     const fuels = inventory.list().filter((s) => (itemDef(s.id) || {}).burn > 0);
     for (const f of fuels.slice(0, 4)) {
         rows.push({
             icon: itemEmoji(f.id),
             label: `Подбросить ${itemName(f.id).toLowerCase()}`,
-            hint: `×${f.n} · +${Math.round(itemDef(f.id).burn / 60)} мин`,
+            hint: `×${f.n} · +${Math.round(itemDef(f.id).burn / 60)} мин горения`,
             action: () => actions.addFuel(f.id)
         });
     }

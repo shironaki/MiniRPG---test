@@ -13,7 +13,7 @@
  */
 import { CHUNK } from "../world/tilemap.js";
 import { TILE_SIZE, TILES } from "../world/tiles.js";
-import { paintTile, paintEdges, paintProp, paintFlames, paintSpitItem } from "./tilesart.js";
+import { paintTile, paintEdges, paintProp, paintFlames, paintSpitItem, setSun } from "./tilesart.js";
 import { drawCharacter, drawSleeping } from "./character.js";
 import { LightMap } from "./lighting.js";
 import { itemEmoji } from "../sandbox/items.js";
@@ -181,7 +181,7 @@ export class Renderer {
                 paintProp(ctx, o, this.time, this.season);
                 if (o.kind === "campfire") {
                     const fire = fires && fires.get(o.id != null ? o.id : `${o.tx},${o.ty}`);
-                    paintFlames(ctx, fire ? fire.intensity : 0, this.time);
+                    paintFlames(ctx, fire ? fire.intensity : 0, this.time, fire ? fire.stack : []);
                     if (fire) {
                         fire.spit.forEach((slot, i) => {
                             if (slot) paintSpitItem(ctx, i, slot.state, itemEmoji(slot.itemId), slot.itemId);
@@ -313,17 +313,28 @@ export class Renderer {
             ctx.fillStyle = `rgba(96,86,52,${0.09 * noon})`;
             ctx.fillRect(0, 0, W, H);
         }
+        // Daylight itself: a bright sky bounce that makes noon read as noon
+        // instead of "grey and gloomy".
+        if (daylight > 0.25) {
+            const d = (daylight - 0.25) / 0.75;
+            ctx.globalCompositeOperation = "lighter";
+            ctx.fillStyle = `rgba(118,122,116,${0.1 * d})`;      // sunlight
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = `rgba(74,104,150,${0.05 * d})`;      // sky bounce
+            ctx.fillRect(0, 0, W, H);
+        }
         ctx.globalCompositeOperation = "source-over";
         if (daylight < 0.6) {                      // moonlight cools the shadows
             ctx.fillStyle = `rgba(20,30,60,${0.1 * (1 - daylight)})`;
             ctx.fillRect(0, 0, W, H);
         }
 
-        // Vignette.
-        const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.32,
-                                           W / 2, H / 2, Math.max(W, H) * 0.72);
+        // Vignette — barely there in daylight, heavy at night.
+        const vig = 0.16 + 0.26 * (1 - daylight);
+        const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.34,
+                                           W / 2, H / 2, Math.max(W, H) * 0.75);
         g.addColorStop(0, "rgba(0,0,0,0)");
-        g.addColorStop(1, "rgba(6,6,10,0.30)");
+        g.addColorStop(1, `rgba(6,6,10,${vig})`);
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
@@ -338,6 +349,7 @@ export class Renderer {
     render(state, dt = 0) {
         this.time += dt;
         this.season = state.clock ? state.clock.season.key : "spring";
+        setSun(state.clock ? state.clock.minute / 60 : 12, state.clock ? state.clock.daylight : 1);
         const ctx = this.ctx;
         ctx.fillStyle = "#0a0c10";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);

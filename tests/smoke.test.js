@@ -138,7 +138,7 @@ test("full Act I playthrough: ashes → fire → food → morning", () => {
     g.inventory.add("fish_raw", 1);
     g.inventory.remove("fish_raw", 1);
     fire.putOnSpit("fish_raw");
-    g.simulate(1);                               // one in-game minute of heat
+    g.simulate(9);                               // nine in-game minutes of heat
     assert.eq(fire.spit[0].state, "done");
     const taken = fire.takeFromSpit(0);
     assert.eq(taken.id, "fish_grill");

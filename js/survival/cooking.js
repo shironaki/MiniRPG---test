@@ -10,12 +10,12 @@ import { ITEMS, itemDef, hasTag } from "../sandbox/items.js";
 
 /** Direct-heat methods: what the fire does to a raw ingredient. */
 export const SPIT_RULES = [
-    { tag: "meat",     out: "meat_roast",     time: 60 },
-    { tag: "fish",     out: "fish_grill",     time: 45 },
-    { tag: "mushroom", out: "mushroom_roast", time: 30 },
-    { tag: "egg",      out: "egg_baked",      time: 35 },
-    { tag: "root",     out: "root_baked",     time: 50 },
-    { tag: "grain",    out: "flatbread",      time: 40 }
+    { tag: "meat",     out: "meat_roast",     time: 600 },
+    { tag: "fish",     out: "fish_grill",     time: 450 },
+    { tag: "mushroom", out: "mushroom_roast", time: 300 },
+    { tag: "egg",      out: "egg_baked",      time: 350 },
+    { tag: "root",     out: "root_baked",     time: 500 },
+    { tag: "grain",    out: "flatbread",      time: 400 }
 ];
 
 /**
@@ -24,16 +24,16 @@ export const SPIT_RULES = [
  * meat+root beats the generic vegetable soup.
  */
 export const POT_RECIPES = [
-    { id: "stew_meat", need: ["meat", "root"],            water: true, time: 150, name: "Сытное рагу" },
-    { id: "fish_soup", need: ["fish", "root"],            water: true, time: 140, name: "Уха" },
-    { id: "fish_soup", need: ["fish", "herb"],            water: true, time: 130, name: "Уха" },
-    { id: "porridge",  need: ["grain", "grain"],          water: true, time: 120, name: "Каша" },
-    { id: "porridge",  need: ["grain", "berry"],          water: true, time: 120, name: "Каша" },
-    { id: "berry_jam", need: ["berry", "berry"],          water: false, time: 110, name: "Ягодное варенье" },
-    { id: "herb_tea",  need: ["herb"],                    water: true, time: 70,  name: "Травяной отвар" },
-    { id: "veg_soup",  need: ["root", "mushroom"],        water: true, time: 120, name: "Похлёбка" },
-    { id: "veg_soup",  need: ["root", "root"],            water: true, time: 110, name: "Похлёбка" },
-    { id: "veg_soup",  need: ["mushroom", "mushroom"],    water: true, time: 110, name: "Похлёбка" }
+    { id: "stew_meat", need: ["meat", "root"],            water: true, time: 1500, name: "Сытное рагу" },
+    { id: "fish_soup", need: ["fish", "root"],            water: true, time: 1400, name: "Уха" },
+    { id: "fish_soup", need: ["fish", "herb"],            water: true, time: 1300, name: "Уха" },
+    { id: "porridge",  need: ["grain", "grain"],          water: true, time: 1200, name: "Каша" },
+    { id: "porridge",  need: ["grain", "berry"],          water: true, time: 1200, name: "Каша" },
+    { id: "berry_jam", need: ["berry", "berry"],          water: false, time: 1100, name: "Ягодное варенье" },
+    { id: "herb_tea",  need: ["herb"],                    water: true, time: 700,  name: "Травяной отвар" },
+    { id: "veg_soup",  need: ["root", "mushroom"],        water: true, time: 1200, name: "Похлёбка" },
+    { id: "veg_soup",  need: ["root", "root"],            water: true, time: 1100, name: "Похлёбка" },
+    { id: "veg_soup",  need: ["mushroom", "mushroom"],    water: true, time: 1100, name: "Похлёбка" }
 ];
 
 /** Can this item be cooked over direct heat? Returns { out, time } or null. */

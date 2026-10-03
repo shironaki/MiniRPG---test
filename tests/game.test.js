@@ -150,7 +150,7 @@ test("the campfire panel opens, takes fuel, lights and cooks", () => {
 
     fire.addFuel("log");                 // a stick alone burns out mid-cook
     fire.putOnSpit("fish_raw");
-    fire.update(60);
+    fire.update(500);
     assert.eq(fire.spit[0].state, "done");
 
     // A lit fire must light and warm the camp.
@@ -205,6 +205,32 @@ test("sleeping in the tent skips to morning", () => {
     assert.eq(g.clock.day, 2);
     assert.lt(g.needs.fatigue, 80, "sleep must rest the hero");
     assert.not(g.player.sleeping);
+});
+
+test("after sleeping the hero is not wedged inside the tent", () => {
+    const g = boot();
+    const tent = g.zone.objects.find((o) => o.kind === "tent");
+    g.clock.minute = 22 * 60;
+    g.sleep(tent);
+
+    assert.ok(g.fitsAt(g.player.x, g.player.y), "the hero must wake up on walkable ground");
+
+    // And they can actually walk away in every direction that is open.
+    let moved = 0;
+    for (const axis of [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }]) {
+        const x = g.player.x, y = g.player.y;
+        for (let i = 0; i < 20; i++) g.player.update(1 / 60, axis, g.zone, {});
+        if (Math.hypot(g.player.x - x, g.player.y - y) > 2) moved++;
+        g.player.x = x; g.player.y = y;
+    }
+    assert.gte(moved, 3, "the hero is stuck: almost no direction works");
+});
+
+test("placeSafely never leaves the hero inside a solid prop", () => {
+    const g = boot();
+    const tent = g.zone.objects.find((o) => o.kind === "tent");
+    g.placeSafely(tent.x, tent.y);          // dead centre of a solid tent
+    assert.ok(g.fitsAt(g.player.x, g.player.y));
 });
 
 test("save and load restore the hero, time and inventory", () => {

@@ -412,12 +412,40 @@ export function paintEdges(ctx, map, tx, ty, px, py, size) {
 /*  Props — drawn every frame, y-sorted with characters. Origin = the base.  */
 /* ======================================================================= */
 
+/**
+ * Where the sun is. The renderer updates this once per frame from the clock;
+ * props use it to throw a shadow in the right direction and length, which is
+ * most of what makes a scene read as "morning" or "noon".
+ */
+export const SUN = { dx: 0.55, dy: 0.42, len: 1, alpha: 1 };
+
+export function setSun(hour, daylight) {
+    // Low sun in the morning and evening → long shadows pointing away from it.
+    const t = Math.max(0, Math.min(1, (hour - 6) / 12));      // 0 at dawn, 1 at dusk
+    const elevation = Math.sin(Math.max(0, Math.min(Math.PI, t * Math.PI)));
+    SUN.dx = Math.cos(Math.PI * (0.15 + t * 0.7)) * -1.25;    // east → west
+    SUN.dy = 0.34 + (1 - elevation) * 0.5;
+    SUN.len = 0.55 + (1 - elevation) * 1.35;
+    SUN.alpha = Math.max(0, Math.min(1, daylight)) * 0.9;
+}
+
 function shadowEllipse(ctx, w, hh, alpha = 0.3) {
-    // Soft core plus a wider, fainter penumbra, offset down-right (sun is
-    // up-left). Grounding objects this way is most of the "3D" feeling.
-    ctx.fillStyle = `rgba(14,12,10,${alpha * 0.45})`;
+    // A cast shadow stretching away from the sun, plus a soft contact pool
+    // under the object. Grounding things this way is most of the "3D" feeling.
+    if (SUN.alpha > 0.05) {
+        const reach = w * SUN.len * SUN.alpha;
+        ctx.save();
+        ctx.fillStyle = `rgba(14,12,10,${alpha * 0.3 * SUN.alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(SUN.dx * reach * 0.6, SUN.dy * hh * SUN.len * 0.8,
+                    w * (1 + SUN.len * 0.55), hh * (1 + SUN.len * 0.25),
+                    Math.atan2(SUN.dy * hh, SUN.dx * w) * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+    ctx.fillStyle = `rgba(14,12,10,${alpha * 0.4})`;
     ctx.beginPath();
-    ctx.ellipse(2.5, 1.8, w * 1.3, hh * 1.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(1.6, 1.2, w * 1.12, hh * 1.12, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = `rgba(14,12,10,${alpha})`;
     ctx.beginPath();
@@ -528,31 +556,47 @@ function broadleaf(ctx, obj, season) {
 
     shadowEllipse(ctx, 15 * S, 5.5 * S, 0.32);
 
-    // Trunk with root flare.
-    const trunk = birch ? "#d9d4c4" : "#5d4226";
+    // Trunk: root flare at the base, rising into the crown so the canopy
+    // never floats above a stump.
+    const trunk = birch ? "#cdc6b4" : "#5d4226";
+    const trunkTop = -30 * S;
+    const halfBase = birch ? 3.4 * S : 5.5 * S;
+    const halfTop = birch ? 1.7 * S : 2.4 * S;
     ctx.fillStyle = trunk;
     ctx.beginPath();
-    ctx.moveTo(-5 * S, 0); ctx.lineTo(-2.8 * S, -18 * S);
-    ctx.lineTo(2.8 * S, -18 * S); ctx.lineTo(5 * S, 0);
+    ctx.moveTo(-halfBase, 0);
+    ctx.quadraticCurveTo(-halfBase * 0.62, -12 * S, -halfTop, trunkTop);
+    ctx.lineTo(halfTop, trunkTop);
+    ctx.quadraticCurveTo(halfBase * 0.62, -12 * S, halfBase, 0);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = birch ? "#b7b2a2" : "#452f19";
+    ctx.fillStyle = birch ? "#a8a192" : "#452f19";
     ctx.beginPath();
-    ctx.moveTo(1.2 * S, -18 * S); ctx.lineTo(2.8 * S, -18 * S);
-    ctx.lineTo(5 * S, 0); ctx.lineTo(2 * S, 0);
+    ctx.moveTo(halfTop * 0.45, trunkTop);
+    ctx.lineTo(halfTop, trunkTop);
+    ctx.quadraticCurveTo(halfBase * 0.62, -12 * S, halfBase, 0);
+    ctx.lineTo(halfBase * 0.42, 0);
     ctx.closePath(); ctx.fill();
+    // Limbs reaching into the canopy.
+    ctx.strokeStyle = birch ? "#c6c1b1" : "#523a20";
+    ctx.lineWidth = 2.2 * S; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-1 * S, -22 * S); ctx.quadraticCurveTo(-7 * S, -28 * S, -11 * S, -34 * S); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(1 * S, -24 * S); ctx.quadraticCurveTo(7 * S, -29 * S, 10 * S, -34 * S); ctx.stroke();
     if (birch) {
         ctx.fillStyle = "#3a3630";
-        for (let i = 0; i < 4; i++) {
-            ctx.fillRect(-3 * S + h(obj.tx, obj.ty, i) * 5 * S, -16 * S + i * 4 * S, 2.4 * S, 1 * S);
+        for (let i = 0; i < 6; i++) {
+            ctx.fillRect(-2 * S + h(obj.tx, obj.ty, i) * 3 * S, -27 * S + i * 4.3 * S, 1.8 * S, 0.9 * S);
         }
     }
 
-    // Crown: overlapping blobs, dark first, then mid, then a rim light.
-    const blobs = [[0, -36, 18], [-12, -28, 13], [12, -29, 12], [-5, -44, 12], [7, -42, 11]];
+    // Crown: overlapping blobs sitting on the limbs — dark pass, mid pass,
+    // then a rim light on the sunward side.
+    const blobs = [[0, -40, 17], [-12, -33, 12.5], [12, -34, 11.5], [-5, -47, 11], [7, -45, 10]];
     ctx.fillStyle = dark;
     for (const [bx, by, br] of blobs) {
         ctx.beginPath();
-        ctx.ellipse(bx * S + 2, by * S + 2, br * S, br * 0.84 * S, 0, 0, Math.PI * 2);
+        ctx.ellipse(bx * S + 2, by * S + 2.5, br * S, br * 0.84 * S, 0, 0, Math.PI * 2);
         ctx.fill();
     }
     ctx.fillStyle = mid;
@@ -564,18 +608,28 @@ function broadleaf(ctx, obj, season) {
     ctx.fillStyle = lit;
     ctx.globalAlpha = 0.6;
     ctx.beginPath();
-    ctx.ellipse(-8 * S, -42 * S, 9 * S, 6.5 * S, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(-8 * S, -45 * S, 8.5 * S, 6 * S, -0.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(-14 * S, -31 * S, 5.5 * S, 4 * S, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(-14 * S, -35 * S, 5 * S, 3.6 * S, -0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = deep;
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.32;
     ctx.beginPath();
-    ctx.ellipse(10 * S, -26 * S, 9 * S, 5 * S, 0.3, 0, Math.PI * 2);
+    ctx.ellipse(10 * S, -30 * S, 8.5 * S, 5 * S, 0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+    // A few leaf clumps breaking the outline.
+    ctx.fillStyle = mid;
+    for (let i = 0; i < 5; i++) {
+        const a = h(obj.tx, obj.ty, i * 9) * Math.PI * 2;
+        const rr = 15 + h(obj.tx, obj.ty, i * 5) * 5;
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(a) * rr * S, -40 * S + Math.sin(a) * rr * 0.6 * S,
+                    3.4 * S, 2.6 * S, a, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 export function paintProp(ctx, obj, time = 0, season = "spring") {
@@ -625,40 +679,129 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
         }
 
         case "dead_tree": {
-            shadowEllipse(ctx, 9 * s, 3.4 * s, 0.26);
-            ctx.strokeStyle = "#6a5a48"; ctx.lineWidth = 4 * s; ctx.lineCap = "round";
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-2 * s, -16 * s, -1 * s, -31 * s); ctx.stroke();
-            ctx.strokeStyle = "#7d6b55"; ctx.lineWidth = 2.2 * s;
-            ctx.beginPath(); ctx.moveTo(-1 * s, -20 * s); ctx.quadraticCurveTo(-7 * s, -25 * s, -11 * s, -29 * s); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(-1 * s, -24 * s); ctx.quadraticCurveTo(6 * s, -28 * s, 10 * s, -33 * s); ctx.stroke();
-            ctx.strokeStyle = "#564736"; ctx.lineWidth = 1.2 * s;
-            ctx.beginPath(); ctx.moveTo(-9 * s, -28 * s); ctx.lineTo(-12 * s, -33 * s); ctx.stroke();
+            // A tree that died standing: bare, pale, still has its shape.
+            shadowEllipse(ctx, 10 * s, 3.8 * s, 0.26);
+            const lean = (h(obj.tx, obj.ty, 5) - 0.5) * 6 * s;
+            const top = -34 * s;
+            ctx.fillStyle = "#6a5a48";                 // trunk with a root flare
+            ctx.beginPath();
+            ctx.moveTo(-5 * s, 0);
+            ctx.quadraticCurveTo(-3.2 * s, -16 * s, lean - 2 * s, top);
+            ctx.lineTo(lean + 2 * s, top);
+            ctx.quadraticCurveTo(3.2 * s, -16 * s, 5 * s, 0);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#857460";
+            ctx.beginPath();                            // lit left side
+            ctx.moveTo(-5 * s, 0);
+            ctx.quadraticCurveTo(-3.2 * s, -16 * s, lean - 2 * s, top);
+            ctx.lineTo(lean - 0.4 * s, top);
+            ctx.quadraticCurveTo(-1.4 * s, -16 * s, -2.2 * s, 0);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#4e4134";
+            for (let i = 0; i < 5; i++) {               // bark cracks
+                const yy = -4 * s - i * 6 * s;
+                ctx.fillRect(-1.5 * s + h(obj.tx, obj.ty, i) * 3 * s, yy, 1 * s, 3.5 * s);
+            }
+            // Two bare limbs, tapering.
+            const limb = (x1, y1, x2, y2, w) => {
+                ctx.strokeStyle = "#6a5a48"; ctx.lineWidth = w; ctx.lineCap = "round";
+                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo((x1 + x2) / 2, y1 - 4 * s, x2, y2); ctx.stroke();
+            };
+            limb(-2 * s, -20 * s, -12 * s, -29 * s, 2.6 * s);
+            limb(-9 * s, -26 * s, -14 * s, -33 * s, 1.4 * s);
+            limb(2 * s, -24 * s, 11 * s, -31 * s, 2.2 * s);
+            limb(9 * s, -29 * s, 13 * s, -36 * s, 1.2 * s);
+            ctx.fillStyle = "#3d3327";                  // splintered top
+            ctx.beginPath();
+            ctx.moveTo(lean - 2 * s, top); ctx.lineTo(lean - 0.5 * s, top - 4 * s);
+            ctx.lineTo(lean + 1 * s, top - 1 * s); ctx.lineTo(lean + 2 * s, top - 3.5 * s);
+            ctx.lineTo(lean + 2 * s, top);
+            ctx.closePath(); ctx.fill();
             break;
         }
 
         case "burnt_tree": {
-            shadowEllipse(ctx, 9 * s, 3.4 * s, 0.34);
-            ctx.strokeStyle = "#241f1c"; ctx.lineWidth = 4.5 * s; ctx.lineCap = "round";
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(1 * s, -14 * s, 2 * s, -27 * s); ctx.stroke();
-            ctx.strokeStyle = "#332b26"; ctx.lineWidth = 2 * s;
-            ctx.beginPath(); ctx.moveTo(1 * s, -16 * s); ctx.quadraticCurveTo(-5 * s, -20 * s, -9 * s, -22 * s); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(2 * s, -21 * s); ctx.quadraticCurveTo(7 * s, -23 * s, 11 * s, -26 * s); ctx.stroke();
-            ctx.fillStyle = "rgba(90,78,70,0.5)";          // ash dust on the windward side
-            ctx.fillRect(-1 * s, -26 * s, 1.5 * s, 10 * s);
+            // A trunk the fire went through: thick, black, split at the top,
+            // grey ash on the windward side, stubs where branches burned off.
+            shadowEllipse(ctx, 11 * s, 4 * s, 0.38);
+            const lean = (h(obj.tx, obj.ty, 9) - 0.5) * 7 * s;
+            const tall = 30 * s + h(obj.tx, obj.ty, 3) * 14 * s;
+            const top = -tall;
+            const halfTop = 2.4 * s, halfBottom = 6 * s;
+
+            ctx.fillStyle = "#1e1917";                  // charred body
+            ctx.beginPath();
+            ctx.moveTo(-halfBottom, 0);
+            ctx.quadraticCurveTo(-halfBottom * 0.55, -tall * 0.5, lean - halfTop, top);
+            ctx.lineTo(lean + halfTop, top);
+            ctx.quadraticCurveTo(halfBottom * 0.55, -tall * 0.5, halfBottom, 0);
+            ctx.closePath(); ctx.fill();
+
+            ctx.fillStyle = "#38302b";                  // weak light down the left
+            ctx.beginPath();
+            ctx.moveTo(-halfBottom, 0);
+            ctx.quadraticCurveTo(-halfBottom * 0.55, -tall * 0.5, lean - halfTop, top);
+            ctx.lineTo(lean - halfTop * 0.2, top);
+            ctx.quadraticCurveTo(-halfBottom * 0.12, -tall * 0.5, -halfBottom * 0.45, 0);
+            ctx.closePath(); ctx.fill();
+
+            ctx.fillStyle = "rgba(150,142,132,0.35)";   // ash dust clinging on
+            for (let i = 0; i < 4; i++) {
+                const f = (i + 1) / 5;
+                ctx.fillRect(-2.5 * s + lean * f, -tall * f, 1.6 * s, 4 * s);
+            }
+            ctx.fillStyle = "rgba(255,170,90,0.10)";    // the fire's last warmth
+            ctx.fillRect(-halfBottom * 0.8, -3 * s, halfBottom * 1.6, 3 * s);
+
+            // Branch stubs: short, thick, burnt off rather than snapped.
+            const stub = (yy, dir, len, w) => {
+                ctx.strokeStyle = "#241e1b"; ctx.lineWidth = w; ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.moveTo(dir * 1.5 * s, yy);
+                ctx.quadraticCurveTo(dir * len * 0.6, yy - 2 * s, dir * len, yy - 4 * s);
+                ctx.stroke();
+            };
+            stub(-tall * 0.45, -1, 9 * s, 3 * s);
+            stub(-tall * 0.68, 1, 8 * s, 2.6 * s);
+            stub(-tall * 0.85, -1, 5 * s, 1.8 * s);
+
+            // Split, splintered crown.
+            ctx.fillStyle = "#15110f";
+            ctx.beginPath();
+            ctx.moveTo(lean - halfTop, top);
+            ctx.lineTo(lean - halfTop * 0.4, top - 6 * s);
+            ctx.lineTo(lean + 0.2 * s, top - 1.5 * s);
+            ctx.lineTo(lean + halfTop * 0.8, top - 4.5 * s);
+            ctx.lineTo(lean + halfTop, top);
+            ctx.closePath(); ctx.fill();
             break;
         }
 
         case "burnt_stump": {
-            shadowEllipse(ctx, 8, 3, 0.34);
-            ctx.fillStyle = "#2a2421";
+            shadowEllipse(ctx, 9, 3.4, 0.34);
+            ctx.fillStyle = "#241f1c";                 // charred body
             ctx.beginPath();
-            ctx.moveTo(-7, 0); ctx.lineTo(-6, -9); ctx.lineTo(-2, -11);
-            ctx.lineTo(4, -10); ctx.lineTo(7, 0);
+            ctx.moveTo(-8, 0); ctx.lineTo(-6.5, -10); ctx.lineTo(-2, -12);
+            ctx.lineTo(4, -11); ctx.lineTo(7.5, 0);
             ctx.closePath(); ctx.fill();
-            ctx.fillStyle = "#3f3732";
-            ctx.beginPath(); ctx.ellipse(-1, -10, 5.5, 2.2, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#15120f";
-            ctx.beginPath(); ctx.ellipse(-1, -10, 2.6, 1.1, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#3b332e";                 // weak light, left side
+            ctx.beginPath();
+            ctx.moveTo(-8, 0); ctx.lineTo(-6.5, -10); ctx.lineTo(-3.5, -11.4); ctx.lineTo(-4, 0);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#4a423c";                 // broken top face
+            ctx.beginPath(); ctx.ellipse(-1, -11.4, 5.4, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#17120f";                 // hollow, burnt out
+            ctx.beginPath(); ctx.ellipse(-1, -11.2, 3, 1.3, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "#2e2724"; ctx.lineWidth = 1.2;   // splinters
+            for (let i = 0; i < 3; i++) {
+                const k = h(obj.tx, obj.ty, i * 7);
+                ctx.beginPath();
+                ctx.moveTo(-4 + i * 3.5, -11);
+                ctx.lineTo(-5 + i * 4 + k * 2, -15 - k * 3);
+                ctx.stroke();
+            }
+            ctx.fillStyle = "rgba(160,150,140,0.25)";  // ash collar
+            ctx.beginPath(); ctx.ellipse(0, 1, 10, 2.6, 0, 0, Math.PI * 2); ctx.fill();
             break;
         }
 
@@ -704,43 +847,83 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
         }
 
         case "ruin_wall": {
-            shadowEllipse(ctx, 13, 4.5, 0.3);
-            ctx.fillStyle = "#6a635a"; ctx.fillRect(-12, -19, 24, 19);
-            // Masonry courses.
-            for (let r = 0; r < 4; r++) {
-                for (let c = 0; c < 3; c++) {
-                    const bx = -12 + c * 8 + (r % 2 ? 3 : 0);
-                    ctx.fillStyle = h(obj.tx + c, obj.ty + r, 3) > 0.5 ? "#766e64" : "#5d574f";
-                    ctx.fillRect(bx, -18 + r * 5, 7, 4);
+            shadowEllipse(ctx, 14, 5, 0.3);
+            const topL = -20 - h(obj.tx, obj.ty, 2) * 6;
+            const topR = -13 - h(obj.tx, obj.ty, 4) * 9;
+            // Broken silhouette: the wall never ends in a straight line.
+            ctx.fillStyle = "#6a635a";
+            ctx.beginPath();
+            ctx.moveTo(-13, 0);
+            ctx.lineTo(-13, topL);
+            ctx.lineTo(-6, topL + 3);
+            ctx.lineTo(-2, topL - 2);
+            ctx.lineTo(3, topR);
+            ctx.lineTo(9, topR + 4);
+            ctx.lineTo(13, topR - 1);
+            ctx.lineTo(13, 0);
+            ctx.closePath(); ctx.fill();
+            // Courses of stone.
+            for (let r = 0; r < 6; r++) {
+                const y = -3 - r * 4.5;
+                if (y < topR - 2 && y < topL - 2) break;
+                for (let c = 0; c < 4; c++) {
+                    const bx = -13 + c * 7 + (r % 2 ? 3 : 0);
+                    if (bx > 8 && y < topR) continue;
+                    ctx.fillStyle = h(obj.tx + c, obj.ty + r, 3) > 0.5 ? "#7a7268" : "#5c564e";
+                    ctx.fillRect(bx, y, 6, 3.6);
                 }
             }
-            ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fillRect(-12, -19, 24, 2);
-            ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(-12, -3, 24, 3);
-            ctx.fillStyle = "rgba(30,25,20,0.5)"; ctx.fillRect(3, -14, 7, 9);   // broken gap
-            ctx.fillStyle = "rgba(90,110,60,0.3)"; ctx.fillRect(-10, -6, 6, 2);
+            ctx.fillStyle = "rgba(255,250,240,0.14)";       // sun on the top edge
+            ctx.fillRect(-13, topL, 11, 2);
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.fillRect(-13, -3, 26, 3);
+            ctx.fillStyle = "rgba(90,110,60,0.35)";         // moss in the joints
+            ctx.fillRect(-11, -8, 5, 2);
+            ctx.fillRect(2, -14, 4, 2);
+            // Fallen stones at the foot.
+            for (let i = 0; i < 3; i++) {
+                const k = h(obj.tx, obj.ty, i * 13);
+                ctx.fillStyle = i % 2 ? "#6e665c" : "#58524a";
+                ctx.beginPath();
+                ctx.ellipse(-14 + k * 28, 1.5 + k * 2, 3 + k * 2, 2 + k, k * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
             break;
         }
 
         case "bush": {
-            shadowEllipse(ctx, 10, 3.4, 0.26);
+            shadowEllipse(ctx, 11, 3.6, 0.26);
             const autumn = season === "autumn";
-            const pal = jitterPalette(autumn ? ["#9a6a28", "#7d551f", "#c08a39"] : ["#3f6b33", "#33592a", "#5d8f45"], obj.tx, obj.ty);
+            const pal = jitterPalette(autumn ? ["#9a6a28", "#7d551f", "#c08a39"]
+                                             : ["#3f6b33", "#30542a", "#6a9c4c"], obj.tx, obj.ty);
+            ctx.strokeStyle = "#4a3a24"; ctx.lineWidth = 1.2;   // woody stems
+            for (let i = -1; i <= 1; i++) {
+                ctx.beginPath(); ctx.moveTo(i * 2, 0); ctx.quadraticCurveTo(i * 3, -4, i * 4, -8); ctx.stroke();
+            }
+            const clumps = [[0, -8, 9], [-7, -6, 6.5], [7, -6, 6], [-3, -13, 6.5], [4, -12, 6]];
             ctx.fillStyle = pal[1];
-            ctx.beginPath(); ctx.ellipse(1, -6, 11, 8, 0, 0, Math.PI * 2); ctx.fill();
+            for (const [bx, by, br] of clumps) {
+                ctx.beginPath(); ctx.ellipse(bx + 1, by + 1.5, br, br * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+            }
             ctx.fillStyle = pal[0];
-            ctx.beginPath(); ctx.ellipse(0, -7, 10, 7.2, 0, 0, Math.PI * 2); ctx.fill();
+            for (const [bx, by, br] of clumps) {
+                ctx.beginPath(); ctx.ellipse(bx, by, br * 0.92, br * 0.74, 0, 0, Math.PI * 2); ctx.fill();
+            }
             ctx.fillStyle = pal[2];
-            ctx.globalAlpha = 0.7;
-            ctx.beginPath(); ctx.ellipse(-4, -10, 5, 3.4, -0.3, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 0.65;
+            ctx.beginPath(); ctx.ellipse(-4, -12, 4.6, 3.2, -0.3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(-8, -7, 3, 2.1, -0.2, 0, Math.PI * 2); ctx.fill();
             ctx.globalAlpha = 1;
             if (obj.berries) {
-                ctx.fillStyle = "#9c2f58";
-                const spots = [[-5, -9], [3, -7], [0, -12], [6, -10], [-2, -5]];
+                const spots = [[-6, -9], [3, -8], [0, -14], [7, -8], [-2, -5], [5, -14]];
                 for (const [bx, by] of spots) {
-                    ctx.beginPath(); ctx.arc(bx, by, 1.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "#5f1a33";
+                    ctx.beginPath(); ctx.arc(bx, by + 0.6, 1.7, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "#a6325f";
+                    ctx.beginPath(); ctx.arc(bx, by, 1.6, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = "rgba(255,190,210,0.75)";
+                    ctx.fillRect(bx - 0.8, by - 1, 1, 1);
                 }
-                ctx.fillStyle = "rgba(255,180,200,0.7)";
-                ctx.fillRect(-5, -10, 1, 1); ctx.fillRect(3, -8, 1, 1);
             }
             break;
         }
@@ -811,22 +994,26 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
         }
 
         case "flower": {
-            const bend = Math.sin(time * 1.3 + obj.tx) * 1.2;
-            ctx.strokeStyle = "#5f8a3f"; ctx.lineWidth = 1.1;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(bend, -5, bend, -9); ctx.stroke();
+            const bend = Math.sin(time * 1.3 + obj.tx) * 1.3;
+            const colors = [["#f0d75e", "#c9ae3a"], ["#e07a9a", "#b85776"],
+                            ["#8aa8e8", "#6782c4"], ["#f2f0ea", "#cfcabd"]];
+            const [petal, petalDark] = colors[(obj.variant || 0) % colors.length];
+            ctx.strokeStyle = "#5f8a3f"; ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(bend, -6, bend, -11); ctx.stroke();
             ctx.fillStyle = "#6f9a4a";
-            ctx.beginPath(); ctx.ellipse(-2 + bend, -5, 2.4, 1.2, -0.4, 0, Math.PI * 2); ctx.fill();
-            const colors = ["#f0d75e", "#e07a9a", "#8aa8e8", "#f2f0ea"];
-            const c = colors[obj.variant % colors.length];
-            ctx.fillStyle = c;
-            for (let i = 0; i < 5; i++) {
-                const a = (i / 5) * Math.PI * 2;
+            ctx.beginPath(); ctx.ellipse(-2.6 + bend, -5, 2.8, 1.3, -0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(2.4 + bend, -7.5, 2.4, 1.1, 0.4, 0, Math.PI * 2); ctx.fill();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 + 0.3;
+                ctx.fillStyle = Math.cos(a) < 0 ? petal : petalDark;
                 ctx.beginPath();
-                ctx.ellipse(bend + Math.cos(a) * 2, -10 + Math.sin(a) * 2, 1.6, 1.6, 0, 0, Math.PI * 2);
+                ctx.ellipse(bend + Math.cos(a) * 2.6, -12 + Math.sin(a) * 2.6, 2, 1.7, a, 0, Math.PI * 2);
                 ctx.fill();
             }
             ctx.fillStyle = "#f7c14b";
-            ctx.beginPath(); ctx.arc(bend, -10, 1.2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(bend, -12, 1.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.fillRect(bend - 1, -12.8, 1, 1);
             break;
         }
 
@@ -970,29 +1157,51 @@ export function paintProp(ctx, obj, time = 0, season = "spring") {
     }
 }
 
-/** Live flames over a campfire. `intensity` 0..1. */
-export function paintFlames(ctx, intensity, time) {
-    // Cold ashes.
-    if (intensity <= 0) {
-        ctx.fillStyle = "#2c2724";
-        ctx.beginPath(); ctx.ellipse(0, -1, 7, 3.2, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#4a443e";
-        ctx.save(); ctx.rotate(0.4); ctx.fillRect(-8, -3, 16, 2.6); ctx.restore();
-        ctx.save(); ctx.rotate(-0.4); ctx.fillRect(-8, -3, 16, 2.6); ctx.restore();
+/**
+ * The fire pit: whatever is actually lying in it, then the flames.
+ *
+ * `stack` comes straight from `Campfire.stack` — one entry per piece of fuel
+ * with how much of it is left — so the player sees the brushwood they threw
+ * in, sees it char, and sees the log underneath still going.
+ *
+ * @param {number} intensity 0..1
+ * @param {Array<{id:string,burn:number,seed:number}>} stack
+ */
+export function paintFlames(ctx, intensity, time, stack = []) {
+    const lit = intensity > 0;
+
+    // Bed of ash and old charcoal, always there once a fire has lived here.
+    ctx.fillStyle = "#2c2724";
+    ctx.beginPath(); ctx.ellipse(0, -0.5, 8.5, 3.8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#3d3733";
+    ctx.beginPath(); ctx.ellipse(-1.5, -1.2, 5, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+
+    // --- what is in the pit ------------------------------------------------
+    const pieces = stack.length ? stack.slice(-5) : (lit ? [{ id: "firewood", burn: 1, seed: 0 }] : []);
+    const paintPile = (alpha) => {
+        pieces.forEach((piece, i) => {
+            const b = Math.max(0, Math.min(1, piece.burn));
+            const n = ((piece.seed || 0) % 100) / 100;
+            const slot = i - (pieces.length - 1) / 2;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(slot * 2.6 + (n - 0.5) * 2, -1 - i * 0.7);
+            ctx.rotate((n - 0.5) * 0.9 + slot * 0.35);
+            drawFuelPiece(ctx, piece.id, b, lit, time, n);
+            ctx.restore();
+        });
+        ctx.globalAlpha = 1;
+    };
+    paintPile(1);
+
+    if (!lit) {
+        // Cold pit: a wisp of ash, two charred ends sticking out.
+        ctx.fillStyle = "rgba(120,114,106,0.35)";
+        ctx.beginPath(); ctx.ellipse(0, -2, 6, 2.4, 0, 0, Math.PI * 2); ctx.fill();
         return;
     }
 
-    // Burning logs.
-    for (const rot of [0.38, -0.38]) {
-        ctx.save(); ctx.rotate(rot);
-        ctx.fillStyle = "#4a3320"; ctx.fillRect(-10, -4.5, 20, 4);
-        ctx.fillStyle = "#5e4228"; ctx.fillRect(-10, -4.5, 20, 1.2);
-        ctx.fillStyle = `rgba(255,${110 + Math.sin(time * 7) * 25},40,${0.5 * intensity})`;
-        ctx.fillRect(-6, -2.4, 12, 1.4);
-        ctx.restore();
-    }
-
-    // Glowing bed of embers.
+    // --- heat --------------------------------------------------------------
     ctx.fillStyle = `rgba(255,120,40,${0.3 * intensity})`;
     ctx.beginPath(); ctx.ellipse(0, -1, 10, 4.6, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = `rgba(255,190,90,${0.25 * intensity})`;
@@ -1003,16 +1212,15 @@ export function paintFlames(ctx, intensity, time) {
     const flick = 0.78 + Math.sin(time * 11.3) * 0.11 + Math.sin(time * 6.7) * 0.08;
     const H = (15 + intensity * 11) * flick;
     const layers = [
-        { c: "rgba(206,62,18,0.7)", w: 9.5, h: H, drift: 1.4, wob: 9.1 },
-        { c: "rgba(244,128,30,0.85)", w: 6.6, h: H * 0.78, drift: 2.1, wob: 12.3 },
-        { c: "rgba(255,222,150,0.9)", w: 3.6, h: H * 0.44, drift: 2.9, wob: 15.7 }
+        { c: `rgba(206,62,18,${0.55 + 0.2 * intensity})`, w: 9.5, h: H, drift: 1.4, wob: 9.1 },
+        { c: `rgba(244,128,30,${0.7 + 0.2 * intensity})`, w: 6.6, h: H * 0.78, drift: 2.1, wob: 12.3 },
+        { c: `rgba(255,222,150,${0.75 + 0.2 * intensity})`, w: 3.6, h: H * 0.44, drift: 2.9, wob: 15.7 }
     ];
     for (const L of layers) {
         const lean = Math.sin(time * 5.5 + L.drift) * L.drift;
         ctx.fillStyle = L.c;
         ctx.beginPath();
         ctx.moveTo(-L.w, -1);
-        // Left edge up to the tip, with a wobble that travels upward.
         for (let k = 1; k <= 5; k++) {
             const f = k / 5;
             const wob = Math.sin(time * L.wob - f * 5 + L.drift) * (1.1 + f * 1.6);
@@ -1027,12 +1235,125 @@ export function paintFlames(ctx, intensity, time) {
         ctx.closePath();
         ctx.fill();
     }
+
+    // The near half of the pile again, over the flames: you should always be
+    // able to see what you threw in and how far gone it is.
+    paintPile(0.72);
+
     // A detached lick of flame, for life.
     const lickY = -H - 4 - ((time * 26) % 10);
     ctx.fillStyle = `rgba(255,170,60,${0.4 * intensity})`;
     ctx.beginPath();
     ctx.ellipse(Math.sin(time * 4) * 3, lickY, 1.8, 3.2, 0, 0, Math.PI * 2);
     ctx.fill();
+}
+
+/**
+ * One piece of fuel in the pit. `b` is how much of it is left (1 → fresh,
+ * 0 → ash); as it drops the piece shrinks, blackens and starts glowing along
+ * its cracks.
+ */
+function drawFuelPiece(ctx, id, b, lit, time, n) {
+    const char = 1 - b;                       // how charred it is
+    const glow = lit ? 0.35 + 0.3 * Math.sin(time * 5 + n * 6) : 0;
+    const wood = (base, lightC) => {
+        ctx.fillStyle = mix(base, "#241e1a", char * 0.85);
+        return mix(lightC, "#3a2f28", char * 0.8);
+    };
+
+    switch (id) {
+        case "hay": {                          // a wisp of straw, burns to nothing
+            const len = 7 * (0.4 + b * 0.6);
+            for (let i = -2; i <= 2; i++) {
+                ctx.strokeStyle = mix("#c9a94e", "#2a2420", char * 0.9);
+                ctx.lineWidth = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(i * 1.6, 0);
+                ctx.quadraticCurveTo(i * 2.2, -len * 0.6, i * 3 + n, -len);
+                ctx.stroke();
+            }
+            break;
+        }
+        case "firewood": {                     // crossed sticks
+            const len = 13 * (0.55 + b * 0.45);
+            for (const rot of [-0.5, 0.35]) {
+                ctx.save(); ctx.rotate(rot);
+                const litC = wood("#6d4f2c", "#9a7845");
+                ctx.fillRect(-len / 2, -1.6, len, 2.6);
+                ctx.fillStyle = litC;
+                ctx.fillRect(-len / 2, -1.6, len, 0.9);
+                if (lit) {                      // embers along the stick
+                    ctx.fillStyle = `rgba(255,140,50,${glow * (0.4 + char)})`;
+                    ctx.fillRect(-len / 2 + 1, -0.4, len - 2, 0.8);
+                }
+                ctx.restore();
+            }
+            break;
+        }
+        case "plank": {
+            const len = 15 * (0.6 + b * 0.4);
+            const litC = wood("#8a6436", "#b08450");
+            ctx.fillRect(-len / 2, -2, len, 3.4);
+            ctx.fillStyle = litC;
+            ctx.fillRect(-len / 2, -2, len, 1);
+            if (lit) {
+                ctx.fillStyle = `rgba(255,150,60,${glow})`;
+                ctx.fillRect(-len / 2, 0.6, len, 0.8);
+            }
+            break;
+        }
+        case "log": {                          // the big one, lasts
+            const len = 18 * (0.65 + b * 0.35);
+            const r = 3.4 * (0.7 + b * 0.3);
+            const litC = wood("#5e4428", "#8a6a3c");
+            ctx.fillRect(-len / 2, -r, len, r * 1.8);
+            ctx.fillStyle = litC;
+            ctx.fillRect(-len / 2, -r, len, r * 0.6);
+            ctx.fillStyle = mix("#c8a46a", "#30261f", char);
+            ctx.beginPath(); ctx.ellipse(len / 2, -r * 0.1, 1.4, r * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+            if (lit) {                          // split cracks glowing orange
+                ctx.fillStyle = `rgba(255,120,40,${glow})`;
+                ctx.fillRect(-len / 2 + 2, -0.5, len - 4, 1);
+                ctx.fillStyle = `rgba(255,200,110,${glow * 0.8})`;
+                ctx.fillRect(-len / 4, -0.2, len / 3, 0.6);
+            }
+            break;
+        }
+        case "coal": case "charcoal": {        // lumps that glow from within
+            for (let i = 0; i < 3; i++) {
+                const sz = (2.4 - i * 0.4) * (0.6 + b * 0.4);
+                const ox = (i - 1) * 3 + n * 1.5, oy = -1 + (i % 2) * 1.2;
+                ctx.fillStyle = id === "coal" ? "#1b1a1c" : "#2a241f";
+                ctx.beginPath();
+                ctx.moveTo(ox - sz, oy); ctx.lineTo(ox - sz * 0.4, oy - sz);
+                ctx.lineTo(ox + sz * 0.7, oy - sz * 0.7); ctx.lineTo(ox + sz, oy + sz * 0.3);
+                ctx.closePath(); ctx.fill();
+                if (lit) {
+                    ctx.fillStyle = `rgba(255,90,25,${0.3 + glow * 0.6})`;
+                    ctx.fillRect(ox - sz * 0.6, oy - sz * 0.4, sz * 1.1, sz * 0.5);
+                }
+            }
+            break;
+        }
+        case "resin": {
+            ctx.fillStyle = mix("#7a4b1c", "#2a1f16", char);
+            ctx.beginPath(); ctx.ellipse(0, -1, 3.2 * (0.6 + b * 0.4), 2 * (0.6 + b * 0.4), 0, 0, Math.PI * 2); ctx.fill();
+            if (lit) {
+                ctx.fillStyle = `rgba(255,210,120,${glow})`;
+                ctx.beginPath(); ctx.ellipse(-0.6, -1.6, 1.2, 0.8, 0, 0, Math.PI * 2); ctx.fill();
+            }
+            break;
+        }
+        default: {
+            const len = 11 * (0.6 + b * 0.4);
+            ctx.fillStyle = mix("#6a5033", "#241e1a", char * 0.85);
+            ctx.fillRect(-len / 2, -1.5, len, 2.6);
+            if (lit) {
+                ctx.fillStyle = `rgba(255,140,50,${glow})`;
+                ctx.fillRect(-len / 2 + 1, -0.3, len - 2, 0.8);
+            }
+        }
+    }
 }
 
 /** Something roasting on the spit. */

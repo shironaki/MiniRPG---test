@@ -56,8 +56,12 @@ export class Campfire {
     constructor({ bus = null, spitSlots = 2, emberSlots = 2 } = {}) {
         this.bus = bus;
         this.lit = false;
-        this.fuel = 0;              // in-game seconds of burn left
-        this.maxFuel = 900;
+        this.fuel = 0;              // in-game seconds of burn left (sum of pieces)
+        this.maxFuel = 14400;       // four in-game hours of fuel fits in the pit
+        // What is physically lying in the pit, oldest first. The renderer draws
+        // these, so a fire full of brushwood looks different from one with a
+        // log on it, and you can see your fuel char and shrink as it burns.
+        this.pieces = [];
         this.spit = new Array(spitSlots).fill(null);
         this.embers = new Array(emberSlots).fill(null);
         this.pot = null;            // { ingredients: [], water: bool, progress, result, time }
@@ -72,9 +76,28 @@ export class Campfire {
     addFuel(itemId) {
         const burn = burnValue(itemId);
         if (burn <= 0) return false;
+        if (this.fuel >= this.maxFuel) {
+            if (this.bus) this.bus.emit("fire:fail", { reason: "full" });
+            return false;
+        }
+        const left = Math.min(burn, this.maxFuel - this.fuel);
+        this.pieces.push({ id: itemId, left, total: burn, seed: Math.floor(Math.random() * 1000) });
         this.fuel = Math.min(this.maxFuel, this.fuel + burn);
-        if (this.bus) this.bus.emit("fire:fuel", { itemId, fuel: this.fuel });
+        if (this.bus) this.bus.emit("fire:fuel", { itemId, fuel: this.fuel, burn });
         return true;
+    }
+
+    /**
+     * What the pit looks like right now: every piece with how much of it is
+     * left (1 = fresh, 0 = ash). Purely descriptive — the renderer owns the
+     * drawing, this owns the truth.
+     */
+    get stack() {
+        return this.pieces.map((p) => ({
+            id: p.id,
+            burn: p.total > 0 ? Math.max(0, Math.min(1, p.left / p.total)) : 0,
+            seed: p.seed || 0
+        }));
     }
 
     /** Light it. Needs fuel and something to spark with. */
@@ -100,11 +123,16 @@ export class Campfire {
         return true;
     }
 
-    /** 0..1 — how strongly it is burning, drives light radius and warmth. */
+    /**
+     * 0..1 — how strongly it is burning. Full blaze while there is real fuel
+     * left, then it sinks to embers over the last ten in-game minutes instead
+     * of snapping out.
+     */
     get intensity() {
         if (!this.lit) return 0;
-        if (this.fuel > 120) return 1;
-        return Math.max(0.25, this.fuel / 120);
+        const FADE = 600;                       // in-game seconds of dying down
+        if (this.fuel > FADE) return 1;
+        return Math.max(0.22, this.fuel / FADE);
     }
 
     get warmth() { return this.intensity * 26; }      // °C added at the fire
@@ -202,9 +230,22 @@ export class Campfire {
     _step(dt) {
         this.flicker += dt;
         if (this.lit) {
-            this.fuel -= dt;
-            if (this.fuel <= 0) {
+            // Burn through the pile piece by piece, oldest first.
+            let rest = dt;
+            while (rest > 0 && this.pieces.length) {
+                const piece = this.pieces[0];
+                const used = Math.min(rest, piece.left);
+                piece.left -= used;
+                rest -= used;
+                if (piece.left <= 0.0001) {
+                    this.pieces.shift();
+                    this.ashes += 1;
+                }
+            }
+            this.fuel = Math.max(0, this.fuel - dt);
+            if (this.fuel <= 0 || !this.pieces.length) {
                 this.fuel = 0;
+                this.pieces.length = 0;
                 this.ashes += 1;
                 this.extinguish("burned_out");
             }
@@ -226,12 +267,17 @@ export class Campfire {
     status() {
         if (!this.lit) return this.fuel > 0 ? "Костёр готов к розжигу" : "Холодное кострище";
         const mins = Math.ceil(this.fuel / 60);
+        if (mins >= 60) {
+            const h = Math.floor(mins / 60);
+            return `Горит · топлива на ~${h} ч ${mins % 60} мин`;
+        }
         return `Горит · топлива на ~${mins} мин`;
     }
 
     toJSON() {
         return {
             lit: this.lit, fuel: this.fuel, hasPot: this.hasPot, ashes: this.ashes,
+            pieces: this.pieces.map((p) => ({ id: p.id, left: p.left, total: p.total, seed: p.seed })),
             spit: this.spit.map((s) => (s ? s.toJSON() : null)),
             embers: this.embers.map((s) => (s ? s.toJSON() : null)),
             pot: this.pot
@@ -241,6 +287,11 @@ export class Campfire {
     load(d) {
         if (!d) return this;
         this.lit = !!d.lit; this.fuel = d.fuel || 0; this.hasPot = !!d.hasPot; this.ashes = d.ashes || 0;
+        this.pieces = (d.pieces || []).map((p) => ({ id: p.id, left: p.left, total: p.total, seed: p.seed || 0 }));
+        // Saves from before the pile existed: rebuild one anonymous piece.
+        if (!this.pieces.length && this.fuel > 0) {
+            this.pieces.push({ id: "firewood", left: this.fuel, total: this.fuel, seed: 0 });
+        }
         this.spit = (d.spit || []).map((s) => (s ? CookSlot.fromJSON(s) : null));
         this.embers = (d.embers || []).map((s) => (s ? CookSlot.fromJSON(s) : null));
         this.pot = d.pot || null;

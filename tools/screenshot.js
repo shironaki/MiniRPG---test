@@ -102,6 +102,22 @@ const scenes = [
         }
     },
     {
+        name: "09-fire-fuel-closeup",
+        about: "Костёр крупно: видно хворост, полено и уголь",
+        setup(g) {
+            g.clock.minute = 21 * 60;
+            const obj = standAt(g, "campfire", -26, 20);
+            const fire = g.fires.get(g.fireKey(g.zone, obj));
+            fire.addFuel("log"); fire.addFuel("firewood"); fire.addFuel("coal");
+            fire.light({ hasFlint: true });
+            fire.update(2400);                 // the log is half gone by now
+            fire.putOnSpit("fish_raw");
+            fire.update(200);
+            g.camera.zoom = 6;
+            g.camera.snapTo(obj.x, obj.y - 8);
+        }
+    },
+    {
         name: "06-forest-noon",
         about: "Старый бор, полдень",
         setup(g) {
@@ -115,6 +131,20 @@ const scenes = [
         setup(g) {
             g.enterZone("meadow", null, true);
             g.clock.minute = 6 * 60;
+        }
+    },
+    {
+        name: "10-tree-closeup",
+        about: "Берёза и сосны крупно",
+        setup(g) {
+            g.enterZone("meadow", null, true);
+            g.clock.minute = 12 * 60;
+            const birch = g.zone.objects.find((o) => o.kind === "birch");
+            if (birch) {
+                g.player.x = birch.x - 40; g.player.y = birch.y + 20;
+                g.camera.zoom = 4;
+                g.camera.snapTo(birch.x, birch.y - 30);
+            }
         }
     },
     {

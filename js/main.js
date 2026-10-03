@@ -189,6 +189,43 @@ export class Game {
 
     /* ===================== world ===================== */
 
+    /**
+     * Is there room for the player's body at this spot? Mirrors the probe
+     * pattern of `moveAndCollide`, so "free" here means "can actually move".
+     */
+    fitsAt(x, y, radius = this.player.radius) {
+        const zone = this.zone;
+        const solid = (wx, wy) => zone.solidAt(wx, wy);
+        return !(
+            solid(x - radius, y - radius) || solid(x + radius, y - radius) ||
+            solid(x - radius, y + radius) || solid(x + radius, y + radius) ||
+            solid(x, y - radius) || solid(x, y + radius) ||
+            solid(x - radius, y) || solid(x + radius, y)
+        );
+    }
+
+    /**
+     * Put the player at (x, y), or at the nearest spot where their body
+     * actually fits. Standing inside a solid prop used to wedge the hero
+     * permanently — every teleport (sleep, collapse, zone change) goes
+     * through here now.
+     */
+    placeSafely(x, y) {
+        if (this.fitsAt(x, y)) { this.player.x = x; this.player.y = y; return true; }
+        const step = TILE_SIZE / 2;
+        for (let ring = 1; ring <= 12; ring++) {
+            // Prefer straight below the target (in front of a tent, say),
+            // then the other directions, then the diagonals.
+            const offsets = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+            for (const [ox, oy] of offsets) {
+                const nx = x + ox * ring * step, ny = y + oy * ring * step;
+                if (this.fitsAt(nx, ny)) { this.player.x = nx; this.player.y = ny; return true; }
+            }
+        }
+        this.player.x = x; this.player.y = y;
+        return false;
+    }
+
     enterZone(zoneId, fromEdge = null, silent = false) {
         const zone = this.world.get(zoneId);
         this.zone = zone;
@@ -199,12 +236,12 @@ export class Game {
             const link = (zone.def.links || []).find((l) => l.edge === edge);
             if (link) {
                 const mid = Math.floor((link.from + link.to) / 2);
-                if (edge === "north") { this.player.x = mid * TILE_SIZE; this.player.y = 3.5 * TILE_SIZE; }
-                else if (edge === "south") { this.player.x = mid * TILE_SIZE; this.player.y = (zone.h - 4) * TILE_SIZE; }
-                else if (edge === "west") { this.player.x = 3.5 * TILE_SIZE; this.player.y = mid * TILE_SIZE; }
-                else { this.player.x = (zone.w - 4) * TILE_SIZE; this.player.y = mid * TILE_SIZE; }
+                if (edge === "north") this.placeSafely(mid * TILE_SIZE, 3.5 * TILE_SIZE);
+                else if (edge === "south") this.placeSafely(mid * TILE_SIZE, (zone.h - 4) * TILE_SIZE);
+                else if (edge === "west") this.placeSafely(3.5 * TILE_SIZE, mid * TILE_SIZE);
+                else this.placeSafely((zone.w - 4) * TILE_SIZE, mid * TILE_SIZE);
             } else {
-                this.player.x = zone.spawn.x; this.player.y = zone.spawn.y;
+                this.placeSafely(zone.spawn.x, zone.spawn.y);
             }
         }
         this.camera.snapTo(this.player.x, this.player.y);
@@ -468,6 +505,8 @@ export class Game {
             return;
         }
         this.player.sleeping = true;
+        this.sleepTarget = tentObj;
+        // Lie down on the bedroll in the mouth of the tent…
         this.player.x = tentObj.x;
         this.player.y = tentObj.y + 6;
         this.hud.toast("Ты засыпаешь…", "😴");
@@ -479,6 +518,9 @@ export class Game {
             if (this.clock.hour >= 6 && this.clock.hour < 12) break;
         }
         this.player.sleeping = false;
+        // …and step out of it on waking, never inside the solid tent tile.
+        this.placeSafely(tentObj.x, tentObj.y + TILE_SIZE);
+        this.sleepTarget = null;
         this.bus.emit("player:slept", { day: this.clock.day });
         this.hud.toast(`Утро. День ${this.clock.day}`, "🌅");
     }
@@ -487,7 +529,7 @@ export class Game {
         // Средняя жёсткость: смерть не конец — ты приходишь в себя в лагере.
         this.hud.toast("Ты потерял сознание…", "💀");
         const tent = this.zone.objects.find((o) => o.kind === "tent" && !o.removed);
-        if (tent) { this.player.x = tent.x; this.player.y = tent.y + 10; }
+        if (tent) this.placeSafely(tent.x, tent.y + TILE_SIZE);
         // Lose a slice of what you carried.
         for (const s of this.inventory.list()) {
             if (itemDef(s.id) && itemDef(s.id).tool) continue;
@@ -537,6 +579,12 @@ export class Game {
             speedFactor: this.needs.speedFactor(),
             wantRun: this.input.pressed("sprint")
         });
+        // Safety net: if anything ever leaves the hero inside a solid thing
+        // (a prop built on top of them, a bad teleport), walk them out instead
+        // of letting the game wedge.
+        if (!this.player.sleeping && !this.fitsAt(this.player.x, this.player.y)) {
+            this.placeSafely(this.player.x, this.player.y);
+        }
 
         // Hotbar keys.
         for (let i = 1; i <= 6; i++) {
