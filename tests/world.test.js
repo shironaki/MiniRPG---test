@@ -177,6 +177,37 @@ test("solid props block at their trunk, low clutter does not block at all", () =
     if (herb) assert.not(z.propSolidAt(herb.x, herb.y), "you can walk through herbs");
 });
 
+test("no ghost footprints: every blocker is a live object, every zone", () => {
+    for (const id of Object.keys(ZONES)) {
+        const z = generateZone(id, 5);
+        const live = new Set(z.objects);
+        for (const [, list] of z.solidIndex) {
+            for (const o of list) {
+                assert.ok(live.has(o), `${id}: ${o.kind} blocks movement but is not in the world`);
+            }
+        }
+    }
+});
+
+test("the hero can walk away from his spawn in every direction", () => {
+    for (const id of Object.keys(ZONES)) {
+        const z = generateZone(id, 5);
+        const sp = z.spawn;
+        assert.not(z.solidAt(sp.x, sp.y), `${id}: spawn itself is solid`);
+        // Walk 64 units out, probing with the player's radius.
+        const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => {
+            for (let d = 10; d <= 64; d += 6) {
+                const x = sp.x + dx * d, y = sp.y + dy * d;
+                for (const [ox, oy] of [[0, 0], [9, 0], [-9, 0], [0, 9], [0, -9]]) {
+                    if (z.solidAt(x + ox, y + oy)) return false;
+                }
+            }
+            return true;
+        });
+        assert.gte(open.length, 2, `${id}: spawn is walled in (${open.length} ways out)`);
+    }
+});
+
 test("ore belongs underground and in the mountains, not in the meadow", () => {
     const surface = ["meadow", "forest", "shore", "ashfall"];
     for (const id of surface) {

@@ -51,9 +51,8 @@ export function drawCharacter(ctx, p) {
      */
     const phase = t;
     const stride = moving ? Math.sin(phase) : 0;
-    const bob = moving ? Math.abs(Math.sin(phase)) * 1.3 - 0.4
+    const bob = moving ? Math.abs(Math.sin(phase)) * 1.0 - 0.3
                        : Math.sin(idle * 1.8) * 0.3;
-    const lean = moving ? Math.cos(phase * 2) * 0.35 : 0;
     const side = dir === "left" ? -1 : 1;
     const back = dir === "up";
     const sideView = dir === "left" || dir === "right";
@@ -62,7 +61,6 @@ export function drawCharacter(ctx, p) {
     const act = p.actionTimer > 0 ? Math.min(1, 1 - p.actionTimer / 0.35) : 0;
     const swing = act > 0 ? (act < 0.3 ? -(act / 0.3) * 0.45
                                        : Math.sin(((act - 0.3) / 0.7) * Math.PI) * 1.15) : 0;
-    const recoil = swing > 0.6 ? (swing - 0.6) * 1.6 : 0;   // body follows the blow
 
     const skinDark = shadeHex(look.skin, -28);
     const skinLit = shadeHex(look.skin, 16);
@@ -98,12 +96,14 @@ export function drawCharacter(ctx, p) {
     const hipY = -9 + bob, legH = 9;
     const footLift = (ph) => Math.max(0, Math.sin(ph)) * 1.6;
     if (sideView) {
-        // Even standing still the far leg peeks out behind the near one,
-        // otherwise the side view reads as a one-legged pole.
-        const fwd = side * stride * 3.4;
-        const rest = side * 2.6;
+        // The two legs swing symmetrically around the hip: one forward, one
+        // back by the same amount. (An offset on one leg only made the hero
+        // look like he was dragging it.) Standing still they part slightly so
+        // the silhouette is not a single pole.
+        const fwd = side * stride * 3.2;
+        const part = moving ? 0 : side * 1.1;
         const legs = [
-            { x: -1.6 - fwd - rest, lift: footLift(phase + Math.PI), far: true },
+            { x: -1.6 - fwd - part, lift: footLift(phase + Math.PI), far: true },
             { x: -1.6 + fwd, lift: footLift(phase), far: false }
         ];
         for (const l of legs) {
@@ -138,9 +138,9 @@ export function drawCharacter(ctx, p) {
 
     /* ---- torso (leans with the stride and with the swing) --------------- */
     ctx.save();
-    ctx.translate(0, hipY);
-    ctx.rotate((lean * 0.03) + side * recoil * 0.12);
-    ctx.translate(0, -hipY);
+    // Weight shift: the torso drifts a hair over the leading leg. No rotation
+    // — a rotating box reads as a machine, not a person.
+    ctx.translate(sideView ? side * stride * 0.5 : stride * 0.4, 0);
 
     const torsoTop = -18 + bob, torsoH = 10;
     const torsoW = sideView ? 8.4 : 10, torsoX = sideView ? -4.2 : -5;

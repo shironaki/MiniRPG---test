@@ -96,6 +96,19 @@ export class Zone {
         return this;
     }
 
+    /**
+     * Wipe every prop standing on a tile — out of the list *and* out of the
+     * collision index. Clearing only the list used to leave ghost footprints
+     * behind: invisible walls where a rock had been removed.
+     */
+    clearTile(tx, ty) {
+        for (const o of this.objects) {
+            if (o.tx === tx && o.ty === ty) this.removeSolid(o);
+        }
+        this.objects = this.objects.filter((o) => !(o.tx === tx && o.ty === ty));
+        return this;
+    }
+
     /** Does any prop footprint cover this world point? */
     propSolidAt(wx, wy) {
         const tx = Math.floor(wx / TILE_SIZE), ty = Math.floor(wy / TILE_SIZE);
@@ -376,7 +389,7 @@ function placeStoryProps(zone, rng) {
                 if (!map.inBounds(x, y)) continue;
                 map.data[y * def.w + x] = (x === hx || x === hx + 6 || y === hy || y === hy + 4) ? T.SOOT : T.ASH;
                 zone.blockTile(x, y, false);
-                zone.objects = zone.objects.filter((o) => !(o.tx === x && o.ty === y));
+                zone.clearTile(x, y);
             }
         }
         for (let x = hx; x < hx + 7; x += 2) addProp(zone, "burnt_beam", x, hy, { solid: true });
@@ -392,7 +405,7 @@ function placeStoryProps(zone, rng) {
                 if (map.get(x, y) === T.DEEP || map.get(x, y) === T.WATER) continue;
                 map.data[y * def.w + x] = T.ASH;
                 zone.blockTile(x, y, false);
-                zone.objects = zone.objects.filter((o) => !(o.tx === x && o.ty === y));
+                zone.clearTile(x, y);
             }
         }
         zone.campSite = { tx: cx, ty: cy };
@@ -413,7 +426,7 @@ function placeStoryProps(zone, rng) {
                     if (!map.inBounds(x, y)) continue;
                     map.data[y * def.w + x] = T.SOOT;
                     const edge = (x === bx || x === bx + bw - 1 || y === by || y === by + bh - 1);
-                    zone.objects = zone.objects.filter((o) => !(o.tx === x && o.ty === y));
+                    zone.clearTile(x, y);
                     zone.blockTile(x, y, false);
                     if (edge && rng.chance(0.55)) addProp(zone, "ruin_wall", x, y, { solid: true, variant: rng.int(0, 2) });
                 }
@@ -426,19 +439,49 @@ function placeStoryProps(zone, rng) {
 /** Starting position: the camp in the prologue, otherwise a clear tile near the middle. */
 function pickSpawn(zone, rng) {
     const { def, map } = zone;
-    if (zone.spawnHint && zone.isFree(zone.spawnHint.tx, zone.spawnHint.ty)) {
-        zone.spawn = {
-            x: zone.spawnHint.tx * TILE_SIZE + TILE_SIZE / 2,
-            y: zone.spawnHint.ty * TILE_SIZE + TILE_SIZE / 2
-        };
+    const R = 9;                       // the hero's radius
+
+    /** Can the hero stand here and walk at least two tiles out in `ways`? */
+    const roomy = (tx, ty, ways = 3) => {
+        if (!zone.isFree(tx, ty)) return false;
+        const cx = tx * TILE_SIZE + TILE_SIZE / 2, cy = ty * TILE_SIZE + TILE_SIZE / 2;
+        for (const [ox, oy] of [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R]]) {
+            if (zone.solidAt(cx + ox, cy + oy)) return false;
+        }
+        let open = 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            let clear = true;
+            for (let d = 10; d <= 72 && clear; d += 6) {
+                for (const [ox, oy] of [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R]]) {
+                    if (zone.solidAt(cx + dx * d + ox, cy + dy * d + oy)) { clear = false; break; }
+                }
+            }
+            if (clear) open++;
+        }
+        return open >= ways;
+    };
+
+    const place = (tx, ty) => {
+        zone.spawn = { x: tx * TILE_SIZE + TILE_SIZE / 2, y: ty * TILE_SIZE + TILE_SIZE / 2 };
+    };
+
+    if (zone.spawnHint && roomy(zone.spawnHint.tx, zone.spawnHint.ty, 2)) {
+        place(zone.spawnHint.tx, zone.spawnHint.ty);
         return;
     }
-    for (let attempt = 0; attempt < 400; attempt++) {
-        const tx = rng.int(BORDER + 2, def.w - BORDER - 3);
-        const ty = rng.int(BORDER + 2, def.h - BORDER - 3);
-        if (zone.isFree(tx, ty) && map.get(tx, ty) !== T.WATER) {
-            zone.spawn = { x: tx * TILE_SIZE + TILE_SIZE / 2, y: ty * TILE_SIZE + TILE_SIZE / 2 };
-            return;
+    // Prefer a spot with elbow room; relax the requirement if the zone is tight.
+    for (const ways of [3, 2, 1]) {
+        for (let attempt = 0; attempt < 400; attempt++) {
+            const tx = rng.int(BORDER + 2, def.w - BORDER - 3);
+            const ty = rng.int(BORDER + 2, def.h - BORDER - 3);
+            if (map.get(tx, ty) === T.WATER) continue;
+            if (roomy(tx, ty, ways)) { place(tx, ty); return; }
+        }
+    }
+    // Last resort: any free tile at all.
+    for (let ty = BORDER + 2; ty < def.h - BORDER - 2; ty++) {
+        for (let tx = BORDER + 2; tx < def.w - BORDER - 2; tx++) {
+            if (zone.isFree(tx, ty)) { place(tx, ty); return; }
         }
     }
 }
