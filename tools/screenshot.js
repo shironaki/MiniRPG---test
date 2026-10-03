@@ -148,6 +148,36 @@ const scenes = [
         }
     },
     {
+        name: "11-highland-noon",
+        about: "Каменная гряда: руда только здесь",
+        setup(g) { g.enterZone("highland", null, true); g.clock.minute = 12 * 60; }
+    },
+    {
+        name: "12-swamp-noon",
+        about: "Торфяное болото",
+        setup(g) { g.enterZone("swamp", null, true); g.clock.minute = 11 * 60; }
+    },
+    {
+        name: "13-road-noon",
+        about: "Разбитый тракт",
+        setup(g) { g.enterZone("road", null, true); g.clock.minute = 14 * 60; }
+    },
+    {
+        name: "14-ruins-village",
+        about: "Сгоревшее село",
+        setup(g) { g.enterZone("ruins", null, true); g.clock.minute = 10 * 60; }
+    },
+    {
+        name: "15-sacred-grove",
+        about: "Священная роща",
+        setup(g) { g.enterZone("sacred", null, true); g.clock.minute = 15 * 60; }
+    },
+    {
+        name: "16-mine",
+        about: "Глубокая шахта",
+        setup(g) { g.enterZone("mine", null, true); g.clock.minute = 12 * 60; }
+    },
+    {
         name: "08-shore-afternoon",
         about: "Лазурный берег",
         setup(g) {

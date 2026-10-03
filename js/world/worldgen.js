@@ -154,6 +154,12 @@ export function generateZone(zoneId, worldSeed = 1) {
             const hgt = fbm2D(seed, x, y, { octaves: 4, scale: 26 });
             const wet = fbm2D(seed + 1013, x, y, { octaves: 3, scale: 18 });
             let tile;
+            if (biome.cave) {
+                // Underground: galleries of rock floor between walls of stone.
+                tile = hgt > 0.62 ? T.CLIFF : (wet > 0.62 ? T.GRAVEL : T.STONE);
+                map.data[y * def.w + x] = tile;
+                continue;
+            }
             if (hgt < biome.water * 0.55) tile = T.DEEP;
             else if (hgt < biome.water) tile = T.WATER;
             else if (hgt > 0.80 && biome.rocks > 0.1) tile = T.CLIFF;
@@ -291,6 +297,23 @@ function scatterProps(zone, rng, biome) {
                 tile === T.PLANK || tile === T.COBBLE) continue;
             const forest = fbm2D(seed, x, y, { octaves: 3, scale: 14 });
             const jitter = rng.next();
+
+            // Underground there is nothing but stone, ore and cave mushrooms.
+            if (biome.cave) {
+                if (jitter > 1 - biome.rocks * 0.6) {
+                    const ore = rng.chance(0.55)
+                        ? rng.weighted([["coal", 5], ["iron", 4], ["copper", 4], ["gem", 1]])
+                        : null;
+                    addProp(zone, ore ? "ore_rock" : "rock", x, y, {
+                        variant: rng.int(0, 2), ore, hp: ore ? 5 : 3, yields: ore || "stone"
+                    });
+                } else if (rng.chance(0.012)) {
+                    addProp(zone, "mushroom_patch", x, y, { solid: false, amount: rng.int(1, 3) });
+                } else if (rng.chance(0.006)) {
+                    addProp(zone, "burnt_beam", x, y, { variant: rng.int(0, 1) });  // old pit prop
+                }
+                continue;
+            }
 
             // Trees cluster where the forest mask is high.
             if (tile !== T.WATER && jitter < biome.trees * (0.35 + forest * 1.5)) {

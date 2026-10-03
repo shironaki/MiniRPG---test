@@ -177,6 +177,19 @@ test("solid props block at their trunk, low clutter does not block at all", () =
     if (herb) assert.not(z.propSolidAt(herb.x, herb.y), "you can walk through herbs");
 });
 
+test("ore belongs underground and in the mountains, not in the meadow", () => {
+    const surface = ["meadow", "forest", "shore", "ashfall"];
+    for (const id of surface) {
+        const z = generateZone(id, 11);
+        const ore = z.objects.filter((o) => o.kind === "ore_rock");
+        assert.eq(ore.length, 0, `${id}: ore has no business lying on the grass`);
+    }
+    const mine = generateZone("mine", 11);
+    assert.gt(mine.objects.filter((o) => o.kind === "ore_rock").length, 10, "the mine must be full of ore");
+    assert.eq(mine.objects.filter((o) => ["pine", "oak", "birch", "willow"].includes(o.kind)).length, 0,
+        "no trees grow underground");
+});
+
 test("you can squeeze between two props that are a tile apart", () => {
     const z = generateZone("forest", 4);
     // Any two solid props sitting in neighbouring tiles must leave a gap

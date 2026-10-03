@@ -656,6 +656,7 @@ export class Game {
                 : null,
             interact: this.interact ? { target: this.interact, label: this.interactLabel(this.interact) } : null,
             playerLight: activeDef && activeDef.light ? activeDef.light : 0,
+            underground: !!this.zone.def.underground,
             entities: []
         }, 1 / 60);
     }

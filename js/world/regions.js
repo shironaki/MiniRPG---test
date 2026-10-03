@@ -61,6 +61,11 @@ export const BIOMES = {
         ground: "moss", water: 0.14, trees: 0.3, rocks: 0.05, bushes: 0.14,
         palette: "sacred", temp: 1, ambient: "#4a6b4a"
     },
+    cave: {
+        name: "Шахта",
+        ground: "stone", water: 0, trees: 0, rocks: 0.5, bushes: 0.03,
+        palette: "stone", temp: -3, ambient: "#2b2a28", cave: true
+    },
     pass: {
         name: "Перевал",
         ground: "snow", water: 0.04, trees: 0.05, rocks: 0.3, bushes: 0.01,
@@ -160,7 +165,7 @@ export const ZONES = {
         links: [{ edge: "south", from: 24, to: 32, target: "highland", label: "Гряда" }]
     },
     mine: {
-        id: "mine", name: "Глубокая шахта", biome: "highland", w: 56, h: 48,
+        id: "mine", name: "Глубокая шахта", biome: "cave", w: 56, h: 48,
         act: 2, danger: 4, unlocked: true, underground: true,
         story: "Штольня, которую закрыли не зря.",
         links: []

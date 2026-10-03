@@ -310,7 +310,13 @@ export class Renderer {
         }
         if (noon > 0 && weather === "clear") {
             ctx.globalCompositeOperation = "lighter";
-            ctx.fillStyle = `rgba(96,86,52,${0.09 * noon})`;
+            ctx.fillStyle = `rgba(112,96,56,${0.11 * noon})`;
+            ctx.fillRect(0, 0, W, H);
+            // Sunlight comes from the upper left: let the frame feel it.
+            const sun = ctx.createLinearGradient(0, 0, W * 0.9, H);
+            sun.addColorStop(0, `rgba(255,236,186,${0.1 * noon})`);
+            sun.addColorStop(0.55, "rgba(255,236,186,0)");
+            ctx.fillStyle = sun;
             ctx.fillRect(0, 0, W, H);
         }
         // Daylight itself: a bright sky bounce that makes noon read as noon
@@ -381,6 +387,12 @@ export class Renderer {
                 this.lightMap.add(s.x, s.y, fire.lightRadius * cam.zoom,
                     { intensity: 0.55 + fire.intensity * 0.45, warmth: 0.9, flicker: 1 });
             }
+        }
+        // Underground the eye adjusts: a weak glow so galleries are readable
+        // even without a torch (a torch is still far brighter).
+        if (state.underground) {
+            const s2 = cam.worldToScreen(state.player.x, state.player.y - 8);
+            this.lightMap.add(s2.x, s2.y, 70 * cam.zoom, { intensity: 0.42, warmth: 0.35 });
         }
         if (state.playerLight > 0) {
             const s = cam.worldToScreen(state.player.x, state.player.y - 8);

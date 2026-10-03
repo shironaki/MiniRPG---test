@@ -10,7 +10,7 @@
 
 /** Ambient colour and strength for a given moment of day. */
 export function ambientFor(daylight, weather = "clear", underground = false) {
-    if (underground) return { color: "#05070e", alpha: 0.82 };
+    if (underground) return { color: "#0a0b10", alpha: 0.7 };
     // daylight: 0 = midnight, 1 = full day.
     if (daylight >= 0.98) {
         const w = { rain: 0.1, storm: 0.18, fog: 0.08, snow: 0.06 }[weather] || 0;

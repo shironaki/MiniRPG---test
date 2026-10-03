@@ -41,139 +41,227 @@ export function drawCharacter(ctx, p) {
     const dir = p.dir || "down";
     const t = p.anim || 0;
     const moving = !!p.moving;
-    const breathe = Math.sin((p.idleTime || 0) * 1.8) * 0.3;
-    const bob = moving ? Math.abs(Math.sin(t)) * 1.1 : breathe;
-    const legSwing = moving ? Math.sin(t) * 3.4 : 0;
+    const idle = p.idleTime || 0;
+
+    /* ---- the walk cycle ------------------------------------------------
+     * One cycle = one full stride. Everything is driven off `phase`:
+     * the body rises twice per stride (contact → passing), the legs swing
+     * in opposite phase, the arms counter-swing, and the torso leans a
+     * little into the direction of travel.
+     */
+    const phase = t;
+    const stride = moving ? Math.sin(phase) : 0;
+    const bob = moving ? Math.abs(Math.sin(phase)) * 1.3 - 0.4
+                       : Math.sin(idle * 1.8) * 0.3;
+    const lean = moving ? Math.cos(phase * 2) * 0.35 : 0;
     const side = dir === "left" ? -1 : 1;
-    const swing = p.actionTimer > 0 ? Math.sin(Math.min(1, 1 - p.actionTimer / 0.35) * Math.PI) : 0;
+    const back = dir === "up";
+    const sideView = dir === "left" || dir === "right";
+
+    // Action swing: a quick wind-up, then a hard downward strike.
+    const act = p.actionTimer > 0 ? Math.min(1, 1 - p.actionTimer / 0.35) : 0;
+    const swing = act > 0 ? (act < 0.3 ? -(act / 0.3) * 0.45
+                                       : Math.sin(((act - 0.3) / 0.7) * Math.PI) * 1.15) : 0;
+    const recoil = swing > 0.6 ? (swing - 0.6) * 1.6 : 0;   // body follows the blow
 
     const skinDark = shadeHex(look.skin, -28);
+    const skinLit = shadeHex(look.skin, 16);
     const shirtDark = shadeHex(look.shirt, -22);
     const shirtLit = shadeHex(look.shirt, 20);
     const pantsDark = shadeHex(look.pants, -16);
 
-    // Contact shadow — tighter and darker than a generic blob.
+    // Contact shadow — shrinks as the body lifts off the ground.
+    const lift = Math.max(0, bob);
     ctx.fillStyle = "rgba(10,9,8,0.32)";
-    ctx.beginPath(); ctx.ellipse(0.5, 0, 6.6, 2.7, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(10,9,8,0.18)";
-    ctx.beginPath(); ctx.ellipse(0.5, 0, 8.6, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0.5, 0, 6.6 - lift * 0.5, 2.7 - lift * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(10,9,8,0.16)";
+    ctx.beginPath(); ctx.ellipse(0.5, 0, 8.6 - lift * 0.5, 3.5 - lift * 0.3, 0, 0, Math.PI * 2); ctx.fill();
 
-    const back = (dir === "up");
+    // Far arm and the tool held in it go behind the body.
+    const armTop = -16.5 + bob, armLen = 7.5;
+    const drawArm = (x, yOff, far, xOff = 0) => {
+        ctx.fillStyle = far ? shadeHex(look.shirt, -34) : shirtDark;
+        ctx.fillRect(x, armTop, 2.6, 3);
+        ctx.fillStyle = far ? shadeHex(look.skin, -34) : look.skin;
+        ctx.fillRect(x + xOff, armTop + 3 + yOff, 2.6, armLen - 3 - Math.abs(xOff) * 0.5);
+        ctx.fillStyle = far ? shadeHex(look.skin, -48) : skinDark;
+        ctx.fillRect(x + xOff, armTop + 3 + yOff, 0.9, armLen - 3 - Math.abs(xOff) * 0.5);
+    };
 
-    // Tool in the far hand goes behind the body when facing away.
+    // Far arm: counter-swings the near leg, so the walk reads from the side.
+    if (sideView) drawArm(side > 0 ? -2.2 : -0.4, Math.abs(stride) * 0.4, true, -side * stride * 2.4);
     if (p.tool && back) drawHeldTool(ctx, p.tool, dir, side, swing, bob, true);
 
-    /* ---- legs ---------------------------------------------------------- */
-    const legL = -9 + bob, legH = 9;
-    ctx.fillStyle = look.pants;
-    ctx.fillRect(-3.9, legL, 3.5, legH - Math.max(0, legSwing) * 0.25);
-    ctx.fillRect(0.5, legL, 3.5, legH - Math.max(0, -legSwing) * 0.25);
-    ctx.fillStyle = pantsDark;
-    ctx.fillRect(-3.9, legL, 1.2, legH - Math.max(0, legSwing) * 0.25);
-    ctx.fillRect(2.8, legL, 1.2, legH - Math.max(0, -legSwing) * 0.25);
-    // Boots.
-    ctx.fillStyle = "#3a2d22";
-    ctx.fillRect(-4.3, -2 + bob + Math.max(0, legSwing) * 0.2, 4.4, 2.2);
-    ctx.fillRect(0.2, -2 + bob + Math.max(0, -legSwing) * 0.2, 4.4, 2.2);
-    ctx.fillStyle = "#241b14";
-    ctx.fillRect(-4.3, -0.4 + bob + Math.max(0, legSwing) * 0.2, 4.4, 0.8);
-    ctx.fillRect(0.2, -0.4 + bob + Math.max(0, -legSwing) * 0.2, 4.4, 0.8);
+    /* ---- legs ----------------------------------------------------------
+     * In side view the legs swing forward/back; head-on they lift in turn.
+     */
+    const hipY = -9 + bob, legH = 9;
+    const footLift = (ph) => Math.max(0, Math.sin(ph)) * 1.6;
+    if (sideView) {
+        // Even standing still the far leg peeks out behind the near one,
+        // otherwise the side view reads as a one-legged pole.
+        const fwd = side * stride * 3.4;
+        const rest = side * 2.6;
+        const legs = [
+            { x: -1.6 - fwd - rest, lift: footLift(phase + Math.PI), far: true },
+            { x: -1.6 + fwd, lift: footLift(phase), far: false }
+        ];
+        for (const l of legs) {
+            const knee = l.lift * 0.9;                       // the lifted leg bends
+            ctx.fillStyle = l.far ? shadeHex(look.pants, -34) : shadeHex(look.pants, 6);
+            ctx.fillRect(l.x, hipY, 3.2, legH - knee);       // thigh + shin
+            ctx.fillStyle = l.far ? shadeHex(look.pants, -46) : pantsDark;
+            ctx.fillRect(l.x, hipY, 1, legH - knee);
+            if (!l.far) {                                    // gap between the legs
+                ctx.fillStyle = "rgba(0,0,0,0.25)";
+                ctx.fillRect(l.x - 0.7, hipY, 0.7, legH - knee);
+            }
+            ctx.fillStyle = l.far ? "#2e241b" : "#3a2d22";   // boot, toe pointing forward
+            ctx.fillRect(l.x - (side > 0 ? 0.3 : 1.1), -2 + bob - knee, 4.5, 2.2);
+            ctx.fillStyle = l.far ? "#1d160f" : "#241b14";
+            ctx.fillRect(l.x - (side > 0 ? 0.3 : 1.1), -0.4 + bob - knee, 4.5, 0.8);
+        }
+    } else {
+        const lL = footLift(phase), lR = footLift(phase + Math.PI);
+        const legs = [[-3.9, lL], [0.5, lR]];
+        for (const [x, l] of legs) {
+            ctx.fillStyle = look.pants;
+            ctx.fillRect(x, hipY, 3.5, legH - l);
+            ctx.fillStyle = pantsDark;
+            ctx.fillRect(x, hipY, 1.2, legH - l);
+            ctx.fillStyle = "#3a2d22";
+            ctx.fillRect(x - 0.4, -2 + bob - l, 4.4, 2.2);
+            ctx.fillStyle = "#241b14";
+            ctx.fillRect(x - 0.4, -0.4 + bob - l, 4.4, 0.8);
+        }
+    }
 
-    /* ---- torso --------------------------------------------------------- */
+    /* ---- torso (leans with the stride and with the swing) --------------- */
+    ctx.save();
+    ctx.translate(0, hipY);
+    ctx.rotate((lean * 0.03) + side * recoil * 0.12);
+    ctx.translate(0, -hipY);
+
     const torsoTop = -18 + bob, torsoH = 10;
+    const torsoW = sideView ? 8.4 : 10, torsoX = sideView ? -4.2 : -5;
     ctx.fillStyle = look.shirt;
-    ctx.fillRect(-5, torsoTop, 10, torsoH);
+    ctx.fillRect(torsoX, torsoTop, torsoW, torsoH);
     ctx.fillStyle = shirtLit;                              // light from upper-left
-    ctx.fillRect(-5, torsoTop, 2.4, torsoH - 2);
+    ctx.fillRect(torsoX, torsoTop, 2.2, torsoH - 2);
     ctx.fillStyle = shirtDark;
-    ctx.fillRect(2.8, torsoTop, 2.2, torsoH);
+    ctx.fillRect(torsoX + torsoW - 2.2, torsoTop, 2.2, torsoH);
     ctx.fillStyle = "rgba(0,0,0,0.18)";                    // shoulder line
-    ctx.fillRect(-5, torsoTop, 10, 1);
-    // Belt.
+    ctx.fillRect(torsoX, torsoTop, torsoW, 1);
+    if (back) {                                            // seam and shoulder blades
+        ctx.fillStyle = "rgba(0,0,0,0.12)";
+        ctx.fillRect(-0.5, torsoTop + 1, 1, torsoH - 3);
+        ctx.fillStyle = shirtLit;
+        ctx.fillRect(-4, torsoTop + 1.6, 3, 1.1);
+        ctx.fillRect(1, torsoTop + 1.6, 3, 1.1);
+    } else if (!sideView) {
+        ctx.fillStyle = shirtDark;                         // collar
+        ctx.fillRect(-1.8, torsoTop, 3.6, 1.6);
+    }
+    // Belt with a buckle.
     ctx.fillStyle = "#4a3722";
-    ctx.fillRect(-5, torsoTop + torsoH - 2, 10, 2);
+    ctx.fillRect(torsoX, torsoTop + torsoH - 2, torsoW, 2);
     ctx.fillStyle = "#8a6a3c";
-    ctx.fillRect(-1, torsoTop + torsoH - 2, 2, 2);
+    ctx.fillRect(sideView ? side * 1.6 - 1 : -1, torsoTop + torsoH - 1.8, 2, 1.6);
     if (look.cloak) {
         ctx.fillStyle = look.cloak;
-        ctx.fillRect(-6.2, torsoTop - 0.5, 12.4, 7.5);
+        ctx.fillRect(torsoX - 1.2, torsoTop - 0.5, torsoW + 2.4, 7.5);
         ctx.fillStyle = "rgba(0,0,0,0.2)";
-        ctx.fillRect(2.6, torsoTop - 0.5, 3.6, 7.5);
+        ctx.fillRect(torsoX + torsoW - 1.6, torsoTop - 0.5, 3.6, 7.5);
     }
 
-    /* ---- arms ---------------------------------------------------------- */
-    const armTop = torsoTop + 1.5, armLen = 7.5;
-    const armSwing = moving ? Math.sin(t) * 1.4 : 0;
-    ctx.fillStyle = look.skin;
-    if (dir === "left" || dir === "right") {
-        // Near arm only; it reaches forward when acting.
-        const ax = side > 0 ? 3.6 : -6.2;
+    /* ---- near arm ------------------------------------------------------- */
+    if (sideView) {
+        const ax = side > 0 ? 2.2 : -4.8;
         ctx.fillStyle = shirtDark;
         ctx.fillRect(ax, armTop, 2.6, 3);
+        const xOff = side * (stride * 2.4 + swing * 2.2);
+        const len = armLen - 3 - Math.max(0, swing) * 1.5 - Math.abs(xOff) * 0.4;
         ctx.fillStyle = look.skin;
-        ctx.fillRect(ax + side * swing * 1.4, armTop + 3, 2.6, armLen - 3 - swing * 2.5);
-    } else {
-        ctx.fillStyle = shirtDark;
-        ctx.fillRect(-7.2, armTop, 2.6, 3);
-        ctx.fillRect(4.6, armTop, 2.6, 3);
-        ctx.fillStyle = look.skin;
-        ctx.fillRect(-7.2, armTop + 3 + armSwing, 2.6, armLen - 3);
+        ctx.fillRect(ax + xOff, armTop + 3 - swing * 1.5, 2.6, len);
         ctx.fillStyle = skinDark;
-        ctx.fillRect(-7.2, armTop + 3 + armSwing, 1, armLen - 3);
-        ctx.fillStyle = look.skin;
-        ctx.fillRect(4.6, armTop + 3 - armSwing - swing * 2.5, 2.6, armLen - 3);
+        ctx.fillRect(ax + xOff, armTop + 3 - swing * 1.5, 0.9, len);
+    } else {
+        drawArm(-7.2, (back ? -1 : 1) * stride * 1.5, false);
+        drawArm(4.6, (back ? 1 : -1) * stride * 1.5 - swing * 2.2, false);
     }
 
-    /* ---- head ---------------------------------------------------------- */
-    const headY = -26.5 + bob;
+    /* ---- head ----------------------------------------------------------- */
+    const headY = -26.5 + bob + Math.abs(stride) * 0.2;
     const headH = 8.6;
+    const headX = sideView ? side * 0.6 : 0;
     ctx.fillStyle = "rgba(0,0,0,0.16)";                     // neck shadow
     ctx.fillRect(-2.4, headY + headH - 0.6, 4.8, 1.6);
     ctx.fillStyle = look.skin;
-    ctx.fillRect(-4.2, headY, 8.4, headH);
+    ctx.fillRect(headX - 4.2, headY, 8.4, headH);
     ctx.fillStyle = skinDark;                               // cheek in shade
-    ctx.fillRect(2.4, headY + 1, 1.8, headH - 1);
-    ctx.fillStyle = shadeHex(look.skin, 16);
-    ctx.fillRect(-4.2, headY + 1, 1.4, headH - 2);
+    ctx.fillRect(headX + 2.4, headY + 1, 1.8, headH - 1);
+    ctx.fillStyle = skinLit;
+    ctx.fillRect(headX - 4.2, headY + 1, 1.4, headH - 2);
+    if (back) {                                            // nape, not a bare box
+        ctx.fillStyle = skinDark;
+        ctx.fillRect(headX - 4.2, headY + headH - 2.4, 8.4, 2.4);
+    }
 
     // Hair.
     const hairDark = shadeHex(look.hair, -22);
+    const hairLit = shadeHex(look.hair, 24);
     ctx.fillStyle = look.hair;
-    if (dir === "up") {
-        ctx.fillRect(-4.6, headY - 0.8, 9.2, headH - 0.5);
+    if (back) {
+        ctx.fillRect(headX - 4.6, headY - 0.8, 9.2, headH - 1.4);
         ctx.fillStyle = hairDark;
-        ctx.fillRect(2.2, headY - 0.8, 2.4, headH - 0.5);
+        ctx.fillRect(headX + 2.2, headY - 0.8, 2.4, headH - 1.4);
+        ctx.fillStyle = hairLit;
+        ctx.fillRect(headX - 3.6, headY - 0.4, 3.4, 1.4);
+        ctx.fillStyle = hairDark;                           // hair falls over the nape
+        ctx.fillRect(headX - 3, headY + headH - 2.2, 6, 1.4);
     } else {
-        ctx.fillRect(-4.6, headY - 0.8, 9.2, 3.6);
+        ctx.fillRect(headX - 4.6, headY - 0.8, 9.2, 3.6);
         ctx.fillStyle = hairDark;
-        ctx.fillRect(2.4, headY - 0.8, 2.2, 3.6);
+        ctx.fillRect(headX + 2.4, headY - 0.8, 2.2, 3.6);
         ctx.fillStyle = look.hair;
         if (look.hairStyle === "long") {
-            ctx.fillRect(-5.4, headY, 1.8, 7.5);
-            ctx.fillRect(3.6, headY, 1.8, 7.5);
+            ctx.fillRect(headX - 5.4, headY, 1.8, 7.5);
+            ctx.fillRect(headX + 3.6, headY, 1.8, 7.5);
         } else {
-            ctx.fillRect(-5, headY + 0.6, 1.2, 2.6);
-            ctx.fillRect(3.8, headY + 0.6, 1.2, 2.6);
+            ctx.fillRect(headX - 5, headY + 0.6, 1.2, 2.6);
+            ctx.fillRect(headX + 3.8, headY + 0.6, 1.2, 2.6);
         }
-        ctx.fillStyle = shadeHex(look.hair, 24);            // highlight strand
-        ctx.fillRect(-3.6, headY - 0.4, 3, 1.1);
+        ctx.fillStyle = hairLit;                            // highlight strand
+        ctx.fillRect(headX - 3.6, headY - 0.4, 3, 1.1);
     }
 
-    // Face.
-    if (dir !== "up") {
+    // Face — with a blink every few seconds.
+    if (!back) {
+        const blink = (idle % 4.1) < 0.12;
         ctx.fillStyle = "#2a211a";
         if (dir === "left") {
-            ctx.fillRect(-3.4, headY + 4.6, 1.5, 1.7);
-            ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(-4.2, headY + 7, 2.4, 0.9);
+            if (blink) ctx.fillRect(headX - 3.4, headY + 5.4, 1.5, 0.7);
+            else ctx.fillRect(headX - 3.4, headY + 4.6, 1.5, 1.7);
+            ctx.fillStyle = skinDark; ctx.fillRect(headX - 4.4, headY + 4.4, 1, 1.6);  // nose
+            ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(headX - 4, headY + 7, 2.4, 0.9);
         } else if (dir === "right") {
-            ctx.fillRect(1.9, headY + 4.6, 1.5, 1.7);
-            ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(1.8, headY + 7, 2.4, 0.9);
+            if (blink) ctx.fillRect(headX + 1.9, headY + 5.4, 1.5, 0.7);
+            else ctx.fillRect(headX + 1.9, headY + 4.6, 1.5, 1.7);
+            ctx.fillStyle = skinDark; ctx.fillRect(headX + 3.6, headY + 4.4, 1, 1.6);
+            ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(headX + 1.6, headY + 7, 2.4, 0.9);
         } else {
-            ctx.fillRect(-2.8, headY + 4.6, 1.6, 1.7);
-            ctx.fillRect(1.2, headY + 4.6, 1.6, 1.7);
-            ctx.fillStyle = "rgba(0,0,0,0.16)"; ctx.fillRect(-1, headY + 7.2, 2, 0.8);
+            if (blink) {
+                ctx.fillRect(headX - 2.8, headY + 5.4, 1.6, 0.7);
+                ctx.fillRect(headX + 1.2, headY + 5.4, 1.6, 0.7);
+            } else {
+                ctx.fillRect(headX - 2.8, headY + 4.6, 1.6, 1.7);
+                ctx.fillRect(headX + 1.2, headY + 4.6, 1.6, 1.7);
+            }
+            ctx.fillStyle = "rgba(0,0,0,0.16)"; ctx.fillRect(headX - 1, headY + 7.2, 2, 0.8);
         }
     }
+
+    ctx.restore();
 
     // Tool in the near hand, in front of the body.
     if (p.tool && !back) drawHeldTool(ctx, p.tool, dir, side, swing, bob, false);
